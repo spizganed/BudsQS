@@ -18,7 +18,9 @@
 
     <application
         android:allowBackup="true"
-        android:label="Buds QS"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar">
 
@@ -41,7 +43,7 @@
             android:name=".ui.AncTileService"
             android:exported="true"
             android:icon="@drawable/ic_anc_tile"
-            android:label="Buds ANC"
+            android:label="QuickBuds ANC"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
@@ -59,7 +61,6 @@
             </intent-filter>
         </receiver>
 
-        <!-- Widget provider — ONLY handles APPWIDGET_UPDATE, no custom actions -->
         <receiver
             android:name=".widget.AncWidgetProvider"
             android:exported="true">
@@ -71,7 +72,6 @@
                 android:resource="@xml/widget_anc_info" />
         </receiver>
 
-        <!-- Widget action receiver — handles the button taps -->
         <receiver
             android:name=".widget.WidgetActionReceiver"
             android:exported="true">

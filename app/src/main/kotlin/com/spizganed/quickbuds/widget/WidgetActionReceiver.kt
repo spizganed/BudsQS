@@ -11,53 +11,71 @@ class WidgetActionReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
+        if (action == WidgetActions.ACTION_NOOP) return
+
         Log.d("BudsWidget", "[RX] Action: $action")
 
-        // Determine the SHORT action name that BudsService expects
-        val shortAction = when (action) {
-            WidgetActions.ACTION_ANC_CYCLE -> "ANC_CYCLE"
-            WidgetActions.ACTION_TRANS -> "TRANS"
-            WidgetActions.ACTION_OFF -> "OFF"
-            WidgetActions.ACTION_GAME_TOGGLE -> "GAME_TOGGLE"
+        val state = WidgetStateStore.read(context)
+        var shortAction: String? = null
+        var sendAncMode: String = state.ancMode
+
+        when (action) {
+            WidgetActions.ACTION_ANC_SELECT -> {
+                val target = intent.getStringExtra(WidgetActions.EXTRA_ANC_TARGET) ?: return
+                when (target) {
+                    "off"   -> { state.ancMode = "Off";          shortAction = "OFF" }
+                    "trans" -> { state.ancMode = "Transparency"; shortAction = "TRANS" }
+                    "low"   -> { state.ancMode = "ANC-Light";    shortAction = "ANC_CYCLE" }
+                    "med"   -> { state.ancMode = "ANC-Medium";   shortAction = "ANC_CYCLE" }
+                    "high"  -> { state.ancMode = "ANC-Deep";     shortAction = "ANC_CYCLE" }
+                }
+                sendAncMode = state.ancMode
+            }
+            WidgetActions.ACTION_GAME_TOGGLE -> {
+                state.gameMode = !state.gameMode
+                shortAction = "GAME_TOGGLE"
+            }
+            WidgetActions.ACTION_ANC_CYCLE -> {
+                state.ancMode = when (state.ancMode) {
+                    "Off" -> "ANC-Light"
+                    "ANC-Light" -> "ANC-Medium"
+                    "ANC-Medium" -> "ANC-Deep"
+                    "ANC-Deep" -> "ANC-Light"
+                    "Transparency" -> "ANC-Light"
+                    else -> "ANC-Light"
+                }
+                shortAction = "ANC_CYCLE"
+                sendAncMode = state.ancMode
+            }
+            WidgetActions.ACTION_TRANS -> {
+                state.ancMode = "Transparency"; shortAction = "TRANS"
+            }
+            WidgetActions.ACTION_OFF -> {
+                state.ancMode = "Off"; shortAction = "OFF"
+            }
             else -> {
                 Log.d("BudsWidget", "[RX] Unknown action, ignoring")
                 return
             }
         }
 
-        val state = WidgetStateStore.read(context)
-        when (shortAction) {
-            "ANC_CYCLE" -> {
-                state.ancMode = when (state.ancMode) {
-                    "ANC-Deep" -> "ANC-Medium"
-                    "ANC-Medium" -> "ANC-Light"
-                    "ANC-Light" -> "ANC-Smart"
-                    else -> "ANC-Deep"
-                }
-            }
-            "TRANS" -> state.ancMode = "Transparency"
-            "OFF" -> state.ancMode = "Off"
-            "GAME_TOGGLE" -> state.gameMode = !state.gameMode
-        }
-        Log.d("BudsWidget", "[RX] New state: ${state.ancMode} game=${state.gameMode}")
         WidgetStateStore.write(context, state)
         AncWidgetProvider.refreshAll(context)
 
-        // Send a local broadcast with the SHORT action name
+        val finalShort = shortAction ?: return
+
         val localIntent = Intent(BudsService.ACTION_WIDGET_COMMAND).apply {
-            putExtra(BudsService.EXTRA_WIDGET_ACTION, shortAction)  // <-- short name
-            putExtra(BudsService.EXTRA_WIDGET_ANC_MODE, state.ancMode)
+            putExtra(BudsService.EXTRA_WIDGET_ACTION, finalShort)
+            putExtra(BudsService.EXTRA_WIDGET_ANC_MODE, sendAncMode)
             putExtra(BudsService.EXTRA_WIDGET_GAME_MODE, state.gameMode)
         }
         context.sendBroadcast(localIntent)
-        Log.d("BudsWidget", "[RX] Sent broadcast with action=$shortAction")
 
-        // Fallback: startService in case the service was cold-started
         try {
             val serviceIntent = Intent(context, BudsService::class.java).apply {
                 this.action = BudsService.ACTION_WIDGET_COMMAND
-                putExtra(BudsService.EXTRA_WIDGET_ACTION, shortAction)  // <-- short name
-                putExtra(BudsService.EXTRA_WIDGET_ANC_MODE, state.ancMode)
+                putExtra(BudsService.EXTRA_WIDGET_ACTION, finalShort)
+                putExtra(BudsService.EXTRA_WIDGET_ANC_MODE, sendAncMode)
                 putExtra(BudsService.EXTRA_WIDGET_GAME_MODE, state.gameMode)
             }
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
@@ -66,7 +84,7 @@ class WidgetActionReceiver : BroadcastReceiver() {
                 context.startService(serviceIntent)
             }
         } catch (e: Exception) {
-            Log.e("BudsWidget", "[RX] startService failed (ok if broadcast handled it)", e)
+            Log.e("BudsWidget", "[RX] startService failed", e)
         }
     }
 }

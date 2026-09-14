@@ -1,86 +1,272 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="8dp"
-    android:background="#111111">
+    android:background="@drawable/widget_outer_bg">
 
-    <!-- Row 1: ANC + Trans -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:orientation="horizontal">
-
-        <Button
-            android:id="@+id/widgetAncBtn"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:layout_marginEnd="4dp"
-            android:text="ANC"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:background="#333333" />
-
-        <Button
-            android:id="@+id/widgetTransBtn"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:layout_marginStart="4dp"
-            android:text="Trans"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:background="#333333" />
-    </LinearLayout>
-
-    <!-- Row 2: Off + Game -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_weight="3"
         android:orientation="horizontal"
-        android:layout_marginTop="4dp">
+        android:padding="14dp"
+        android:background="@drawable/widget_card_bg"
+        android:gravity="center_vertical">
 
-        <Button
-            android:id="@+id/widgetOffBtn"
-            android:layout_width="0dp"
+        <LinearLayout
+            android:layout_width="90dp"
             android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:layout_marginEnd="4dp"
-            android:text="Off"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:background="#333333" />
+            android:orientation="vertical"
+            android:gravity="center">
 
-        <Button
-            android:id="@+id/widgetGameBtn"
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="horizontal"
+                android:gravity="center">
+
+                <ImageView
+                    android:id="@+id/widget_bud_left"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_bud_left"
+                    android:contentDescription="@string/widget_battery_left" />
+
+                <ImageView
+                    android:id="@+id/widget_bud_right"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_bud_right"
+                    android:contentDescription="@string/widget_battery_right" />
+            </LinearLayout>
+
+            <ImageView
+                android:id="@+id/widget_bud_case"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:scaleType="fitCenter"
+                android:paddingTop="2dp"
+                android:src="@drawable/ic_case"
+                android:contentDescription="@string/widget_battery_case" />
+        </LinearLayout>
+
+        <LinearLayout
             android:layout_width="0dp"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:layout_marginStart="4dp"
-            android:text="Game"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:background="#333333" />
+            android:orientation="vertical"
+            android:paddingStart="14dp">
+
+            <LinearLayout
+                android:id="@+id/widget_row_left"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="8dp">
+
+                <TextView
+                    android:layout_width="14dp"
+                    android:layout_height="wrap_content"
+                    android:text="@string/widget_battery_left"
+                    android:textColor="@color/widget_text_primary"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <ProgressBar
+                    android:id="@+id/widget_bar_left"
+                    style="@android:style/Widget.ProgressBar.Horizontal"
+                    android:layout_width="0dp"
+                    android:layout_height="6dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="10dp"
+                    android:layout_marginEnd="8dp"
+                    android:max="100"
+                    android:progress="0"
+                    android:progressDrawable="@drawable/widget_battery_bar" />
+
+                <TextView
+                    android:id="@+id/widget_text_left"
+                    android:layout_width="30dp"
+                    android:layout_height="wrap_content"
+                    android:text=""
+                    android:textColor="@color/widget_text_primary"
+                    android:textSize="11sp"
+                    android:gravity="end" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/widget_row_right"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="8dp">
+
+                <TextView
+                    android:layout_width="14dp"
+                    android:layout_height="wrap_content"
+                    android:text="@string/widget_battery_right"
+                    android:textColor="@color/widget_text_primary"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <ProgressBar
+                    android:id="@+id/widget_bar_right"
+                    style="@android:style/Widget.ProgressBar.Horizontal"
+                    android:layout_width="0dp"
+                    android:layout_height="6dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="10dp"
+                    android:layout_marginEnd="8dp"
+                    android:max="100"
+                    android:progress="0"
+                    android:progressDrawable="@drawable/widget_battery_bar" />
+
+                <TextView
+                    android:id="@+id/widget_text_right"
+                    android:layout_width="30dp"
+                    android:layout_height="wrap_content"
+                    android:text=""
+                    android:textColor="@color/widget_text_primary"
+                    android:textSize="11sp"
+                    android:gravity="end" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/widget_row_case"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:layout_width="14dp"
+                    android:layout_height="wrap_content"
+                    android:text="@string/widget_battery_case"
+                    android:textColor="@color/widget_text_primary"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <ProgressBar
+                    android:id="@+id/widget_bar_case"
+                    style="@android:style/Widget.ProgressBar.Horizontal"
+                    android:layout_width="0dp"
+                    android:layout_height="6dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="10dp"
+                    android:layout_marginEnd="8dp"
+                    android:max="100"
+                    android:progress="0"
+                    android:progressDrawable="@drawable/widget_battery_bar" />
+
+                <TextView
+                    android:id="@+id/widget_text_case"
+                    android:layout_width="30dp"
+                    android:layout_height="wrap_content"
+                    android:text=""
+                    android:textColor="@color/widget_text_primary"
+                    android:textSize="11sp"
+                    android:gravity="end" />
+            </LinearLayout>
+        </LinearLayout>
     </LinearLayout>
 
-    <!-- Battery row -->
-    <TextView
-        android:id="@+id/widgetBattery"
+    <LinearLayout
+        android:id="@+id/widget_anc_segments"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="L-- R--"
-        android:textColor="#CCCCCC"
-        android:textSize="11sp"
-        android:gravity="center"
-        android:paddingTop="6dp"
-        android:typeface="monospace" />
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal"
+        android:padding="3dp"
+        android:background="@drawable/widget_segment_container">
+
+        <TextView android:id="@+id/widget_seg_off"
+            android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:gravity="center"
+            android:text="@string/widget_anc_off"
+            android:textColor="@color/widget_segment_text"
+            android:textSize="11sp" android:textStyle="bold"
+            android:background="@drawable/widget_segment_bg" />
+
+        <TextView android:id="@+id/widget_seg_trans"
+            android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:gravity="center"
+            android:text="@string/widget_anc_trans"
+            android:textColor="@color/widget_segment_text"
+            android:textSize="11sp" android:textStyle="bold"
+            android:background="@drawable/widget_segment_bg" />
+
+        <TextView android:id="@+id/widget_seg_low"
+            android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:gravity="center"
+            android:text="@string/widget_anc_low"
+            android:textColor="@color/widget_segment_text"
+            android:textSize="11sp" android:textStyle="bold"
+            android:background="@drawable/widget_segment_bg" />
+
+        <TextView android:id="@+id/widget_seg_med"
+            android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:gravity="center"
+            android:text="@string/widget_anc_med"
+            android:textColor="@color/widget_segment_text"
+            android:textSize="11sp" android:textStyle="bold"
+            android:background="@drawable/widget_segment_bg" />
+
+        <TextView android:id="@+id/widget_seg_high"
+            android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:gravity="center"
+            android:text="@string/widget_anc_high"
+            android:textColor="@color/widget_segment_text"
+            android:textSize="11sp" android:textStyle="bold"
+            android:background="@drawable/widget_segment_bg" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/widget_game_row"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:background="@drawable/widget_card_bg"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/widget_game_mode_label"
+            android:textColor="@color/widget_text_primary"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/widget_game_switch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="56dp"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:gravity="center"
+            android:text="OFF"
+            android:textColor="@color/widget_text_primary"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:background="@drawable/widget_button_bg" />
+    </LinearLayout>
 
 </LinearLayout>

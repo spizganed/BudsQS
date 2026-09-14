@@ -3,4 +3,18 @@
     <color name="primary">#FF6200EE</color>
     <color name="on_primary">#FFFFFFFF</color>
     <color name="ic_launcher_background">#000000</color>
+
+    <color name="widget_bg_outer">#1A1A1A</color>
+    <color name="widget_bg_card">#242424</color>
+    <color name="widget_bg_button">#2E2E2E</color>
+    <color name="widget_bg_button_active">#D71921</color>
+    <color name="widget_text_primary">#FFFFFF</color>
+    <color name="widget_text_secondary">#8A8A8A</color>
+    <color name="widget_bar_track">#404040</color>
+    <color name="widget_bar_fill">#FFFFFF</color>
+
+    <color name="widget_segment_bg">#2E2E2E</color>
+    <color name="widget_segment_bg_active">#FFFFFF</color>
+    <color name="widget_segment_text">#8A8A8A</color>
+    <color name="widget_segment_text_active">#000000</color>
 </resources>

@@ -18,7 +18,12 @@ import android.os.Bundle
 import android.os.IBinder
 import android.view.View
 import android.view.ViewGroup
-import android.widget.*
+import android.widget.Button
+import android.widget.LinearLayout
+import android.widget.PopupMenu
+import android.widget.ScrollView
+import android.widget.TextView
+import android.widget.Toast
 import com.spizganed.quickbuds.R
 import com.spizganed.quickbuds.bluetooth.BudsConnectionManager
 import com.spizganed.quickbuds.bluetooth.BudsService
@@ -78,6 +83,23 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
         }
     }
 
+    private val storeListener: (WidgetStateStore.State) -> Unit = { state ->
+        val ancChanged = state.ancMode != activeAncMode
+        val gameChanged = state.gameMode != gameModeOn
+        if (ancChanged || gameChanged) {
+            activeAncMode = state.ancMode
+            gameModeOn = state.gameMode
+            updateAncButtons()
+            updateGameButtons()
+            appendStatus("Sync -> $activeAncMode (game=$gameModeOn)")
+        }
+        runOnUiThread {
+            batteryLeftText.text  = if (state.hasLeft())  "L: ${state.leftBattery}"  else "L: --"
+            batteryCaseText.text  = if (state.hasCase())  "C: ${state.caseBattery}"  else "C: --"
+            batteryRightText.text = if (state.hasRight()) "R: ${state.rightBattery}" else "R: --"
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -86,19 +108,24 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(serviceIntent)
         else startService(serviceIntent)
 
-        mainLayout = findViewById(R.id.mainLayout)
-        statusText = findViewById(R.id.statusText)
-        scroll = findViewById(R.id.scroll)
-        batteryLeftText = findViewById(R.id.batteryLeftText)
-        batteryCaseText = findViewById(R.id.batteryCaseText)
-        batteryRightText = findViewById(R.id.batteryRightText)
-        btnToggleLog = findViewById(R.id.btnToggleLog)
-        btnAncMode = findViewById(R.id.btnAncMode)
-        btnTransparency = findViewById(R.id.btnTransparency)
-        btnAncOff = findViewById(R.id.btnAncOff)
-        btnGameOn = findViewById(R.id.btnGameOn)
-        btnGameOff = findViewById(R.id.btnGameOff)
-        btnSettings = findViewById(R.id.btnSettings)
+        mainLayout = findViewById<LinearLayout>(R.id.mainLayout)
+        statusText = findViewById<TextView>(R.id.statusText)
+        scroll = findViewById<ScrollView>(R.id.scroll)
+        batteryLeftText = findViewById<TextView>(R.id.batteryLeftText)
+        batteryCaseText = findViewById<TextView>(R.id.batteryCaseText)
+        batteryRightText = findViewById<TextView>(R.id.batteryRightText)
+        btnToggleLog = findViewById<Button>(R.id.btnToggleLog)
+        btnAncMode = findViewById<Button>(R.id.btnAncMode)
+        btnTransparency = findViewById<Button>(R.id.btnTransparency)
+        btnAncOff = findViewById<Button>(R.id.btnAncOff)
+        btnGameOn = findViewById<Button>(R.id.btnGameOn)
+        btnGameOff = findViewById<Button>(R.id.btnGameOff)
+        btnSettings = findViewById<Button>(R.id.btnSettings)
+
+        WidgetStateStore.addListener(storeListener)
+        val initial = WidgetStateStore.read(this)
+        activeAncMode = initial.ancMode
+        gameModeOn = initial.gameMode
 
         val prefs = getSharedPreferences("BudsQSPrefs", Context.MODE_PRIVATE)
         currentTheme = prefs.getInt("theme", THEME_OLED)
@@ -119,14 +146,14 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
 
         btnTransparency.setOnClickListener {
             activeAncMode = "Transparency"
-            appendStatus("ANC → Transparency")
+            appendStatus("ANC -> Transparency")
             manager.sendAncTransparency()
             updateAncButtons()
             syncWidgetState()
         }
         btnAncOff.setOnClickListener {
             activeAncMode = "Off"
-            appendStatus("ANC → Off")
+            appendStatus("ANC -> Off")
             manager.sendAncOff()
             updateAncButtons()
             syncWidgetState()
@@ -152,6 +179,11 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
         checkPermissions()
     }
 
+    override fun onDestroy() {
+        WidgetStateStore.removeListener(storeListener)
+        super.onDestroy()
+    }
+
     private fun syncWidgetState() {
         val state = WidgetStateStore.read(this)
         state.ancMode = activeAncMode
@@ -168,10 +200,10 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
         popup.menu.add("Smart")
         popup.setOnMenuItemClickListener { item ->
             when (item.title) {
-                "Deep" -> { activeAncMode = "ANC-Deep"; manager.sendAncDeep(); appendStatus("ANC → Deep") }
-                "Medium" -> { activeAncMode = "ANC-Medium"; manager.sendAncMedium(); appendStatus("ANC → Medium") }
-                "Light" -> { activeAncMode = "ANC-Light"; manager.sendAncLight(); appendStatus("ANC → Light") }
-                "Smart" -> { activeAncMode = "ANC-Smart"; manager.sendAncSmart(); appendStatus("ANC → Smart") }
+                "Deep" -> { activeAncMode = "ANC-Deep"; manager.sendAncDeep(); appendStatus("ANC -> Deep") }
+                "Medium" -> { activeAncMode = "ANC-Medium"; manager.sendAncMedium(); appendStatus("ANC -> Medium") }
+                "Light" -> { activeAncMode = "ANC-Light"; manager.sendAncLight(); appendStatus("ANC -> Light") }
+                "Smart" -> { activeAncMode = "ANC-Smart"; manager.sendAncSmart(); appendStatus("ANC -> Smart") }
             }
             updateAncButtons()
             syncWidgetState()
@@ -273,36 +305,39 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
     }
 
     private fun applyTheme(theme: Int) {
-        val bgColor: Int
-        when (theme) {
-            THEME_OLED -> {
-                bgColor = Color.BLACK
-                textColor = Color.WHITE
-                inactiveBtnColor = Color.parseColor("#333333")
-                accentColor = Color.parseColor("#CC0000")
-            }
-            THEME_DARK -> {
-                bgColor = Color.parseColor("#121212")
-                textColor = Color.parseColor("#E0E0E0")
-                inactiveBtnColor = Color.parseColor("#424242")
-                accentColor = Color.parseColor("#CC0000")
-            }
-            else -> {
-                bgColor = Color.WHITE
-                textColor = Color.BLACK
-                inactiveBtnColor = Color.parseColor("#EEEEEE")
-                accentColor = Color.parseColor("#CC0000")
-            }
+        val bgColor: Int = when (theme) {
+            THEME_OLED -> Color.BLACK
+            THEME_DARK -> Color.parseColor("#121212")
+            else -> Color.WHITE
         }
+        val newTextColor: Int = when (theme) {
+            THEME_OLED -> Color.WHITE
+            THEME_DARK -> Color.parseColor("#E0E0E0")
+            else -> Color.BLACK
+        }
+        val newInactive: Int = when (theme) {
+            THEME_OLED -> Color.parseColor("#333333")
+            THEME_DARK -> Color.parseColor("#424242")
+            else -> Color.parseColor("#EEEEEE")
+        }
+        val newAccent: Int = Color.parseColor("#CC0000")
+
+        textColor = newTextColor
+        inactiveBtnColor = newInactive
+        accentColor = newAccent
+
         mainLayout.setBackgroundColor(bgColor)
-        scroll.setBackgroundColor(if (theme == THEME_LIGHT) Color.parseColor("#F5F5F5") else Color.parseColor("#111111"))
+        scroll.setBackgroundColor(
+            if (theme == THEME_LIGHT) Color.parseColor("#F5F5F5")
+            else Color.parseColor("#111111")
+        )
         statusText.setTextColor(textColor)
         applyColorsToViews(mainLayout, textColor, inactiveBtnColor)
         updateAncButtons()
         updateGameButtons()
         statusText.setOnLongClickListener {
             val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            cm.setPrimaryClip(ClipData.newPlainText("BudsQS Log", statusText.text.toString()))
+            cm.setPrimaryClip(ClipData.newPlainText("QuickBuds Log", statusText.text.toString()))
             Toast.makeText(this, "Log copied", Toast.LENGTH_SHORT).show()
             true
         }
@@ -310,8 +345,13 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
 
     private fun applyColorsToViews(view: View, tc: Int, btnBg: Int) {
         if (view is TextView) view.setTextColor(tc)
-        if (view is Button) { view.setBackgroundColor(btnBg); view.setTextColor(tc) }
-        if (view is ViewGroup) for (i in 0 until view.childCount) applyColorsToViews(view.getChildAt(i), tc, btnBg)
+        if (view is Button) {
+            view.setBackgroundColor(btnBg)
+            view.setTextColor(tc)
+        }
+        if (view is ViewGroup) {
+            for (i in 0 until view.childCount) applyColorsToViews(view.getChildAt(i), tc, btnBg)
+        }
     }
 
     private fun checkPermissions() {
@@ -345,41 +385,16 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
     override fun onConnected(connected: Boolean) {
         runOnUiThread {
             appendStatus(if (connected) ">>> READY <<<" else "Disconnected")
-            if (!connected) {
-                // Clear battery UI when disconnected
-                batteryLeftText.text = "L: --%"
-                batteryCaseText.text = "C: --%"
-                batteryRightText.text = "R: --%"
-
-                // Also clear widget state
-                val st = WidgetStateStore.read(this@MainActivity)
-                st.leftBattery = -1
-                st.caseBattery = -1
-                st.rightBattery = -1
-                WidgetStateStore.write(this@MainActivity, st)
-                AncWidgetProvider.refreshAll(this@MainActivity)
-            }
         }
     }
 
     override fun onPacketReceived(bytes: ByteArray) {}
 
-    override fun onBattery(left: Int?, case: Int?, right: Int?, chargingLeft: Boolean, chargingCase: Boolean, chargingRight: Boolean) {
-        runOnUiThread {
-            batteryLeftText.text = "L: ${left ?: "--"}%" + if (chargingLeft) "⚡" else ""
-            batteryCaseText.text = "C: ${case ?: "--"}%" + if (chargingCase) "⚡" else ""
-            batteryRightText.text = "R: ${right ?: "--"}%" + if (chargingRight) "⚡" else ""
-
-            // Push to widget
-            val st = WidgetStateStore.read(this@MainActivity)
-            if (left != null) st.leftBattery = left
-            if (case != null) st.caseBattery = case
-            if (right != null) st.rightBattery = right
-            st.ancMode = activeAncMode
-            st.gameMode = gameModeOn
-            WidgetStateStore.write(this@MainActivity, st)
-            AncWidgetProvider.refreshAll(this@MainActivity)
-        }
+    override fun onBattery(
+        left: Int?, case: Int?, right: Int?,
+        chargingLeft: Boolean, chargingCase: Boolean, chargingRight: Boolean
+    ) {
+        // UI is driven by storeListener; nothing to do here
     }
 
     override fun onBudState(state: String) {

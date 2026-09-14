@@ -16,8 +16,10 @@ import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
 import android.util.Log
+import com.spizganed.quickbuds.widget.AncWidgetProvider
+import com.spizganed.quickbuds.widget.WidgetStateStore
 
-class BudsService : Service() {
+class BudsService : Service(), BudsConnectionManager.Listener {
 
     private val binder = LocalBinder()
     var manager: BudsConnectionManager? = null
@@ -36,6 +38,7 @@ class BudsService : Service() {
                     listenerField.isAccessible = true
                     val listeners = listenerField.get(m) as? java.util.concurrent.CopyOnWriteArrayList<*>
                     listeners?.forEach { l ->
+                        if (l === this@BudsService) return@forEach
                         try {
                             val onStatusMethod = l?.javaClass?.getMethod("onStatus", String::class.java)
                             onStatusMethod?.invoke(l, msg)
@@ -69,7 +72,7 @@ class BudsService : Service() {
         wakeLock?.setReferenceCounted(false)
         wakeLock?.acquire(60 * 60 * 1000L)
 
-        manager = BudsConnectionManager(this)
+        manager = BudsConnectionManager(this).also { it.addListener(this) }
 
         val filter = IntentFilter(ACTION_WIDGET_COMMAND)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -131,7 +134,6 @@ class BudsService : Service() {
             return
         }
 
-        // widgetAction is now the short name: "ANC_CYCLE", "TRANS", "OFF", "GAME_TOGGLE"
         when (widgetAction) {
             "ANC_CYCLE" -> when (ancMode) {
                 "ANC-Deep" -> { statusLog("<< sending ANC Deep"); manager?.sendAncDeep() }
@@ -151,24 +153,38 @@ class BudsService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 channelId,
-                "Buds Connection Service",
-                NotificationManager.IMPORTANCE_LOW
-            )
+                "Buds Connection",
+                NotificationManager.IMPORTANCE_MIN
+            ).apply {
+                setShowBadge(false)
+                enableLights(false)
+                enableVibration(false)
+                setSound(null, null)
+                description = "Keeps the connection to your earbuds alive"
+            }
             getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }
 
         val notification: Notification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(this, channelId)
-                .setContentTitle("Buds QS")
-                .setContentText("Maintaining connection to earbuds...")
+                .setContentTitle("QuickBuds")
+                .setContentText("Maintaining connection to earbuds")
                 .setSmallIcon(android.R.drawable.stat_sys_headset)
+                .setSilent(true)
+                .setOngoing(false)
+                .setShowWhen(false)
+                .setPriority(Notification.PRIORITY_MIN)
                 .build()
         } else {
             @Suppress("DEPRECATION")
             Notification.Builder(this)
-                .setContentTitle("Buds QS")
-                .setContentText("Maintaining connection to earbuds...")
+                .setContentTitle("QuickBuds")
+                .setContentText("Maintaining connection to earbuds")
                 .setSmallIcon(android.R.drawable.stat_sys_headset)
+                .setSilent(true)
+                .setOngoing(false)
+                .setShowWhen(false)
+                .setPriority(Notification.PRIORITY_MIN)
                 .build()
         }
         startForeground(1, notification)
@@ -181,11 +197,44 @@ class BudsService : Service() {
 
     override fun onDestroy() {
         statusLog("[SVC] onDestroy")
+        try { manager?.removeListener(this) } catch (_: Exception) {}
         try { unregisterReceiver(widgetCommandReceiver) } catch (_: Exception) {}
         try { wakeLock?.release() } catch (_: Exception) {}
         wakeLock = null
         super.onDestroy()
     }
+
+    override fun onStatus(msg: String) {}
+
+    override fun onConnected(connected: Boolean) {
+        if (connected) {
+            statusLog("[SVC] Connected")
+        } else {
+            statusLog("[SVC] Disconnected")
+            val st = WidgetStateStore.read(this)
+            st.leftBattery = -1
+            st.caseBattery = -1
+            st.rightBattery = -1
+            WidgetStateStore.write(this, st)
+            AncWidgetProvider.refreshAll(this)
+        }
+    }
+
+    override fun onPacketReceived(bytes: ByteArray) {}
+
+    override fun onBattery(
+        left: Int?, case: Int?, right: Int?,
+        chargingLeft: Boolean, chargingCase: Boolean, chargingRight: Boolean
+    ) {
+        val st = WidgetStateStore.read(this)
+        if (left != null) st.leftBattery = left
+        if (case != null) st.caseBattery = case
+        if (right != null) st.rightBattery = right
+        WidgetStateStore.write(this, st)
+        AncWidgetProvider.refreshAll(this)
+    }
+
+    override fun onBudState(state: String) {}
 
     companion object {
         const val ACTION_FORCE_CONNECT = "com.spizganed.quickbuds.FORCE_CONNECT"

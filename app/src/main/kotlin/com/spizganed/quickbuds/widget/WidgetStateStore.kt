@@ -2,13 +2,10 @@ package com.spizganed.quickbuds.widget
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.Handler
+import android.os.Looper
+import java.util.concurrent.CopyOnWriteArrayList
 
-/**
- * SharedPreferences-backed state shared between:
- *   - MainActivity (writes on button tap / status update)
- *   - Widget providers (read to render)
- *   - Service (writes on incoming packets)
- */
 object WidgetStateStore {
 
     private const val PREFS = "BudsWidgetState"
@@ -18,6 +15,9 @@ object WidgetStateStore {
     private const val KEY_CASE = "caseBattery"
     private const val KEY_RIGHT = "rightBattery"
 
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val listeners = CopyOnWriteArrayList<(State) -> Unit>()
+
     data class State(
         var ancMode: String = "Off",
         var gameMode: Boolean = false,
@@ -25,22 +25,33 @@ object WidgetStateStore {
         var caseBattery: Int = -1,
         var rightBattery: Int = -1
     ) {
-        fun batteryText(): String {
-            val l = if (leftBattery >= 0) "$leftBattery" else "--"
-            val r = if (rightBattery >= 0) "$rightBattery" else "--"
-            return if (caseBattery >= 0) {
-                "L$l C$caseBattery R$r"
-            } else {
-                "L$l R$r"
-            }
-        }
+        fun leftProgress(): Int = if (leftBattery in 0..100) leftBattery else 0
+        fun rightProgress(): Int = if (rightBattery in 0..100) rightBattery else 0
+        fun caseProgress(): Int = if (caseBattery in 0..100) caseBattery else 0
 
-        fun ancButtonLabel(): String = when (ancMode) {
-            "ANC-Deep" -> "D"
-            "ANC-Medium" -> "M"
-            "ANC-Light" -> "L"
-            "ANC-Smart" -> "S"
-            else -> "ANC"
+        fun hasLeft(): Boolean = leftBattery in 0..100
+        fun hasRight(): Boolean = rightBattery in 0..100
+        fun hasCase(): Boolean = caseBattery in 0..100
+
+        fun leftText(): String = if (leftBattery in 0..100) leftBattery.toString() else ""
+        fun rightText(): String = if (rightBattery in 0..100) rightBattery.toString() else ""
+        fun caseText(): String = if (caseBattery in 0..100) caseBattery.toString() else ""
+
+        fun offIsActive(): Boolean = ancMode == "Off" || ancMode.isEmpty()
+        fun transIsActive(): Boolean = ancMode == "Transparency"
+        fun lowIsActive(): Boolean = ancMode == "ANC-Light"
+        fun medIsActive(): Boolean = ancMode == "ANC-Medium"
+        fun highIsActive(): Boolean = ancMode == "ANC-Deep"
+    }
+
+    fun addListener(l: (State) -> Unit) { listeners.add(l) }
+    fun removeListener(l: (State) -> Unit) { listeners.remove(l) }
+
+    private fun notifyListeners(state: State) {
+        mainHandler.post {
+            for (l in listeners) {
+                try { l(state) } catch (_: Exception) {}
+            }
         }
     }
 
@@ -49,13 +60,13 @@ object WidgetStateStore {
 
     fun read(context: Context): State {
         val p = prefs(context)
-        return State(
-            ancMode = p.getString(KEY_ANC, "Off") ?: "Off",
-            gameMode = p.getBoolean(KEY_GAME, false),
-            leftBattery = p.getInt(KEY_LEFT, -1),
-            caseBattery = p.getInt(KEY_CASE, -1),
-            rightBattery = p.getInt(KEY_RIGHT, -1)
-        )
+        val s = State()
+        s.ancMode = p.getString(KEY_ANC, "Off") ?: "Off"
+        s.gameMode = p.getBoolean(KEY_GAME, false)
+        s.leftBattery = p.getInt(KEY_LEFT, -1)
+        s.caseBattery = p.getInt(KEY_CASE, -1)
+        s.rightBattery = p.getInt(KEY_RIGHT, -1)
+        return s
     }
 
     fun write(context: Context, state: State) {
@@ -66,5 +77,6 @@ object WidgetStateStore {
             .putInt(KEY_CASE, state.caseBattery)
             .putInt(KEY_RIGHT, state.rightBattery)
             .apply()
+        notifyListeners(state)
     }
 }

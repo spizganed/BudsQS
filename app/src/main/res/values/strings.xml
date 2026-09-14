@@ -1,5 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">BudsQS</string>
-    <string name="hello_world">Hello, World!</string>
+    <string name="app_name">QuickBuds</string>
+
+    <string name="widget_anc_label">ANC</string>
+    <string name="widget_game_label">Game</string>
+    <string name="widget_buds_desc">Earbuds</string>
+    <string name="widget_battery_left">L</string>
+    <string name="widget_battery_right">R</string>
+    <string name="widget_battery_case">C</string>
+
+    <string name="widget_anc_off">Off</string>
+    <string name="widget_anc_trans">Trans</string>
+    <string name="widget_anc_low">Low</string>
+    <string name="widget_anc_med">Med</string>
+    <string name="widget_anc_high">High</string>
+    <string name="widget_game_mode_label">Game Mode</string>
 </resources>
