@@ -1,15 +1,23 @@
 package com.example.oneplusbudsqs.bluetooth
 
 import android.annotation.SuppressLint
-import android.bluetooth.*
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothSocket
 import android.content.Context
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import com.example.oneplusbudsqs.protocol.BatteryParser
+import com.example.oneplusbudsqs.protocol.BudStateParser
 import com.example.oneplusbudsqs.protocol.OpoProtocol
+import com.example.oneplusbudsqs.protocol.OppoPacketFramer
+import java.io.IOException
+import java.io.InputStream
+import java.io.OutputStream
 import java.util.*
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.Executors
 
 @SuppressLint("MissingPermission")
 class BudsConnectionManager(private val context: Context) {
@@ -18,6 +26,8 @@ class BudsConnectionManager(private val context: Context) {
         fun onStatus(msg: String)
         fun onConnected(connected: Boolean)
         fun onPacketReceived(bytes: ByteArray)
+        fun onBattery(left: Int?, case: Int?, right: Int?, chargingLeft: Boolean, chargingCase: Boolean, chargingRight: Boolean)
+        fun onBudState(state: String)
     }
 
     private val listeners = CopyOnWriteArrayList<Listener>()
@@ -33,192 +43,266 @@ class BudsConnectionManager(private val context: Context) {
     fun removeListener(l: Listener) { listeners.remove(l) }
 
     private val handler = Handler(Looper.getMainLooper())
-    private var bluetoothGatt: BluetoothGatt? = null
-    private var writeChar: BluetoothGattCharacteristic? = null
-    private var notifyChar: BluetoothGattCharacteristic? = null
+    private val pollExecutor = Executors.newSingleThreadScheduledExecutor()
+
+    private var bluetoothSocket: BluetoothSocket? = null
+    private var connectedThread: ConnectedThread? = null
     private var isReady = false
-    private var lastConnectAttempt = 0L
+    private var isConnecting = false
+    private var reconnectAttempts = 0
 
-    private val gattCallback = object : BluetoothGattCallback() {
-        override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
-            Log.d("BudsConn", "onConnectionStateChange status: $status, newState: $newState")
-            if (newState == BluetoothProfile.STATE_CONNECTED) {
-                log("Connected! Discovering services...")
-                gatt.discoverServices()
-            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                log("GATT disconnected (Status: $status)")
-                isReady = false
-                try { bluetoothGatt?.close() } catch (e: Exception) {}
-                bluetoothGatt = null
-                writeChar = null
-                notifyChar = null
-                handler.post { listeners.forEach { it.onConnected(false) } }
-            }
-        }
+    private var lastLeft: BatteryParser.Info? = null
+    private var lastRight: BatteryParser.Info? = null
+    private var lastCase: BatteryParser.Info? = null
 
-        override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
-            if (status != BluetoothGatt.GATT_SUCCESS) return
-            val service = gatt.getService(UUID.fromString(OpoProtocol.SERVICE_UUID)) ?: return
-            writeChar = service.getCharacteristic(UUID.fromString(OpoProtocol.WRITE_CHAR_UUID))
-            notifyChar = service.getCharacteristic(UUID.fromString(OpoProtocol.NOTIFY_CHAR_UUID))
-
-            val nChar = notifyChar
-            if (nChar == null) {
-                log("Notify characteristic not found!")
-                return
-            }
-            gatt.setCharacteristicNotification(nChar, true)
-            val descriptor = nChar.getDescriptor(UUID.fromString("00002902-0000-1000-8000-00805f9b34fb"))
-            if (descriptor == null) {
-                // No CCCD; fall back to starting the handshake anyway.
-                log("CCCD descriptor missing; starting handshake without it.")
-                startHandshake()
-                return
-            }
-            // IMPORTANT: only ONE GATT op may be in flight. We must wait for the CCCD
-            // write to complete (onDescriptorWrite) BEFORE writing HELLO, otherwise the
-            // descriptor write is clobbered and the buds never send notifications.
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                gatt.writeDescriptor(descriptor, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
-            } else {
-                @Suppress("DEPRECATION")
-                descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-                @Suppress("DEPRECATION")
-                gatt.writeDescriptor(descriptor)
-            }
-        }
-
-        override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
-            log("CCCD write complete (status=$status). Notifications enabled; starting handshake.")
-            startHandshake()
-        }
-
-        override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, value: ByteArray) {
-            log("RX: ${OpoProtocol.bytesToHex(value)}")
-            handler.post { listeners.forEach { it.onPacketReceived(value) } }
-        }
-
-        @Deprecated("Deprecated in Java")
-        override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-                @Suppress("DEPRECATION")
-                val data = characteristic.value ?: return
-                log("RX: ${OpoProtocol.bytesToHex(data)}")
-                handler.post { listeners.forEach { it.onPacketReceived(data) } }
-            }
-        }
-    }
+    fun isConnected(): Boolean = isReady && bluetoothSocket?.isConnected == true
 
     fun connect(device: BluetoothDevice) {
-        val now = System.currentTimeMillis()
-        if (now - lastConnectAttempt < 3000) {
-            Log.d("BudsConn", "Connect debounced.")
+        if (isConnecting || isConnected()) {
+            log("Already connecting/connected, ignoring.")
             return
         }
-        lastConnectAttempt = now
+        isConnecting = true
+        log("Initiating RFCOMM connection to ${device.name}...")
+        BluetoothAdapter.getDefaultAdapter()?.cancelDiscovery()
 
-        if (bluetoothGatt != null) {
-            log("Already connected or connecting.")
-            return
-        }
+        Thread {
+            val uuids = listOf(
+                OpoProtocol.SPP_UUID_PRIMARY,
+                OpoProtocol.SPP_UUID_FALLBACK
+            )
+            var socket: BluetoothSocket? = null
+            var lastError: String? = null
 
-        log("Initiating silent background connection to ${device.name}...")
-        bluetoothGatt = device.connectGatt(context, true, gattCallback, BluetoothDevice.TRANSPORT_LE)
-    }
-
-    /**
-     * Called by KeepAliveReceiver when ACL/profile CONNECTED fires.
-     * KEY FIX: If we're already ready (handshake complete), do NOTHING.
-     * Only tear down and reconnect if we're not currently connected.
-     */
-    fun forceReconnect(device: BluetoothDevice) {
-        // If we're already fully connected and ready, don't touch it!
-        if (isReady && bluetoothGatt != null) {
-            Log.d("BudsConn", "forceReconnect ignored — already READY.")
-            return
-        }
-        // If we have a GATT that's still connecting (not yet ready), also let it be
-        if (bluetoothGatt != null) {
-            Log.d("BudsConn", "forceReconnect ignored — connection in progress.")
-            return
-        }
-
-        Log.d("BudsConn", "forceReconnect proceeding.")
-        lastConnectAttempt = 0L
-        log("Force-reconnecting to ${device.name}...")
-        bluetoothGatt = device.connectGatt(context, true, gattCallback, BluetoothDevice.TRANSPORT_LE)
-    }
-
-    /**
-     * Called by KeepAliveReceiver when ACL_DISCONNECTED fires.
-     */
-    fun forceCleanup() {
-        Log.d("BudsConn", "forceCleanup called.")
-        isReady = false
-        try { bluetoothGatt?.close() } catch (e: Exception) {}
-        bluetoothGatt = null
-        writeChar = null
-        notifyChar = null
-        handler.post { listeners.forEach { it.onConnected(false) } }
-    }
-
-    fun connectAudioProfile(device: BluetoothDevice) {
-        val adapter = BluetoothAdapter.getDefaultAdapter()
-        adapter?.getProfileProxy(context, object : BluetoothProfile.ServiceListener {
-            override fun onServiceConnected(profile: Int, proxy: BluetoothProfile) {
-                if (profile == BluetoothProfile.A2DP) {
-                    try {
-                        val method = proxy.javaClass.getMethod("connect", BluetoothDevice::class.java)
-                        method.invoke(proxy, device)
-                    } catch (e: Exception) { }
-                    adapter.closeProfileProxy(BluetoothProfile.A2DP, proxy)
+            for (uuidStr in uuids) {
+                try {
+                    log("Trying UUID: $uuidStr")
+                    val uuid = UUID.fromString(uuidStr)
+                    socket = device.createRfcommSocketToServiceRecord(uuid)
+                    socket.connect()
+                    log("Connected via UUID: $uuidStr")
+                    break
+                } catch (e: IOException) {
+                    log("Failed UUID $uuidStr: ${e.message}")
+                    lastError = e.message
+                    try { socket?.close() } catch (_: Exception) {}
+                    socket = null
                 }
             }
-            override fun onServiceDisconnected(profile: Int) {}
-        }, BluetoothProfile.A2DP)
+
+            if (socket == null) {
+                try {
+                    log("Trying RFCOMM channel 15...")
+                    val m = device.javaClass.getMethod("createRfcommSocket", Int::class.javaPrimitiveType)
+                    socket = m.invoke(device, 15) as BluetoothSocket
+                    socket.connect()
+                    log("Connected via raw channel 15")
+                } catch (e: Exception) {
+                    log("Channel 15 failed: ${e.message}")
+                    lastError = e.message
+                    socket = null
+                }
+            }
+
+            if (socket != null) {
+                bluetoothSocket = socket
+                connectedThread = ConnectedThread(socket)
+                connectedThread?.start()
+                isReady = true
+                reconnectAttempts = 0
+                handler.post { listeners.forEach { it.onConnected(true) } }
+                log("Ready for commands. Running init sequence...")
+                runInitSequence()
+                startBatteryPolling()
+            } else {
+                log("All connection methods failed: $lastError")
+                isConnecting = false
+                disconnect()
+                if (reconnectAttempts < 3) {
+                    reconnectAttempts++
+                    log("Auto-retry $reconnectAttempts/3 in 5s...")
+                    handler.postDelayed({
+                        if (!isConnected() && !isConnecting) connect(device)
+                    }, 5000)
+                } else {
+                    log("Giving up. Tap CONNECT to retry manually.")
+                    reconnectAttempts = 0
+                }
+                return@Thread
+            }
+            isConnecting = false
+        }.start()
+    }
+
+    private fun runInitSequence() {
+        Thread {
+            try {
+                delay(300); sendRawBlocking(OpoProtocol.buildHandshake(), "handshake")
+                delay(200); sendRawBlocking(OpoProtocol.buildQueryProductId(), "query product id")
+                delay(200); sendRawBlocking(OpoProtocol.buildQueryBroadcastCodes(), "query broadcast codes")
+                delay(300); sendRawBlocking(OpoProtocol.queryStatus(), "query status")
+                delay(200); sendRawBlocking(OpoProtocol.queryAncMode(), "query anc")
+                delay(200); sendRawBlocking(OpoProtocol.queryBattery(), "query battery")
+            } catch (e: Exception) {
+                log("Init sequence error: ${e.message}")
+            }
+        }.start()
+    }
+
+    private fun startBatteryPolling() {
+        pollExecutor.scheduleWithFixedDelay({
+            if (isReady) {
+                try {
+                    sendRaw(OpoProtocol.queryStatus(), "poll status")
+                } catch (_: Exception) {}
+            }
+        }, 5, 5, java.util.concurrent.TimeUnit.SECONDS)
     }
 
     fun disconnect() {
-        bluetoothGatt?.disconnect()
-        bluetoothGatt?.close()
-        bluetoothGatt = null
         isReady = false
+        isConnecting = false
+        connectedThread?.cancel()
+        connectedThread = null
+        bluetoothSocket = null
         handler.post { listeners.forEach { it.onConnected(false) } }
+        log("Disconnected")
     }
 
-    private fun startHandshake() {
-        sendRaw(OpoProtocol.HELLO)
-        handler.postDelayed({
-            sendRaw(OpoProtocol.REGISTER)
-            handler.postDelayed({
-                isReady = true
-                log("Handshake complete. Ready for commands.")
-                handler.post { listeners.forEach { it.onConnected(true) } }
-            }, 1500)
-        }, 2000)
+    // --- ANC ---
+    fun sendAncOff() { sendRaw(OpoProtocol.ancOff(), "ANC Off") }
+    fun sendAncOn() { sendRaw(OpoProtocol.ancOn(), "ANC On") }
+    fun sendAncTransparency() { sendRaw(OpoProtocol.ancTransparency(), "ANC Trans") }
+    fun sendAncSmart() { sendRaw(OpoProtocol.ancSmart(), "ANC Smart") }
+    fun sendAncDeep() { sendRaw(OpoProtocol.ancDeep(), "ANC Deep") }
+    fun sendAncMedium() { sendRaw(OpoProtocol.ancMedium(), "ANC Medium") }
+    fun sendAncLight() { sendRaw(OpoProtocol.ancLight(), "ANC Light") }
+
+    // --- Feature switches ---
+    fun setGameMode(on: Boolean) =
+        sendRaw(if (on) OpoProtocol.gameModeOn() else OpoProtocol.gameModeOff(), "GameMode")
+
+    fun setDualDevice(on: Boolean) =
+        sendRaw(if (on) OpoProtocol.dualDeviceOn() else OpoProtocol.dualDeviceOff(), "DualDevice")
+
+    fun setSpatialSound(on: Boolean) =
+        sendRaw(if (on) OpoProtocol.spatialSoundOn() else OpoProtocol.spatialSoundOff(), "SpatialSound")
+
+    fun setAutoPlayPause(on: Boolean) =
+        sendRaw(if (on) OpoProtocol.autoPlayPauseOn() else OpoProtocol.autoPlayPauseOff(), "AutoPlayPause")
+
+    fun requestFullStatus() { sendRaw(OpoProtocol.queryStatus(), "manual status") }
+
+    /**
+     * Each send spawns a fresh thread so a blocked write can never queue
+     * all subsequent commands (which was causing the widget commands to hang).
+     */
+    private fun sendRaw(data: ByteArray, label: String = "") {
+        Thread {
+            sendRawBlocking(data, label)
+        }.start()
     }
 
-    fun sendAncMode(mode: Byte) {
-        if (!isReady) { log("Not ready"); return }
-        sendRaw(OpoProtocol.ancSetPacket(mode))
+    private fun sendRawBlocking(data: ByteArray, label: String = "") {
+        try {
+            val thread = connectedThread
+            if (thread == null) {
+                log("sendRaw[$label]: no active connection.")
+                return
+            }
+            if (bluetoothSocket?.isConnected != true) {
+                log("sendRaw[$label]: socket reports not connected.")
+                return
+            }
+            log("TX[$label]: ${OpoProtocol.bytesToHex(data)}")
+            thread.write(data)
+        } catch (e: Exception) {
+            log("sendRaw[$label] error: ${e.message}")
+        }
     }
 
-    fun setGameMode(on: Boolean) {
-        if (!isReady) { log("Not ready"); return }
-        sendRaw(if (on) OpoProtocol.gameModeOn() else OpoProtocol.gameModeOff())
+    private fun delay(ms: Long) {
+        try { Thread.sleep(ms) } catch (_: InterruptedException) {}
     }
 
-    @Suppress("DEPRECATION")
-    private fun sendRaw(data: ByteArray) {
-        val char = writeChar ?: return
-        val gatt = bluetoothGatt ?: return
-        log("TX: ${OpoProtocol.bytesToHex(data)}")
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            gatt.writeCharacteristic(char, data, BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE)
-        } else {
-            char.value = data
-            char.writeType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
-            gatt.writeCharacteristic(char)
+    private inner class ConnectedThread(private val socket: BluetoothSocket) : Thread() {
+        private val inputStream: InputStream = socket.inputStream
+        private val outputStream: OutputStream = socket.outputStream
+        private val buffer = ByteArray(1024)
+        private val framer = OppoPacketFramer()
+
+        override fun run() {
+            while (true) {
+                try {
+                    val bytes = inputStream.read(buffer)
+                    if (bytes > 0) {
+                        val frames = framer.append(buffer, bytes)
+                        for (frame in frames) {
+                            handlePacket(frame)
+                        }
+                    }
+                } catch (e: IOException) {
+                    log("Connection lost: ${e.message}")
+                    disconnect()
+                    break
+                }
+            }
+        }
+
+        fun write(bytes: ByteArray) {
+            try {
+                outputStream.write(bytes)
+                outputStream.flush()
+            } catch (e: IOException) {
+                log("Write failed: ${e.message}")
+            }
+        }
+
+        fun cancel() {
+            try { socket.close() } catch (_: IOException) {}
+        }
+    }
+
+    private fun handlePacket(packet: ByteArray) {
+        log("RX: ${OpoProtocol.bytesToHex(packet)}")
+        handler.post { listeners.forEach { it.onPacketReceived(packet) } }
+
+        val battery = BatteryParser.parse(packet)
+        val activeBattery = BatteryParser.parseActive(packet)
+        val budState = BudStateParser.parse(packet)
+
+        if (battery != null) {
+            if (battery.left != null) lastLeft = battery.left
+            if (battery.right != null) lastRight = battery.right
+            if (battery.case != null) lastCase = battery.case
+            emitBattery()
+        } else if (activeBattery != null) {
+            if (activeBattery.left != null) lastLeft = activeBattery.left
+            if (activeBattery.right != null) lastRight = activeBattery.right
+            if (activeBattery.case != null) lastCase = activeBattery.case
+            emitBattery()
+        } else if (budState != null) {
+            val label = when (budState) {
+                BudStateParser.State.BothInCase -> "Both in case"
+                BudStateParser.State.BothOut -> "Both out"
+                BudStateParser.State.LeftOut -> "Left out"
+                BudStateParser.State.RightOut -> "Right out"
+                is BudStateParser.State.Unknown -> "Unknown (0x${"%02X".format(budState.raw)})"
+            }
+            handler.post { listeners.forEach { it.onBudState(label) } }
+        }
+    }
+
+    private fun emitBattery() {
+        handler.post {
+            listeners.forEach {
+                it.onBattery(
+                    lastLeft?.level, lastCase?.level, lastRight?.level,
+                    lastLeft?.isCharging ?: false,
+                    lastCase?.isCharging ?: false,
+                    lastRight?.isCharging ?: false
+                )
+            }
         }
     }
 

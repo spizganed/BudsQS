@@ -5,6 +5,8 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.bluetooth.BluetoothManager
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -20,7 +22,11 @@ import android.widget.*
 import com.example.oneplusbudsqs.R
 import com.example.oneplusbudsqs.bluetooth.BudsConnectionManager
 import com.example.oneplusbudsqs.bluetooth.BudsService
-import com.example.oneplusbudsqs.protocol.OpoProtocol
+import com.example.oneplusbudsqs.widget.AncWidgetProvider
+import com.example.oneplusbudsqs.widget.WidgetStateStore
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MainActivity : Activity(), BudsConnectionManager.Listener {
 
@@ -33,7 +39,11 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
     private lateinit var batteryCaseText: TextView
     private lateinit var batteryRightText: TextView
     private lateinit var btnToggleLog: Button
-    private lateinit var btnAncOn: Button
+    private lateinit var btnAncMode: Button
+    private lateinit var btnTransparency: Button
+    private lateinit var btnAncOff: Button
+    private lateinit var btnGameOn: Button
+    private lateinit var btnGameOff: Button
     private lateinit var btnSettings: Button
 
     private val TARGET_MAC = "A8:E6:E8:92:C1:25"
@@ -44,6 +54,15 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
     private val THEME_LIGHT = 2
     private var currentTheme = THEME_OLED
 
+    private val timeFormat = SimpleDateFormat("HH:mm:ss.SSS", Locale.US)
+
+    private var activeAncMode: String = "Off"
+    private var gameModeOn = false
+
+    private var accentColor: Int = Color.parseColor("#CC0000")
+    private var inactiveBtnColor: Int = Color.parseColor("#333333")
+    private var textColor: Int = Color.WHITE
+
     private var isBound = false
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
@@ -51,7 +70,7 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
             manager = binder.getService().manager!!
             manager.addListener(this@MainActivity)
             isBound = true
-            appendStatus("Foreground Service Connected")
+            appendStatus("Service connected")
             connectDirectly()
         }
         override fun onServiceDisconnected(name: ComponentName?) {
@@ -63,6 +82,10 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        val serviceIntent = Intent(this, BudsService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(serviceIntent)
+        else startService(serviceIntent)
+
         mainLayout = findViewById(R.id.mainLayout)
         statusText = findViewById(R.id.statusText)
         scroll = findViewById(R.id.scroll)
@@ -70,7 +93,11 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
         batteryCaseText = findViewById(R.id.batteryCaseText)
         batteryRightText = findViewById(R.id.batteryRightText)
         btnToggleLog = findViewById(R.id.btnToggleLog)
-        btnAncOn = findViewById(R.id.btnAncOn)
+        btnAncMode = findViewById(R.id.btnAncMode)
+        btnTransparency = findViewById(R.id.btnTransparency)
+        btnAncOff = findViewById(R.id.btnAncOff)
+        btnGameOn = findViewById(R.id.btnGameOn)
+        btnGameOff = findViewById(R.id.btnGameOff)
         btnSettings = findViewById(R.id.btnSettings)
 
         val prefs = getSharedPreferences("BudsQSPrefs", Context.MODE_PRIVATE)
@@ -88,86 +115,126 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
             }
         }
 
-        findViewById<Button>(R.id.btnConnect).setOnClickListener { connectDirectly() }
-        findViewById<Button>(R.id.btnDisconnect).setOnClickListener { manager.disconnect() }
+        btnAncMode.setOnClickListener { view -> showAncPopup(view) }
 
-        btnAncOn.setOnClickListener { view ->
-            val popup = PopupMenu(this, view)
-            popup.menu.add("High (Real-time)")
-            popup.menu.add("Medium")
-            popup.menu.add("Low")
-            popup.setOnMenuItemClickListener { item ->
-                when (item.title) {
-                    "High (Real-time)" -> { btnAncOn.text = "ANC: High"; manager.sendAncMode(OpoProtocol.ANC_HIGH) }
-                    "Medium" -> { btnAncOn.text = "ANC: Med"; manager.sendAncMode(OpoProtocol.ANC_MODERATE) }
-                    "Low" -> { btnAncOn.text = "ANC: Low"; manager.sendAncMode(OpoProtocol.ANC_LOW) }
-                }
-                true
-            }
-            popup.show()
+        btnTransparency.setOnClickListener {
+            activeAncMode = "Transparency"
+            appendStatus("ANC → Transparency")
+            manager.sendAncTransparency()
+            updateAncButtons()
+            syncWidgetState()
+        }
+        btnAncOff.setOnClickListener {
+            activeAncMode = "Off"
+            appendStatus("ANC → Off")
+            manager.sendAncOff()
+            updateAncButtons()
+            syncWidgetState()
         }
 
-        findViewById<Button>(R.id.btnTransparency).setOnClickListener {
-            btnAncOn.text = "ANC"
-            manager.sendAncMode(OpoProtocol.ANC_TRANSPARENCY)
-        }
-        findViewById<Button>(R.id.btnAncOff).setOnClickListener {
-            btnAncOn.text = "ANC"
-            manager.sendAncMode(OpoProtocol.ANC_OFF)
-        }
-        // Game Mode: fixed packet format (15 bytes) confirmed from HeyMelody capture.
-        findViewById<Button>(R.id.btnGameOn).setOnClickListener {
+        btnGameOn.setOnClickListener {
             appendStatus("Game Mode ON")
             manager.setGameMode(true)
+            gameModeOn = true
+            updateGameButtons()
+            syncWidgetState()
         }
-        findViewById<Button>(R.id.btnGameOff).setOnClickListener {
+        btnGameOff.setOnClickListener {
             appendStatus("Game Mode OFF")
             manager.setGameMode(false)
+            gameModeOn = false
+            updateGameButtons()
+            syncWidgetState()
         }
 
+        updateAncButtons()
+        updateGameButtons()
         checkPermissions()
     }
 
-    private fun startServiceIfAllowed() {
-        if (!hasAllRequiredPermissions()) return
-        val serviceIntent = Intent(this, BudsService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(serviceIntent)
-        } else {
-            startService(serviceIntent)
+    private fun syncWidgetState() {
+        val state = WidgetStateStore.read(this)
+        state.ancMode = activeAncMode
+        state.gameMode = gameModeOn
+        WidgetStateStore.write(this, state)
+        AncWidgetProvider.refreshAll(this)
+    }
+
+    private fun showAncPopup(anchor: View) {
+        val popup = PopupMenu(this, anchor)
+        popup.menu.add("Deep")
+        popup.menu.add("Medium")
+        popup.menu.add("Light")
+        popup.menu.add("Smart")
+        popup.setOnMenuItemClickListener { item ->
+            when (item.title) {
+                "Deep" -> { activeAncMode = "ANC-Deep"; manager.sendAncDeep(); appendStatus("ANC → Deep") }
+                "Medium" -> { activeAncMode = "ANC-Medium"; manager.sendAncMedium(); appendStatus("ANC → Medium") }
+                "Light" -> { activeAncMode = "ANC-Light"; manager.sendAncLight(); appendStatus("ANC → Light") }
+                "Smart" -> { activeAncMode = "ANC-Smart"; manager.sendAncSmart(); appendStatus("ANC → Smart") }
+            }
+            updateAncButtons()
+            syncWidgetState()
+            true
+        }
+        popup.show()
+    }
+
+    private fun updateAncButtons() {
+        runOnUiThread {
+            btnAncMode.setBackgroundColor(inactiveBtnColor)
+            btnTransparency.setBackgroundColor(inactiveBtnColor)
+            btnAncOff.setBackgroundColor(inactiveBtnColor)
+            btnAncMode.setTextColor(textColor)
+            btnTransparency.setTextColor(textColor)
+            btnAncOff.setTextColor(textColor)
+
+            when {
+                activeAncMode == "Off" -> {
+                    btnAncOff.setBackgroundColor(accentColor)
+                    btnAncOff.setTextColor(Color.WHITE)
+                    btnAncMode.text = "ANC"
+                }
+                activeAncMode == "Transparency" -> {
+                    btnTransparency.setBackgroundColor(accentColor)
+                    btnTransparency.setTextColor(Color.WHITE)
+                    btnAncMode.text = "ANC"
+                }
+                activeAncMode.startsWith("ANC-") -> {
+                    btnAncMode.setBackgroundColor(accentColor)
+                    btnAncMode.setTextColor(Color.WHITE)
+                    btnAncMode.text = when (activeAncMode) {
+                        "ANC-Deep" -> "ANC: Deep"
+                        "ANC-Medium" -> "ANC: Med"
+                        "ANC-Light" -> "ANC: Light"
+                        "ANC-Smart" -> "ANC: Smart"
+                        else -> "ANC"
+                    }
+                }
+            }
         }
     }
 
-    private fun hasAllRequiredPermissions(): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED &&
-            checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED &&
-            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-        } else {
-            checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        }
-    }
-
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQUEST_PERMISSIONS) {
-            if (hasAllRequiredPermissions()) {
-                startServiceIfAllowed()
-                val intent = Intent(this, BudsService::class.java)
-                bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+    private fun updateGameButtons() {
+        runOnUiThread {
+            if (gameModeOn) {
+                btnGameOn.setBackgroundColor(accentColor)
+                btnGameOn.setTextColor(Color.WHITE)
+                btnGameOff.setBackgroundColor(inactiveBtnColor)
+                btnGameOff.setTextColor(textColor)
             } else {
-                appendStatus("Permissions denied. App cannot function.")
+                btnGameOn.setBackgroundColor(inactiveBtnColor)
+                btnGameOn.setTextColor(textColor)
+                btnGameOff.setBackgroundColor(accentColor)
+                btnGameOff.setTextColor(Color.WHITE)
             }
         }
     }
 
     override fun onStart() {
         super.onStart()
-        if (hasAllRequiredPermissions()) {
-            startServiceIfAllowed()
-            val intent = Intent(this, BudsService::class.java)
-            bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
-        }
+        val intent = Intent(this, BudsService::class.java)
+        bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
     }
 
     override fun onStop() {
@@ -180,36 +247,71 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
     }
 
     private fun showSettingsDialog() {
-        val options = arrayOf("OLED Black (Default)", "Standard Dark", "Light")
+        val options = arrayOf(
+            "Theme: OLED Black",
+            "Theme: Standard Dark",
+            "Theme: Light",
+            "Reconnect to buds",
+            "Disconnect from buds"
+        )
         val builder = AlertDialog.Builder(this)
-        builder.setTitle("App Theme")
-        builder.setSingleChoiceItems(options, currentTheme) { dialog, which ->
-            currentTheme = which
-            applyTheme(currentTheme)
-            val prefs = getSharedPreferences("BudsQSPrefs", Context.MODE_PRIVATE)
-            prefs.edit().putInt("theme", currentTheme).apply()
+        builder.setTitle("Settings")
+        builder.setItems(options) { dialog, which ->
+            when (which) {
+                0, 1, 2 -> {
+                    currentTheme = which
+                    applyTheme(currentTheme)
+                    getSharedPreferences("BudsQSPrefs", Context.MODE_PRIVATE).edit()
+                        .putInt("theme", currentTheme).apply()
+                }
+                3 -> { connectDirectly(); appendStatus("Manual reconnect triggered") }
+                4 -> { manager.disconnect(); appendStatus("Manual disconnect triggered") }
+            }
             dialog.dismiss()
         }
         builder.show()
     }
 
     private fun applyTheme(theme: Int) {
-        val bgColor: Int; val textColor: Int; val btnBgColor: Int; val logBgColor: Int
+        val bgColor: Int
         when (theme) {
-            THEME_OLED -> { bgColor = Color.BLACK; textColor = Color.WHITE; btnBgColor = Color.parseColor("#333333"); logBgColor = Color.parseColor("#111111") }
-            THEME_DARK -> { bgColor = Color.parseColor("#121212"); textColor = Color.parseColor("#E0E0E0"); btnBgColor = Color.parseColor("#424242"); logBgColor = Color.parseColor("#1E1E1E") }
-            else -> { bgColor = Color.WHITE; textColor = Color.BLACK; btnBgColor = Color.parseColor("#EEEEEE"); logBgColor = Color.parseColor("#F5F5F5") }
+            THEME_OLED -> {
+                bgColor = Color.BLACK
+                textColor = Color.WHITE
+                inactiveBtnColor = Color.parseColor("#333333")
+                accentColor = Color.parseColor("#CC0000")
+            }
+            THEME_DARK -> {
+                bgColor = Color.parseColor("#121212")
+                textColor = Color.parseColor("#E0E0E0")
+                inactiveBtnColor = Color.parseColor("#424242")
+                accentColor = Color.parseColor("#CC0000")
+            }
+            else -> {
+                bgColor = Color.WHITE
+                textColor = Color.BLACK
+                inactiveBtnColor = Color.parseColor("#EEEEEE")
+                accentColor = Color.parseColor("#CC0000")
+            }
         }
         mainLayout.setBackgroundColor(bgColor)
-        scroll.setBackgroundColor(logBgColor)
+        scroll.setBackgroundColor(if (theme == THEME_LIGHT) Color.parseColor("#F5F5F5") else Color.parseColor("#111111"))
         statusText.setTextColor(textColor)
-        applyColorsToViews(mainLayout, textColor, btnBgColor)
+        applyColorsToViews(mainLayout, textColor, inactiveBtnColor)
+        updateAncButtons()
+        updateGameButtons()
+        statusText.setOnLongClickListener {
+            val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            cm.setPrimaryClip(ClipData.newPlainText("BudsQS Log", statusText.text.toString()))
+            Toast.makeText(this, "Log copied", Toast.LENGTH_SHORT).show()
+            true
+        }
     }
 
-    private fun applyColorsToViews(view: View, textColor: Int, btnBgColor: Int) {
-        if (view is TextView) view.setTextColor(textColor)
-        if (view is Button) { view.setBackgroundColor(btnBgColor); view.setTextColor(textColor) }
-        if (view is ViewGroup) { for (i in 0 until view.childCount) applyColorsToViews(view.getChildAt(i), textColor, btnBgColor) }
+    private fun applyColorsToViews(view: View, tc: Int, btnBg: Int) {
+        if (view is TextView) view.setTextColor(tc)
+        if (view is Button) { view.setBackgroundColor(btnBg); view.setTextColor(tc) }
+        if (view is ViewGroup) for (i in 0 until view.childCount) applyColorsToViews(view.getChildAt(i), tc, btnBg)
     }
 
     private fun checkPermissions() {
@@ -221,24 +323,20 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
         } else {
             if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) needed.add(Manifest.permission.ACCESS_FINE_LOCATION)
         }
-        if (needed.isEmpty()) {
-            startServiceIfAllowed()
-        } else {
-            requestPermissions(needed.toTypedArray(), REQUEST_PERMISSIONS)
-        }
+        if (needed.isNotEmpty()) requestPermissions(needed.toTypedArray(), REQUEST_PERMISSIONS)
     }
 
     @SuppressLint("MissingPermission")
     private fun connectDirectly() {
-        if (!isBound) return
+        if (!isBound) { appendStatus("Service not bound yet."); return }
         val btManager = getSystemService(BluetoothManager::class.java)
         val adapter = btManager?.adapter
-        if (adapter == null || !adapter.isEnabled) return
+        if (adapter == null || !adapter.isEnabled) { appendStatus("Bluetooth not enabled"); return }
         try {
             val device = adapter.getRemoteDevice(TARGET_MAC)
             manager.connect(device)
         } catch (e: IllegalArgumentException) {
-            appendStatus("Invalid MAC address: ${e.message}")
+            appendStatus("Invalid MAC: ${e.message}")
         }
     }
 
@@ -247,42 +345,54 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
     override fun onConnected(connected: Boolean) {
         runOnUiThread {
             appendStatus(if (connected) ">>> READY <<<" else "Disconnected")
-            if (connected) {
-                val btManager = getSystemService(BluetoothManager::class.java)
-                val device = btManager?.adapter?.getRemoteDevice(TARGET_MAC)
-                if (device != null) {
-                    manager.connectAudioProfile(device)
-                }
+            if (!connected) {
+                // Clear battery UI when disconnected
+                batteryLeftText.text = "L: --%"
+                batteryCaseText.text = "C: --%"
+                batteryRightText.text = "R: --%"
+
+                // Also clear widget state
+                val st = WidgetStateStore.read(this@MainActivity)
+                st.leftBattery = -1
+                st.caseBattery = -1
+                st.rightBattery = -1
+                WidgetStateStore.write(this@MainActivity, st)
+                AncWidgetProvider.refreshAll(this@MainActivity)
             }
         }
     }
 
-    override fun onPacketReceived(bytes: ByteArray) {
-        if (bytes.size < 5) return
-        val hexString = OpoProtocol.bytesToHex(bytes)
-        if (bytes[0] == 0xAA.toByte()) {
-            appendStatus("[RAW] $hexString")
+    override fun onPacketReceived(bytes: ByteArray) {}
+
+    override fun onBattery(left: Int?, case: Int?, right: Int?, chargingLeft: Boolean, chargingCase: Boolean, chargingRight: Boolean) {
+        runOnUiThread {
+            batteryLeftText.text = "L: ${left ?: "--"}%" + if (chargingLeft) "⚡" else ""
+            batteryCaseText.text = "C: ${case ?: "--"}%" + if (chargingCase) "⚡" else ""
+            batteryRightText.text = "R: ${right ?: "--"}%" + if (chargingRight) "⚡" else ""
+
+            // Push to widget
+            val st = WidgetStateStore.read(this@MainActivity)
+            if (left != null) st.leftBattery = left
+            if (case != null) st.caseBattery = case
+            if (right != null) st.rightBattery = right
+            st.ancMode = activeAncMode
+            st.gameMode = gameModeOn
+            WidgetStateStore.write(this@MainActivity, st)
+            AncWidgetProvider.refreshAll(this@MainActivity)
         }
-        // Battery packet: AA 0D 00 00 04 02 FF 06 00 F1 [L] [R] 00 00 03
-        if (bytes[0] == 0xAA.toByte() && bytes[1] == 0x0D.toByte() && bytes.size >= 12) {
-            val l = bytes[10].toInt() and 0x7F
-            val r = bytes[11].toInt() and 0x7F
-            runOnUiThread {
-                batteryLeftText.text = "L: ${if (l in 1..100) "$l%" else "--"}"
-                batteryRightText.text = "R: ${if (r in 1..100) "$r%" else "--"}"
-                // Case offset not yet located; leave as-is until confirmed.
-            }
-        }
+    }
+
+    override fun onBudState(state: String) {
+        runOnUiThread { appendStatus("Bud state: $state") }
     }
 
     private fun appendStatus(msg: String) {
         runOnUiThread {
-            statusText.append("\n$msg")
-            scroll.post { scroll.fullScroll(ScrollView.FOCUS_DOWN) }
+            try {
+                val ts = timeFormat.format(Date())
+                statusText.append("\n[$ts] $msg")
+                scroll.post { scroll.fullScroll(ScrollView.FOCUS_DOWN) }
+            } catch (_: Exception) {}
         }
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
     }
 }

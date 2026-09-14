@@ -23,35 +23,22 @@ class KeepAliveReceiver : BroadcastReceiver() {
                 fireForceConnect(context)
             }
             BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
-                Log.d("BudsConn", "KeepAlive: ACL_DISCONNECTED - forcing cleanup")
-                fireForceDisconnect(context)
+                Log.d("BudsConn", "KeepAlive: ACL_DISCONNECTED (no action)")
             }
             "android.bluetooth.a2dp.profile.action.CONNECTION_STATE_CHANGED" -> {
                 val state = intent.getIntExtra(BluetoothProfile.EXTRA_STATE, -1)
                 Log.d("BudsConn", "KeepAlive: A2DP state=$state")
-                if (state == BluetoothProfile.STATE_CONNECTED) {
-                    fireForceConnect(context)
-                }
             }
             "android.bluetooth.headset.profile.action.CONNECTION_STATE_CHANGED" -> {
                 val state = intent.getIntExtra(BluetoothProfile.EXTRA_STATE, -1)
                 Log.d("BudsConn", "KeepAlive: HFP state=$state")
-                if (state == BluetoothProfile.STATE_CONNECTED) {
-                    fireForceConnect(context)
-                }
             }
         }
     }
 
     private fun fireForceConnect(context: Context) {
         val serviceIntent = Intent(context, BudsService::class.java)
-        serviceIntent.action = "com.example.oneplusbudsqs.FORCE_CONNECT"
-        context.startService(serviceIntent)
-    }
-
-    private fun fireForceDisconnect(context: Context) {
-        val serviceIntent = Intent(context, BudsService::class.java)
-        serviceIntent.action = "com.example.oneplusbudsqs.FORCE_DISCONNECT"
+        serviceIntent.action = BudsService.ACTION_FORCE_CONNECT
         context.startService(serviceIntent)
     }
 }

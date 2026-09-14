@@ -4,64 +4,159 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    android:paddingBottom="16dp"
+    android:paddingTop="48dp">
 
-    <!-- Device Name and Battery -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/deviceNameText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="OnePlus Buds 4"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btnSettings"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="0dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:text="⚙" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingTop="4dp"
+        android:paddingBottom="16dp">
+
+        <TextView
+            android:id="@+id/batteryLeftText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="L: --%"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:paddingEnd="16dp" />
+
+        <TextView
+            android:id="@+id/batteryCaseText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="C: --%"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:paddingEnd="16dp" />
+
+        <TextView
+            android:id="@+id/batteryRightText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="R: --%"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- ANC -->
     <TextView
-        android:id="@+id/deviceNameText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="OnePlus Buds 4"
-        android:textSize="20sp"
-        android:textStyle="bold"
-        android:gravity="center"
-        android:paddingBottom="8dp" />
+        android:text="ANC"
+        android:paddingBottom="4dp" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center"
-        android:paddingBottom="16dp">
+        android:orientation="horizontal">
 
-        <TextView android:id="@+id/batteryLeftText" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="L: --%" android:textSize="16sp" android:paddingEnd="16dp" android:textStyle="bold" />
-        <TextView android:id="@+id/batteryCaseText" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="C: --%" android:textSize="16sp" android:paddingEnd="16dp" android:textStyle="bold" />
-        <TextView android:id="@+id/batteryRightText" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="R: --%" android:textSize="16sp" android:textStyle="bold" />
+        <Button
+            android:id="@+id/btnAncMode"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="ANC"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btnTransparency"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Transparency" />
+
+        <Button
+            android:id="@+id/btnAncOff"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Off" />
     </LinearLayout>
 
-    <!-- Connect Buttons -->
+    <!-- Game Mode -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Game Mode"
+        android:paddingTop="12dp"
+        android:paddingBottom="4dp" />
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:paddingBottom="16dp">
-        <Button android:id="@+id/btnConnect" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="CONNECT" android:textStyle="bold" />
-        <Button android:id="@+id/btnDisconnect" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Disconnect" />
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btnGameOn"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="4dp"
+            android:text="ON" />
+
+        <Button
+            android:id="@+id/btnGameOff"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            android:text="OFF" />
     </LinearLayout>
 
-    <!-- ANC Controls -->
-    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="ANC" android:paddingTop="8dp" />
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
-        <Button android:id="@+id/btnAncOn" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="High" />
-        <Button android:id="@+id/btnTransparency" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Trans" />
-        <Button android:id="@+id/btnAncOff" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Off" />
-    </LinearLayout>
+    <Button
+        android:id="@+id/btnToggleLog"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="Show Log" />
 
-    <!-- Game Mode Controls -->
-    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Game / Low-latency" android:paddingTop="12dp" />
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
-        <Button android:id="@+id/btnGameOn" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Game On" />
-        <Button android:id="@+id/btnGameOff" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Game Off" />
-    </LinearLayout>
+    <ScrollView
+        android:id="@+id/scroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="#EEEEEE"
+        android:padding="8dp"
+        android:layout_marginTop="8dp"
+        android:visibility="gone">
 
-    <!-- Bottom Buttons -->
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="16dp">
-        <Button android:id="@+id/btnToggleLog" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Show Log" />
-        <Button android:id="@+id/btnSettings" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="⚙️ Settings" />
-    </LinearLayout>
-
-    <!-- Hidden Status Log -->
-    <ScrollView android:id="@+id/scroll" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:background="#EEEEEE" android:padding="8dp" android:layout_marginTop="8dp" android:visibility="gone">
-        <TextView android:id="@+id/statusText" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Status log will appear here." android:textSize="12sp" android:typeface="monospace" />
+        <TextView
+            android:id="@+id/statusText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Status log will appear here."
+            android:textSize="11sp"
+            android:typeface="monospace" />
     </ScrollView>
 </LinearLayout>
