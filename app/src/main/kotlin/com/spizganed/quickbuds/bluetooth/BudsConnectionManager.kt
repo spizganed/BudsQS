@@ -10,6 +10,7 @@ import android.os.Looper
 import android.util.Log
 import com.spizganed.quickbuds.protocol.BatteryParser
 import com.spizganed.quickbuds.protocol.BudStateParser
+import com.spizganed.quickbuds.protocol.EarStatusParser
 import com.spizganed.quickbuds.protocol.OpoProtocol
 import com.spizganed.quickbuds.protocol.OppoPacketFramer
 import java.io.IOException
@@ -28,6 +29,7 @@ class BudsConnectionManager(private val context: Context) {
         fun onPacketReceived(bytes: ByteArray)
         fun onBattery(left: Int?, case: Int?, right: Int?, chargingLeft: Boolean, chargingCase: Boolean, chargingRight: Boolean)
         fun onBudState(state: String)
+        fun onEarStatus(leftInBox: Boolean, rightInBox: Boolean) {}
     }
 
     private val listeners = CopyOnWriteArrayList<Listener>()
@@ -143,6 +145,7 @@ class BudsConnectionManager(private val context: Context) {
                 delay(300); sendRawBlocking(OpoProtocol.queryStatus(), "query status")
                 delay(200); sendRawBlocking(OpoProtocol.queryAncMode(), "query anc")
                 delay(200); sendRawBlocking(OpoProtocol.queryBattery(), "query battery")
+                delay(200); sendRawBlocking(OpoProtocol.queryEarStatus(), "query ear status")
             } catch (e: Exception) {
                 log("Init sequence error: ${e.message}")
             }
@@ -154,6 +157,7 @@ class BudsConnectionManager(private val context: Context) {
             if (isReady) {
                 try {
                     sendRaw(OpoProtocol.queryStatus(), "poll status")
+                    sendRaw(OpoProtocol.queryEarStatus(), "poll ear status")
                 } catch (_: Exception) {}
             }
         }, 5, 5, java.util.concurrent.TimeUnit.SECONDS)
@@ -169,7 +173,6 @@ class BudsConnectionManager(private val context: Context) {
         log("Disconnected")
     }
 
-    // --- ANC ---
     fun sendAncOff() { sendRaw(OpoProtocol.ancOff(), "ANC Off") }
     fun sendAncOn() { sendRaw(OpoProtocol.ancOn(), "ANC On") }
     fun sendAncTransparency() { sendRaw(OpoProtocol.ancTransparency(), "ANC Trans") }
@@ -178,7 +181,6 @@ class BudsConnectionManager(private val context: Context) {
     fun sendAncMedium() { sendRaw(OpoProtocol.ancMedium(), "ANC Medium") }
     fun sendAncLight() { sendRaw(OpoProtocol.ancLight(), "ANC Light") }
 
-    // --- Feature switches ---
     fun setGameMode(on: Boolean) =
         sendRaw(if (on) OpoProtocol.gameModeOn() else OpoProtocol.gameModeOff(), "GameMode")
 
@@ -193,10 +195,6 @@ class BudsConnectionManager(private val context: Context) {
 
     fun requestFullStatus() { sendRaw(OpoProtocol.queryStatus(), "manual status") }
 
-    /**
-     * Each send spawns a fresh thread so a blocked write can never queue
-     * all subsequent commands (which was causing the widget commands to hang).
-     */
     private fun sendRaw(data: ByteArray, label: String = "") {
         Thread {
             sendRawBlocking(data, label)
@@ -270,6 +268,7 @@ class BudsConnectionManager(private val context: Context) {
         val battery = BatteryParser.parse(packet)
         val activeBattery = BatteryParser.parseActive(packet)
         val budState = BudStateParser.parse(packet)
+        val earStatus = EarStatusParser.parse(packet)
 
         if (battery != null) {
             if (battery.left != null) lastLeft = battery.left
@@ -281,6 +280,12 @@ class BudsConnectionManager(private val context: Context) {
             if (activeBattery.right != null) lastRight = activeBattery.right
             if (activeBattery.case != null) lastCase = activeBattery.case
             emitBattery()
+        } else if (earStatus != null) {
+            handler.post {
+                listeners.forEach {
+                    it.onEarStatus(earStatus.leftInBox, earStatus.rightInBox)
+                }
+            }
         } else if (budState != null) {
             val label = when (budState) {
                 BudStateParser.State.BothInCase -> "Both in case"

@@ -14,6 +14,8 @@ object WidgetStateStore {
     private const val KEY_LEFT = "leftBattery"
     private const val KEY_CASE = "caseBattery"
     private const val KEY_RIGHT = "rightBattery"
+    private const val KEY_LEFT_IN_BOX = "leftInBox"
+    private const val KEY_RIGHT_IN_BOX = "rightInBox"
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val listeners = CopyOnWriteArrayList<(State) -> Unit>()
@@ -23,7 +25,9 @@ object WidgetStateStore {
         var gameMode: Boolean = false,
         var leftBattery: Int = -1,
         var caseBattery: Int = -1,
-        var rightBattery: Int = -1
+        var rightBattery: Int = -1,
+        var leftInBox: Boolean = false,
+        var rightInBox: Boolean = false
     ) {
         fun leftProgress(): Int = if (leftBattery in 0..100) leftBattery else 0
         fun rightProgress(): Int = if (rightBattery in 0..100) rightBattery else 0
@@ -66,6 +70,8 @@ object WidgetStateStore {
         s.leftBattery = p.getInt(KEY_LEFT, -1)
         s.caseBattery = p.getInt(KEY_CASE, -1)
         s.rightBattery = p.getInt(KEY_RIGHT, -1)
+        s.leftInBox = p.getBoolean(KEY_LEFT_IN_BOX, false)
+        s.rightInBox = p.getBoolean(KEY_RIGHT_IN_BOX, false)
         return s
     }
 
@@ -76,6 +82,8 @@ object WidgetStateStore {
             .putInt(KEY_LEFT, state.leftBattery)
             .putInt(KEY_CASE, state.caseBattery)
             .putInt(KEY_RIGHT, state.rightBattery)
+            .putBoolean(KEY_LEFT_IN_BOX, state.leftInBox)
+            .putBoolean(KEY_RIGHT_IN_BOX, state.rightInBox)
             .apply()
         notifyListeners(state)
     }

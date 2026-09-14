@@ -50,6 +50,7 @@ class AncWidgetProvider : AppWidgetProvider() {
             views.setTextViewText(R.id.widget_text_right, state.rightText())
             views.setTextViewText(R.id.widget_text_case, state.caseText())
 
+            // Hide entire battery row when unknown
             views.setViewVisibility(
                 R.id.widget_row_left,
                 if (state.hasLeft()) View.VISIBLE else View.INVISIBLE
@@ -61,6 +62,16 @@ class AncWidgetProvider : AppWidgetProvider() {
             views.setViewVisibility(
                 R.id.widget_row_case,
                 if (state.hasCase()) View.VISIBLE else View.INVISIBLE
+            )
+
+            // Hide bud icon when the bud is in the case
+            views.setViewVisibility(
+                R.id.widget_bud_left,
+                if (state.leftInBox) View.INVISIBLE else View.VISIBLE
+            )
+            views.setViewVisibility(
+                R.id.widget_bud_right,
+                if (state.rightInBox) View.INVISIBLE else View.VISIBLE
             )
 
             setSegment(views, R.id.widget_seg_off,   state.offIsActive())

@@ -16,9 +16,11 @@ object OpoProtocol {
     const val CMD_QUERY_STATUS = 0x010D
     const val CMD_QUERY_EQ = 0x010F
     const val CMD_QUERY_EQ_ALL = 0x0122
+    const val CMD_QUERY_EAR_STATUS = 0x0105
 
-    // Feature IDs for 0x0403 "set feature" command
-    const val FEATURE_GAME_MODE = 0x06   // OnePlus Buds 4 low latency
+    const val CMD_RESP_EAR_STATUS = 0x8105
+
+    const val FEATURE_GAME_MODE = 0x06
     const val FEATURE_AUTO_PLAY_PAUSE = 0x04
     const val FEATURE_DUAL_DEVICE = 0x11
     const val FEATURE_SPATIAL_SOUND = 0x1B
@@ -72,11 +74,9 @@ object OpoProtocol {
     fun ancLight(): ByteArray = buildPacket(CMD_SET_ANC, payload = ancPayload(6))
     fun ancSmart(): ByteArray = buildPacket(CMD_SET_ANC, payload = ancPayload(7))
 
-    // --- Feature switches ---
     private fun featurePayload(featureId: Int, on: Boolean): ByteArray =
         byteArrayOf(featureId.toByte(), if (on) 0x01 else 0x00)
 
-    /** Game Mode / Low Latency — feature 0x06 */
     fun gameModeOn(): ByteArray = buildPacket(CMD_SET_FEATURE, payload = featurePayload(FEATURE_GAME_MODE, true))
     fun gameModeOff(): ByteArray = buildPacket(CMD_SET_FEATURE, payload = featurePayload(FEATURE_GAME_MODE, false))
 
@@ -89,16 +89,17 @@ object OpoProtocol {
     fun spatialSoundOn(): ByteArray = buildPacket(CMD_SET_FEATURE, payload = featurePayload(FEATURE_SPATIAL_SOUND, true))
     fun spatialSoundOff(): ByteArray = buildPacket(CMD_SET_FEATURE, payload = featurePayload(FEATURE_SPATIAL_SOUND, false))
 
-    // --- Spatial audio modes ---
     fun spatialOff(): ByteArray = buildPacket(CMD_SET_SPATIAL, payload = byteArrayOf(0x00))
     fun spatialFixed(): ByteArray = buildPacket(CMD_SET_SPATIAL, payload = byteArrayOf(0x01))
     fun spatialHeadTracking(): ByteArray = buildPacket(CMD_SET_SPATIAL, payload = byteArrayOf(0x02))
 
-    // --- Queries ---
     fun queryBattery(): ByteArray = buildPacket(CMD_QUERY_BATTERY, seq = 0xF0)
     fun queryAncMode(): ByteArray = buildPacket(CMD_QUERY_ANC, payload = byteArrayOf(0x01, 0x01))
     fun queryEq(): ByteArray = buildPacket(CMD_QUERY_EQ)
     fun queryEqAll(): ByteArray = buildPacket(CMD_QUERY_EQ_ALL, payload = byteArrayOf(0x01, 0x05))
+
+    /** Ear status query — 0x0105. Response: 0x8105 with [count, (devType, status)...] payload. */
+    fun queryEarStatus(): ByteArray = buildPacket(CMD_QUERY_EAR_STATUS, seq = 0xF1)
 
     fun queryStatus(): ByteArray = buildPacket(
         CMD_QUERY_STATUS,

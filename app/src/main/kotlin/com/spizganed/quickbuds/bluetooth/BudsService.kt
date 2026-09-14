@@ -213,6 +213,8 @@ class BudsService : Service(), BudsConnectionManager.Listener {
             st.leftBattery = -1
             st.caseBattery = -1
             st.rightBattery = -1
+            st.leftInBox = false
+            st.rightInBox = false
             WidgetStateStore.write(this, st)
             AncWidgetProvider.refreshAll(this)
         }
@@ -233,6 +235,16 @@ class BudsService : Service(), BudsConnectionManager.Listener {
     }
 
     override fun onBudState(state: String) {}
+
+    override fun onEarStatus(leftInBox: Boolean, rightInBox: Boolean) {
+        val st = WidgetStateStore.read(this)
+        if (st.leftInBox == leftInBox && st.rightInBox == rightInBox) return
+        statusLog("[SVC] Ear status: leftInBox=$leftInBox rightInBox=$rightInBox")
+        st.leftInBox = leftInBox
+        st.rightInBox = rightInBox
+        WidgetStateStore.write(this, st)
+        AncWidgetProvider.refreshAll(this)
+    }
 
     companion object {
         const val ACTION_FORCE_CONNECT = "com.spizganed.quickbuds.FORCE_CONNECT"
