@@ -1,8 +1,20 @@
-*.iml
+# Android / Gradle
 .gradle/
 build/
+app/build/
 local.properties
+*.iml
 .idea/
-.DS_Store
-captures/
 .cxx/
+
+# CodeAssist IDE caches
+.platform/
+.platform/caches/
+*.class
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
