@@ -1,4 +1,4 @@
-package com.example.oneplusbudsqs.bluetooth
+package com.spizganed.quickbuds.bluetooth
 
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothProfile

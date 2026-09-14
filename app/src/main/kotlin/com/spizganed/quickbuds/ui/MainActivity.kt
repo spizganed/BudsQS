@@ -1,4 +1,4 @@
-package com.example.oneplusbudsqs.ui
+package com.spizganed.quickbuds.ui
 
 import android.Manifest
 import android.annotation.SuppressLint
@@ -19,11 +19,11 @@ import android.os.IBinder
 import android.view.View
 import android.view.ViewGroup
 import android.widget.*
-import com.example.oneplusbudsqs.R
-import com.example.oneplusbudsqs.bluetooth.BudsConnectionManager
-import com.example.oneplusbudsqs.bluetooth.BudsService
-import com.example.oneplusbudsqs.widget.AncWidgetProvider
-import com.example.oneplusbudsqs.widget.WidgetStateStore
+import com.spizganed.quickbuds.R
+import com.spizganed.quickbuds.bluetooth.BudsConnectionManager
+import com.spizganed.quickbuds.bluetooth.BudsService
+import com.spizganed.quickbuds.widget.AncWidgetProvider
+import com.spizganed.quickbuds.widget.WidgetStateStore
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale

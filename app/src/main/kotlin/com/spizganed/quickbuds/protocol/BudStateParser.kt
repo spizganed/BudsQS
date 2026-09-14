@@ -1,4 +1,4 @@
-package com.example.oneplusbudsqs.protocol
+package com.spizganed.quickbuds.protocol
 
 object BudStateParser {
     sealed class State {

@@ -1,4 +1,4 @@
-package com.example.oneplusbudsqs.widget
+package com.spizganed.quickbuds.widget
 
 import android.content.Context
 import android.content.SharedPreferences

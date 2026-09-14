@@ -1,11 +1,11 @@
-package com.example.oneplusbudsqs.widget
+package com.spizganed.quickbuds.widget
 
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import com.example.oneplusbudsqs.bluetooth.BudsService
-import com.example.oneplusbudsqs.bluetooth.WidgetActions
+import com.spizganed.quickbuds.bluetooth.BudsService
+import com.spizganed.quickbuds.bluetooth.WidgetActions
 
 class WidgetActionReceiver : BroadcastReceiver() {
 

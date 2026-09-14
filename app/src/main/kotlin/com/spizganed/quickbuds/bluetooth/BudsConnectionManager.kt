@@ -1,4 +1,4 @@
-package com.example.oneplusbudsqs.bluetooth
+package com.spizganed.quickbuds.bluetooth
 
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
@@ -8,10 +8,10 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import com.example.oneplusbudsqs.protocol.BatteryParser
-import com.example.oneplusbudsqs.protocol.BudStateParser
-import com.example.oneplusbudsqs.protocol.OpoProtocol
-import com.example.oneplusbudsqs.protocol.OppoPacketFramer
+import com.spizganed.quickbuds.protocol.BatteryParser
+import com.spizganed.quickbuds.protocol.BudStateParser
+import com.spizganed.quickbuds.protocol.OpoProtocol
+import com.spizganed.quickbuds.protocol.OppoPacketFramer
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream

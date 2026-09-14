@@ -1,4 +1,4 @@
-package com.example.oneplusbudsqs.protocol
+package com.spizganed.quickbuds.protocol
 
 /**
  * Reassembles 0xAA-framed OPPO protocol packets from a byte stream.

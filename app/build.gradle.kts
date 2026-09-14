@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.oneplusbudsqs"
+    namespace = "com.spizganed.quickbuds"
     compileSdk = 36
 
     defaultConfig {

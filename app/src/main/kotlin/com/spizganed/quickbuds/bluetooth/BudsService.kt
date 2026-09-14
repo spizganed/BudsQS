@@ -1,4 +1,4 @@
-package com.example.oneplusbudsqs.bluetooth
+package com.spizganed.quickbuds.bluetooth
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -188,9 +188,9 @@ class BudsService : Service() {
     }
 
     companion object {
-        const val ACTION_FORCE_CONNECT = "com.example.oneplusbudsqs.FORCE_CONNECT"
-        const val ACTION_FORCE_DISCONNECT = "com.example.oneplusbudsqs.FORCE_DISCONNECT"
-        const val ACTION_WIDGET_COMMAND = "com.example.oneplusbudsqs.WIDGET_COMMAND"
+        const val ACTION_FORCE_CONNECT = "com.spizganed.quickbuds.FORCE_CONNECT"
+        const val ACTION_FORCE_DISCONNECT = "com.spizganed.quickbuds.FORCE_DISCONNECT"
+        const val ACTION_WIDGET_COMMAND = "com.spizganed.quickbuds.WIDGET_COMMAND"
         const val EXTRA_WIDGET_ACTION = "widget_action"
         const val EXTRA_WIDGET_ANC_MODE = "widget_anc_mode"
         const val EXTRA_WIDGET_GAME_MODE = "widget_game_mode"

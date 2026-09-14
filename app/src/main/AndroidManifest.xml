@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.oneplusbudsqs">
+    package="com.spizganed.quickbuds">
 
     <uses-feature android:name="android.software.companion_device_setup" android:required="true" />
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
@@ -76,10 +76,10 @@
             android:name=".widget.WidgetActionReceiver"
             android:exported="true">
             <intent-filter>
-                <action android:name="com.example.oneplusbudsqs.widget.ANC_CYCLE" />
-                <action android:name="com.example.oneplusbudsqs.widget.TRANS" />
-                <action android:name="com.example.oneplusbudsqs.widget.OFF" />
-                <action android:name="com.example.oneplusbudsqs.widget.GAME_TOGGLE" />
+                <action android:name="com.spizganed.quickbuds.widget.ANC_CYCLE" />
+                <action android:name="com.spizganed.quickbuds.widget.TRANS" />
+                <action android:name="com.spizganed.quickbuds.widget.OFF" />
+                <action android:name="com.spizganed.quickbuds.widget.GAME_TOGGLE" />
             </intent-filter>
         </receiver>
 

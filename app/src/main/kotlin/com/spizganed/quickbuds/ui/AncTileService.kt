@@ -1,4 +1,4 @@
-package com.example.oneplusbudsqs.ui
+package com.spizganed.quickbuds.ui
 
 import android.content.ComponentName
 import android.content.Context
@@ -9,9 +9,9 @@ import android.os.Build
 import android.os.IBinder
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
-import com.example.oneplusbudsqs.R
-import com.example.oneplusbudsqs.bluetooth.BudsConnectionManager
-import com.example.oneplusbudsqs.bluetooth.BudsService
+import com.spizganed.quickbuds.R
+import com.spizganed.quickbuds.bluetooth.BudsConnectionManager
+import com.spizganed.quickbuds.bluetooth.BudsService
 
 class AncTileService : TileService(), BudsConnectionManager.Listener {
 

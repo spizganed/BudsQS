@@ -1,4 +1,4 @@
-package com.example.oneplusbudsqs.protocol
+package com.spizganed.quickbuds.protocol
 
 object BatteryParser {
     data class Info(val level: Int, val isCharging: Boolean)
