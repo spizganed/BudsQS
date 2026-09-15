@@ -23,6 +23,10 @@ import java.util.concurrent.Executors
 @SuppressLint("MissingPermission")
 class BudsConnectionManager(private val context: Context) {
 
+    init {
+        PacketLogger.init(context)
+    }
+
     interface Listener {
         fun onStatus(msg: String)
         fun onConnected(connected: Boolean)
@@ -313,6 +317,7 @@ class BudsConnectionManager(private val context: Context) {
 
     private fun log(msg: String) {
         Log.d("BudsConn", msg)
+        PacketLogger.log(msg)
         handler.post { listeners.forEach { it.onStatus(msg) } }
     }
 }
