@@ -16,6 +16,11 @@ object WidgetStateStore {
     private const val KEY_RIGHT = "rightBattery"
     private const val KEY_LEFT_IN_BOX = "leftInBox"
     private const val KEY_RIGHT_IN_BOX = "rightInBox"
+    private const val KEY_LEFT_STATUS = "leftStatus"
+    private const val KEY_RIGHT_STATUS = "rightStatus"
+    private const val KEY_LID_CLOSED = "caseLidClosed"
+    private const val KEY_LEFT_DOCKED = "leftDocked"
+    private const val KEY_RIGHT_DOCKED = "rightDocked"
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val listeners = CopyOnWriteArrayList<(State) -> Unit>()
@@ -27,7 +32,20 @@ object WidgetStateStore {
         var caseBattery: Int = -1,
         var rightBattery: Int = -1,
         var leftInBox: Boolean = false,
-        var rightInBox: Boolean = false
+        var rightInBox: Boolean = false,
+
+        // Raw wear status codes from getEarBudsStatus (0x0109):
+        //   4 = in case, 1/5 = out of case idle, 3/7 = wearing, 0 = disconnected, -1 = unknown
+        var leftStatus: Int = -1,
+        var rightStatus: Int = -1,
+
+        // true when the case lid is believed closed
+        var caseLidClosed: Boolean = false,
+
+        // buds that were docked when the lid closed — they stay hidden while the
+        // lid is closed even though the firmware re-reports them as "off" (1/5)
+        var leftDocked: Boolean = false,
+        var rightDocked: Boolean = false
     ) {
         fun leftProgress(): Int = if (leftBattery in 0..100) leftBattery else 0
         fun rightProgress(): Int = if (rightBattery in 0..100) rightBattery else 0
@@ -40,6 +58,9 @@ object WidgetStateStore {
         fun leftText(): String = if (leftBattery in 0..100) leftBattery.toString() else ""
         fun rightText(): String = if (rightBattery in 0..100) rightBattery.toString() else ""
         fun caseText(): String = if (caseBattery in 0..100) caseBattery.toString() else ""
+
+        fun leftWearing(): Boolean = leftStatus == 3 || leftStatus == 7
+        fun rightWearing(): Boolean = rightStatus == 3 || rightStatus == 7
 
         fun offIsActive(): Boolean = ancMode == "Off" || ancMode.isEmpty()
         fun transIsActive(): Boolean = ancMode == "Transparency"
@@ -72,6 +93,11 @@ object WidgetStateStore {
         s.rightBattery = p.getInt(KEY_RIGHT, -1)
         s.leftInBox = p.getBoolean(KEY_LEFT_IN_BOX, false)
         s.rightInBox = p.getBoolean(KEY_RIGHT_IN_BOX, false)
+        s.leftStatus = p.getInt(KEY_LEFT_STATUS, -1)
+        s.rightStatus = p.getInt(KEY_RIGHT_STATUS, -1)
+        s.caseLidClosed = p.getBoolean(KEY_LID_CLOSED, false)
+        s.leftDocked = p.getBoolean(KEY_LEFT_DOCKED, false)
+        s.rightDocked = p.getBoolean(KEY_RIGHT_DOCKED, false)
         return s
     }
 
@@ -84,6 +110,11 @@ object WidgetStateStore {
             .putInt(KEY_RIGHT, state.rightBattery)
             .putBoolean(KEY_LEFT_IN_BOX, state.leftInBox)
             .putBoolean(KEY_RIGHT_IN_BOX, state.rightInBox)
+            .putInt(KEY_LEFT_STATUS, state.leftStatus)
+            .putInt(KEY_RIGHT_STATUS, state.rightStatus)
+            .putBoolean(KEY_LID_CLOSED, state.caseLidClosed)
+            .putBoolean(KEY_LEFT_DOCKED, state.leftDocked)
+            .putBoolean(KEY_RIGHT_DOCKED, state.rightDocked)
             .apply()
         notifyListeners(state)
     }

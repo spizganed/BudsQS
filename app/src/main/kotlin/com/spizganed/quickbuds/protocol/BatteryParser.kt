@@ -1,12 +1,14 @@
 package com.spizganed.quickbuds.protocol
 
 object BatteryParser {
+
     data class Info(val level: Int, val isCharging: Boolean)
     data class Result(val left: Info?, val right: Info?, val case: Info?)
 
     /**
      * Parse battery query response (Cmd=0x8106).
-     * Payload: [Index(1B), RawValue(1B)] pairs.
+     * Payload: [status][count][Index, RawValue] pairs  (status byte is skipped:
+     * it is not 1/2/3, so the pair loop ignores it naturally)
      * Index: 1=Left, 2=Right, 3=Case.
      * RawValue: level = val & 0x7F, charging = (val & 0x80) != 0
      */

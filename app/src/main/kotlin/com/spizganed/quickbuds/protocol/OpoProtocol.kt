@@ -16,8 +16,17 @@ object OpoProtocol {
     const val CMD_QUERY_STATUS = 0x010D
     const val CMD_QUERY_EQ = 0x010F
     const val CMD_QUERY_EQ_ALL = 0x0122
-    const val CMD_QUERY_EAR_STATUS = 0x0105
 
+    // --- wearing / in-case status (reverse-engineered from OppoPodsManager) ---
+    const val CMD_QUERY_WEARING = 0x0109      // getEarBudsStatus — THE in-case query
+    const val CMD_RESP_WEARING = 0x8109
+    const val CMD_ACTIVE_REPORT = 0x0204      // spontaneous notification, payload[0] = subType
+    const val CMD_REGISTER_NOTIFY = 0x0205    // subscribe to spontaneous notifications
+    const val EVT_WEARING = 0x02              // 0x0204 subType: wearing status changed
+
+    // Legacy misnomers — 0x0105 is actually getRemoteVersion (returns firmware CSV).
+    // Kept only so the old unused EarStatusParser still compiles; do NOT call.
+    const val CMD_QUERY_EAR_STATUS = 0x0105
     const val CMD_RESP_EAR_STATUS = 0x8105
 
     const val FEATURE_GAME_MODE = 0x06
@@ -56,6 +65,13 @@ object OpoProtocol {
     fun buildHandshake(): ByteArray = buildPacket(CMD_HANDSHAKE)
     fun buildQueryProductId(): ByteArray = buildPacket(CMD_QUERY_PRODUCT_ID)
     fun buildQueryBroadcastCodes(): ByteArray = buildPacket(CMD_QUERY_BROADCAST)
+
+    /** getEarBudsStatus (0x0109) — returns [count][comp,st] pairs, st=4 means in case. */
+    fun queryWearingStatus(): ByteArray = buildPacket(CMD_QUERY_WEARING, seq = 0xF2)
+
+    /** Subscribe to spontaneous 0x0204 notifications (battery + wearing), per reference impl. */
+    fun registerNotifications(): ByteArray =
+        buildPacket(CMD_REGISTER_NOTIFY, payload = byteArrayOf(0x01, 0x01, 0x02, 0x02))
 
     private fun ancPayload(index: Int): ByteArray {
         val byteCount = index / 8 + 1
@@ -97,9 +113,6 @@ object OpoProtocol {
     fun queryAncMode(): ByteArray = buildPacket(CMD_QUERY_ANC, payload = byteArrayOf(0x01, 0x01))
     fun queryEq(): ByteArray = buildPacket(CMD_QUERY_EQ)
     fun queryEqAll(): ByteArray = buildPacket(CMD_QUERY_EQ_ALL, payload = byteArrayOf(0x01, 0x05))
-
-    /** Ear status query — 0x0105. Response: 0x8105 with [count, (devType, status)...] payload. */
-    fun queryEarStatus(): ByteArray = buildPacket(CMD_QUERY_EAR_STATUS, seq = 0xF1)
 
     fun queryStatus(): ByteArray = buildPacket(
         CMD_QUERY_STATUS,

@@ -205,16 +205,29 @@ class BudsService : Service(), BudsConnectionManager.Listener {
     override fun onStatus(msg: String) {}
 
     override fun onConnected(connected: Boolean) {
+        val st = WidgetStateStore.read(this)
         if (connected) {
             statusLog("[SVC] Connected")
+            if (st.caseLidClosed || st.leftDocked || st.rightDocked) {
+                st.caseLidClosed = false
+                st.leftDocked = false
+                st.rightDocked = false
+                WidgetStateStore.write(this, st)
+                AncWidgetProvider.refreshAll(this)
+            }
         } else {
             statusLog("[SVC] Disconnected")
-            val st = WidgetStateStore.read(this)
             st.leftBattery = -1
             st.caseBattery = -1
             st.rightBattery = -1
-            st.leftInBox = false
-            st.rightInBox = false
+            // Socket died with a bud in the case (4 = docked, 0 = docked & asleep)
+            // => lid closed. Freeze the docked set so those icons stay hidden.
+            if (st.leftStatus == 4 || st.rightStatus == 4 ||
+                st.leftStatus == 0 || st.rightStatus == 0) {
+                st.caseLidClosed = true
+                st.leftDocked = (st.leftStatus == 4 || st.leftStatus == 0)
+                st.rightDocked = (st.rightStatus == 4 || st.rightStatus == 0)
+            }
             WidgetStateStore.write(this, st)
             AncWidgetProvider.refreshAll(this)
         }
@@ -226,6 +239,8 @@ class BudsService : Service(), BudsConnectionManager.Listener {
         left: Int?, case: Int?, right: Int?,
         chargingLeft: Boolean, chargingCase: Boolean, chargingRight: Boolean
     ) {
+        statusLog("[SVC] Battery: L=$left C=$case R=$right " +
+                "(chg: $chargingLeft/$chargingCase/$chargingRight)")
         val st = WidgetStateStore.read(this)
         if (left != null) st.leftBattery = left
         if (case != null) st.caseBattery = case
@@ -236,14 +251,26 @@ class BudsService : Service(), BudsConnectionManager.Listener {
 
     override fun onBudState(state: String) {}
 
-    override fun onEarStatus(leftInBox: Boolean, rightInBox: Boolean) {
+    override fun onEarStatus(leftInBox: Boolean, rightInBox: Boolean) {}
+
+    override fun onWearState(left: Int, right: Int, caseSt: Int) {
         val st = WidgetStateStore.read(this)
-        if (st.leftInBox == leftInBox && st.rightInBox == rightInBox) return
-        statusLog("[SVC] Ear status: leftInBox=$leftInBox rightInBox=$rightInBox")
-        st.leftInBox = leftInBox
-        st.rightInBox = rightInBox
-        WidgetStateStore.write(this, st)
-        AncWidgetProvider.refreshAll(this)
+        var changed = false
+        if (left >= 0 && st.leftStatus != left) {
+            st.leftStatus = left
+            st.leftInBox = (left == 4)
+            changed = true
+        }
+        if (right >= 0 && st.rightStatus != right) {
+            st.rightStatus = right
+            st.rightInBox = (right == 4)
+            changed = true
+        }
+        if (changed) {
+            statusLog("[SVC] Wear state: L=$left R=$right case=$caseSt")
+            WidgetStateStore.write(this, st)
+            AncWidgetProvider.refreshAll(this)
+        }
     }
 
     companion object {

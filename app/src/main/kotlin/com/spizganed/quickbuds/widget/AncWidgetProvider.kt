@@ -28,12 +28,40 @@ class AncWidgetProvider : AppWidgetProvider() {
 
     companion object {
 
+        // ---- Icon color (tweak freely) ----
+        private const val COLOR_ICON = 0xFF9AA0A6.toInt()   // gray
+
         fun refreshAll(context: Context) {
             val mgr = AppWidgetManager.getInstance(context)
             val ids = mgr.getAppWidgetIds(
                 ComponentName(context, AncWidgetProvider::class.java)
             )
             for (id in ids) updateWidget(context, mgr, id)
+        }
+
+        /** Bud state -> icon mode. st: 4=in case, 0=in case asleep, 3/7=in ear, 1/5=out idle */
+        private fun budMode(status: Int): Int = when (status) {
+            4, 0 -> WidgetIcons.MODE_GONE
+            3, 7 -> WidgetIcons.MODE_FILLED
+            else -> WidgetIcons.MODE_OUTLINE
+        }
+
+        private fun applyIcon(
+            context: Context, views: RemoteViews,
+            viewId: Int, resId: Int, mode: Int
+        ) {
+            when (mode) {
+                WidgetIcons.MODE_GONE ->
+                    views.setViewVisibility(viewId, View.INVISIBLE)
+                WidgetIcons.MODE_FILLED -> {
+                    views.setViewVisibility(viewId, View.VISIBLE)
+                    views.setImageViewBitmap(viewId, WidgetIcons.filled(context, resId, COLOR_ICON))
+                }
+                else -> {
+                    views.setViewVisibility(viewId, View.VISIBLE)
+                    views.setImageViewBitmap(viewId, WidgetIcons.outline(context, resId, COLOR_ICON))
+                }
+            }
         }
 
         private fun updateWidget(context: Context, mgr: AppWidgetManager, id: Int) {
@@ -64,15 +92,19 @@ class AncWidgetProvider : AppWidgetProvider() {
                 if (state.hasCase()) View.VISIBLE else View.INVISIBLE
             )
 
-            // Hide bud icon when the bud is in the case
-            views.setViewVisibility(
-                R.id.widget_bud_left,
-                if (state.leftInBox) View.INVISIBLE else View.VISIBLE
-            )
-            views.setViewVisibility(
-                R.id.widget_bud_right,
-                if (state.rightInBox) View.INVISIBLE else View.VISIBLE
-            )
+            // Buds: hidden in case; filled in ear; outline when out & not worn
+            applyIcon(context, views, R.id.widget_bud_left, R.drawable.ic_bud_left, budMode(state.leftStatus))
+            applyIcon(context, views, R.id.widget_bud_right, R.drawable.ic_bud_right, budMode(state.rightStatus))
+
+            // Case: hidden when disconnected; filled when closed (but linked via a bud);
+            // outline when open. A bud reporting st=0 means the lid is closed.
+            val anyAsleep = state.leftStatus == 0 || state.rightStatus == 0
+            val caseMode = when {
+                state.caseLidClosed -> WidgetIcons.MODE_GONE
+                anyAsleep -> WidgetIcons.MODE_FILLED
+                else -> WidgetIcons.MODE_OUTLINE
+            }
+            applyIcon(context, views, R.id.widget_bud_case, R.drawable.ic_case, caseMode)
 
             setSegment(views, R.id.widget_seg_off,   state.offIsActive())
             setSegment(views, R.id.widget_seg_trans, state.transIsActive())

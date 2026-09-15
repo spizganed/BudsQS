@@ -9,10 +9,9 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import com.spizganed.quickbuds.protocol.BatteryParser
-import com.spizganed.quickbuds.protocol.BudStateParser
-import com.spizganed.quickbuds.protocol.EarStatusParser
 import com.spizganed.quickbuds.protocol.OpoProtocol
 import com.spizganed.quickbuds.protocol.OppoPacketFramer
+import com.spizganed.quickbuds.protocol.WearingStatusParser
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
@@ -34,6 +33,13 @@ class BudsConnectionManager(private val context: Context) {
         fun onBattery(left: Int?, case: Int?, right: Int?, chargingLeft: Boolean, chargingCase: Boolean, chargingRight: Boolean)
         fun onBudState(state: String)
         fun onEarStatus(leftInBox: Boolean, rightInBox: Boolean) {}
+
+        /**
+         * Full wear state (raw status codes from 0x0109 / 0x0204):
+         * 4 = in case, 1/5 = out idle, 3/7 = wearing, 0 = disconnected, -1 = side not reported.
+         * caseSt is the raw code reported by the case component (comp 3), -1 if absent.
+         */
+        fun onWearState(left: Int, right: Int, caseSt: Int) {}
     }
 
     private val listeners = CopyOnWriteArrayList<Listener>()
@@ -56,10 +62,17 @@ class BudsConnectionManager(private val context: Context) {
     private var isReady = false
     private var isConnecting = false
     private var reconnectAttempts = 0
+    private var pollingStarted = false
 
     private var lastLeft: BatteryParser.Info? = null
     private var lastRight: BatteryParser.Info? = null
     private var lastCase: BatteryParser.Info? = null
+
+    private var lastLeftInCase = false
+    private var lastRightInCase = false
+    private var lastLeftStatus = -1
+    private var lastRightStatus = -1
+    private var lastCaseStatus = -1
 
     fun isConnected(): Boolean = isReady && bluetoothSocket?.isConnected == true
 
@@ -146,10 +159,11 @@ class BudsConnectionManager(private val context: Context) {
                 delay(300); sendRawBlocking(OpoProtocol.buildHandshake(), "handshake")
                 delay(200); sendRawBlocking(OpoProtocol.buildQueryProductId(), "query product id")
                 delay(200); sendRawBlocking(OpoProtocol.buildQueryBroadcastCodes(), "query broadcast codes")
-                delay(300); sendRawBlocking(OpoProtocol.queryStatus(), "query status")
+                delay(200); sendRawBlocking(OpoProtocol.registerNotifications(), "register notify")
+                delay(200); sendRawBlocking(OpoProtocol.queryStatus(), "query status")
                 delay(200); sendRawBlocking(OpoProtocol.queryAncMode(), "query anc")
                 delay(200); sendRawBlocking(OpoProtocol.queryBattery(), "query battery")
-                delay(200); sendRawBlocking(OpoProtocol.queryEarStatus(), "query ear status")
+                delay(200); sendRawBlocking(OpoProtocol.queryWearingStatus(), "query wearing")
             } catch (e: Exception) {
                 log("Init sequence error: ${e.message}")
             }
@@ -157,11 +171,16 @@ class BudsConnectionManager(private val context: Context) {
     }
 
     private fun startBatteryPolling() {
+        if (pollingStarted) {
+            log("Polling already running, not starting a second poller.")
+            return
+        }
+        pollingStarted = true
         pollExecutor.scheduleWithFixedDelay({
             if (isReady) {
                 try {
                     sendRaw(OpoProtocol.queryStatus(), "poll status")
-                    sendRaw(OpoProtocol.queryEarStatus(), "poll ear status")
+                    sendRaw(OpoProtocol.queryWearingStatus(), "poll wearing")
                 } catch (_: Exception) {}
             }
         }, 5, 5, java.util.concurrent.TimeUnit.SECONDS)
@@ -265,14 +284,55 @@ class BudsConnectionManager(private val context: Context) {
         }
     }
 
+    private fun payloadOf(packet: ByteArray): ByteArray {
+        if (packet.size < 9) return ByteArray(0)
+        val payLen = (packet[7].toInt() and 0xFF) or ((packet[8].toInt() and 0xFF) shl 8)
+        val end = minOf(9 + payLen, packet.size)
+        return if (end > 9) packet.copyOfRange(9, end) else ByteArray(0)
+    }
+
     private fun handlePacket(packet: ByteArray) {
         log("RX: ${OpoProtocol.bytesToHex(packet)}")
         handler.post { listeners.forEach { it.onPacketReceived(packet) } }
 
+        if (packet.size < 9) return
+        val cmd = (packet[4].toInt() and 0xFF) or ((packet[5].toInt() and 0xFF) shl 8)
+        val payload = payloadOf(packet)
+
+        // --- Wearing / in-case state: 0x8109 query response OR 0x0204 spontaneous event ---
+        var wearing: WearingStatusParser.Result? = null
+        var fromEvent = false
+        if (cmd == OpoProtocol.CMD_RESP_WEARING) {
+            wearing = WearingStatusParser.parseQueryResponse(payload)
+        } else if (cmd == OpoProtocol.CMD_ACTIVE_REPORT && payload.isNotEmpty() &&
+                   payload[0].toInt() and 0xFF == OpoProtocol.EVT_WEARING) {
+            wearing = WearingStatusParser.parseActiveReport(payload)
+            fromEvent = true
+        }
+        if (wearing != null) {
+            if (wearing.leftValid) {
+                lastLeftInCase = wearing.leftInCase
+                lastLeftStatus = wearing.leftStatus
+            }
+            if (wearing.rightValid) {
+                lastRightInCase = wearing.rightInCase
+                lastRightStatus = wearing.rightStatus
+            }
+            if (wearing.caseStatus >= 0) lastCaseStatus = wearing.caseStatus
+            val l = if (lastLeftInCase) "IN-CASE" else "out"
+            val r = if (lastRightInCase) "IN-CASE" else "out"
+            log("WEAR ${if (fromEvent) "EVT" else "QRY"}: L=$l R=$r")
+            handler.post {
+                listeners.forEach {
+                    it.onEarStatus(lastLeftInCase, lastRightInCase)
+                    it.onWearState(lastLeftStatus, lastRightStatus, lastCaseStatus)
+                }
+            }
+            return
+        }
+
         val battery = BatteryParser.parse(packet)
         val activeBattery = BatteryParser.parseActive(packet)
-        val budState = BudStateParser.parse(packet)
-        val earStatus = EarStatusParser.parse(packet)
 
         if (battery != null) {
             if (battery.left != null) lastLeft = battery.left
@@ -284,21 +344,6 @@ class BudsConnectionManager(private val context: Context) {
             if (activeBattery.right != null) lastRight = activeBattery.right
             if (activeBattery.case != null) lastCase = activeBattery.case
             emitBattery()
-        } else if (earStatus != null) {
-            handler.post {
-                listeners.forEach {
-                    it.onEarStatus(earStatus.leftInBox, earStatus.rightInBox)
-                }
-            }
-        } else if (budState != null) {
-            val label = when (budState) {
-                BudStateParser.State.BothInCase -> "Both in case"
-                BudStateParser.State.BothOut -> "Both out"
-                BudStateParser.State.LeftOut -> "Left out"
-                BudStateParser.State.RightOut -> "Right out"
-                is BudStateParser.State.Unknown -> "Unknown (0x${"%02X".format(budState.raw)})"
-            }
-            handler.post { listeners.forEach { it.onBudState(label) } }
         }
     }
 
