@@ -1,121 +1,94 @@
-# BudsQS
+# QuickBuds
 
-> **Working title.** The repo/app is currently called *BudsQS* — a placeholder until a better name lands.
+> Lightweight, open-source control for OnePlus / OPPO / realme earbuds — direct RFCOMM, no bloat.
+> Repo name: BudsQS (historical). App name: **QuickBuds**.
 
-A lightweight, standalone Android app for controlling **OnePlus / OPPO / realme** Bluetooth earbuds directly over RFCOMM — no HeyMelody, no Wearable app, no root, no Shizuku, no ADB permissions. Install, run, done.
+[![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](./LICENSE)
+[![Platform](https://img.shields.io/badge/Platform-Android-3DDC84.svg)]()
 
-It speaks the earbuds' private OPPO protocol directly, giving you ANC control, battery readout, game mode, and a home-screen widget / Quick Settings tile that work **even when the app is closed**.
+Control your earbuds' ANC, Game Mode, and battery monitoring from a clean widget — without HeyMelody, without the Wearable app, without root, Shizuku, or ADB. Built 100% on-device (CodeAssist + Termux), reverse-engineered packet by packet.
 
----
+## Why
+
+The official apps are heavy, account-bound, and push features you don't want. QuickBuds speaks directly to the buds over a classic Bluetooth RFCOMM channel and implements only what the developer actually uses — see [ROADMAP.md](./ROADMAP.md) for the full, brutally honest priority list.
 
 ## Features
 
-- **ANC control** — Off, Noise Cancellation, Transparency, plus Smart / Deep / Medium / Light sub-modes
-- **Live battery** — Left / Right / Case with charging state, polled every 5s
-- **Game Mode** — low-latency toggle
-- **Home-screen widget** — 4 buttons + battery, functional while the app is closed
-- **Quick Settings tile** — ANC toggle straight from the QS panel
-- **Foreground service** — keeps the connection alive and survives the app being swiped away
-- **Bud state** — detects which bud is in / out / in the case
-- **Themes** — OLED, Dark, Light
+**Connection & control**
+- Direct RFCOMM to the earbuds (UUID `0000079A-D102-11E1-9B23-00025B00A5A5`, with fallbacks)
+- Full init handshake, then the buds **push** battery/wearing events to the app
+- ANC: Off / Transparency / Light / Medium / Deep (+ Smart command ready)
+- Game Mode toggle
+- Auto-retry connection logic (survives the buds being busy)
 
----
+**Home-screen widget (3x2)**
+- Battery bars for Left / Case / Right — always showing last-known values, updated on every hardware packet (poll or push)
+- Bud status icons: **white** = in ear, **grey** = out of ear, **hidden** = in case
+- 5-segment ANC switcher + Game Mode row — works even with the app closed
+- Nothing to configure; reacts as fast as the hardware reports
 
-## Requirements
+**App & service**
+- Foreground service keeps the link alive (notification: roadmap item to hide it)
+- Quick Settings tile
+- OLED Black / Dark / Light themes
+- Full packet logging (every sent command and received frame, timestamped) behind the in-app log
 
-- Android device with Bluetooth Classic (RFCOMM) support
-- **Tested on:** Nothing Phone (3a), Android 15, latest stock firmware
-- **No root. No Shizuku. No ADB. No special permissions beyond normal install.**
-- Earphones: **OnePlus Buds 4** (tested). Other OPPO / OnePlus / realme buds using the same protocol may work — untested.
+## Requirements & tested setup
 
----
+- Android (developed and tested on Nothing Phone (3a), Android 15)
+- OnePlus Buds 4 (other OnePlus/OPPO/realme buds likely work — protocol is shared)
+- Bluetooth permissions granted on first launch
 
-## Install
-
-1. Download the latest APK from the [Releases](../../releases) page.
-2. Install it (you may need to allow "Install unknown apps" for your browser/file manager).
-3. Open the app, grant the Bluetooth permissions it asks for.
-4. Make sure your earbuds are already **paired** in system Bluetooth settings — the app connects to paired devices, it does not pair them for you.
-
-The app connects automatically once the earbuds are paired and nearby.
-
----
-
-## Usage
-
-- **In-app:** open the app for full controls (ANC, battery, game mode, themes).
-- **Widget:** add the BudsQS widget to your home screen. The four buttons control ANC and Game Mode; the battery row updates live. Works while the app is closed.
-- **Quick Settings:** add the BudsQS tile from the QS edit screen for a one-tap ANC toggle.
-
----
-
-## Build from source
-
-```bash
-git clone https://github.com/spizganed/BudsQS.git
-cd BudsQS
-./gradlew assembleDebug
-```
-
-The APK lands in `app/build/outputs/apk/debug/`.
-
-Built with the [CodeAssist IDE](https://github.com/TyronNeo/CodeAssist) on Android.
-
----
-
-## Protocol (brief)
-
-Communication uses **Bluetooth Classic RFCOMM** on UUID `0000079A-D102-11E1-9B23-00025B00A5A5`, with a fallback to RFCOMM channel 15.
-
-Packet frame:
+## How it works
 
 ```
-AA [TotalLen] 00 00 [Cmd LE] [Seq] [PayLen LE] [Payload...]
+Widget tap / app UI
+      |
+WidgetActionReceiver  ->  BudsService  ->  BudsConnectionManager (RFCOMM)
+                                                  |
+                                     OppoPacketFramer (AA framing)
+                                                  |
+                              OpoProtocol: handshake, queries, 0x0205 event
+                              registration, ANC/GameMode command builders
+                                                  |
+                              WearingStatusParser / BatteryParser -> state
+                                                  |
+                              WidgetStateStore -> AncWidgetProvider (refresh)
 ```
 
-Key commands:
+Key protocol facts (observed on Buds 4):
+- Battery query `0x01F0` -> components `(01,L) (02,R) (03,C)`
+- Wearing query `0x01F2` -> status codes: `4` = in case, `1/5` = out idle, `3/7` = wearing
+- `0x0205` registration makes the buds push `0x0204` events (battery confirmed; wear events under investigation)
+- Closing the lid with buds docked kills the RFCOMM socket — used as one of the lid-state signals
 
-| Function        | Cmd    |
-|-----------------|--------|
-| Handshake       | 0x0100 |
-| Product ID      | 0x0103 |
-| Broadcast codes | 0x0200 |
-| Status query    | 0x010D |
-| Battery query   | 0x0106 |
-| ANC query       | 0x010C |
-| Set ANC         | 0x0404 |
-| Set feature     | 0x0403 |
+## Development workflow
 
-Battery values are `[Index, RawValue]` pairs — `level = val & 0x7F`, `charging = (val & 0x80) != 0`. Index `1` = Left, `2` = Right, `3` = Case.
+- **No desktop. Ever.** CodeAssist IDE on the phone, Termux for git/build scripts, GitHub mobile for repo ops.
+- AI-assisted (Kimi) for protocol reverse-engineering, parsers, and logic; the human does device testing and design decisions.
+- App icon pipeline (Termux) documented in the repo history; adaptive icon is on the roadmap.
 
-For a deeper protocol write-up, see the reference projects credited below.
+## Project status
 
----
+Actively developed against [ROADMAP.md](./ROADMAP.md). Handoff notes for future sessions live in [HANDOFF.md](./HANDOFF.md). Recent milestone: widget overhaul — vector icons traced from the originals (fixes pixelation), locked white/grey/hidden state logic, 3x2 layout, case icon removed after verifying even HeyMelody can't read lid state in all scenarios.
+
+## Screenshots
+
+<!-- Add current screenshots here (widget states + app UI). Older shots may exist in repo history. -->
 
 ## Credits
 
-This project would not exist without the reverse-engineering work done by others. The protocol was deciphered with the help of:
+Protocol reverse engineering standing on the shoulders of:
 
-- **[Leaf-lsgtky/OppoPods](https://github.com/Leaf-lsgtky/OppoPods)** — OPPO earbud protocol reverse engineering
-- **[Zhaoyi-ya/OppoPodsManager](https://github.com/Zhaoyi-ya/OppoPodsManager)** — OPPO earbud protocol reference and feature implementation
+- **[Leaf-lsgtky/OppoPods](https://github.com/Leaf-lsgtky/OppoPods)** — OPPO earbud protocol RE
+- **[Zhaoyi-ya/OppoPodsManager](https://github.com/Zhaoyi-ya/OppoPodsManager)** — protocol reference & feature implementation
 
-Their source was cloned and used as reference material while building BudsQS. Because of that, **BudsQS is licensed under GPL-3.0**, the same license as both projects above.
-
-Built with:
-- [CodeAssist IDE](https://github.com/TyronNeo/CodeAssist) by Tyron
-
----
+Tools: CodeAssist IDE (Tyron), Termux, decompile.com, Kimi (Moonshot AI).
 
 ## License
 
-**GPL-3.0** — see [LICENSE](LICENSE).
+GPL-3.0 — see [LICENSE](./LICENSE). Same license as the reference projects above.
 
-You are free to use, study, modify, and redistribute this project, including commercially, **as long as** any derivative work is also released under GPL-3.0 and credits the original authors.
+## Disclaimer
 
----
-
-## Status
-
-- Working — all core features functional.
-- The package name (`com.example.oneplusbudsqs`) is temporary and will change when the UI is redesigned.
-- The widget and UI are due for a visual redesign.
+Unofficial project, not affiliated with OnePlus, OPPO, or realme. Product names are trademarks of their respective owners. You use this software at your own risk; sending raw commands to your earbuds is generally safe but comes with no warranty.

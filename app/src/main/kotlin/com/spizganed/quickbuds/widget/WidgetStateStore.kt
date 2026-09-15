@@ -21,6 +21,8 @@ object WidgetStateStore {
     private const val KEY_LID_CLOSED = "caseLidClosed"
     private const val KEY_LEFT_DOCKED = "leftDocked"
     private const val KEY_RIGHT_DOCKED = "rightDocked"
+    private const val KEY_CONNECTED = "connected"
+    private const val KEY_CASE_BATTERY_AT = "caseBatteryAt"
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val listeners = CopyOnWriteArrayList<(State) -> Unit>()
@@ -45,7 +47,14 @@ object WidgetStateStore {
         // buds that were docked when the lid closed — they stay hidden while the
         // lid is closed even though the firmware re-reports them as "off" (1/5)
         var leftDocked: Boolean = false,
-        var rightDocked: Boolean = false
+        var rightDocked: Boolean = false,
+
+        // true while the RFCOMM link to the buds is up
+        var connected: Boolean = false,
+
+        // timestamp of the last valid case battery report — a closed lid stops
+        // these, so freshness == lid open
+        var caseBatteryAt: Long = 0L
     ) {
         fun leftProgress(): Int = if (leftBattery in 0..100) leftBattery else 0
         fun rightProgress(): Int = if (rightBattery in 0..100) rightBattery else 0
@@ -98,6 +107,8 @@ object WidgetStateStore {
         s.caseLidClosed = p.getBoolean(KEY_LID_CLOSED, false)
         s.leftDocked = p.getBoolean(KEY_LEFT_DOCKED, false)
         s.rightDocked = p.getBoolean(KEY_RIGHT_DOCKED, false)
+        s.connected = p.getBoolean(KEY_CONNECTED, false)
+        s.caseBatteryAt = p.getLong(KEY_CASE_BATTERY_AT, 0L)
         return s
     }
 
@@ -115,6 +126,8 @@ object WidgetStateStore {
             .putBoolean(KEY_LID_CLOSED, state.caseLidClosed)
             .putBoolean(KEY_LEFT_DOCKED, state.leftDocked)
             .putBoolean(KEY_RIGHT_DOCKED, state.rightDocked)
+            .putBoolean(KEY_CONNECTED, state.connected)
+            .putLong(KEY_CASE_BATTERY_AT, state.caseBatteryAt)
             .apply()
         notifyListeners(state)
     }

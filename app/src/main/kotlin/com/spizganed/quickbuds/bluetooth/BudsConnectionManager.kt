@@ -246,6 +246,14 @@ class BudsConnectionManager(private val context: Context) {
         try { Thread.sleep(ms) } catch (_: InterruptedException) {}
     }
 
+    private fun wearLabel(st: Int): String = when (st) {
+        3, 7 -> "EAR"
+        4 -> "CASE"
+        1, 5 -> "out"
+        0 -> "off"
+        else -> "?"
+    }
+
     private inner class ConnectedThread(private val socket: BluetoothSocket) : Thread() {
         private val inputStream: InputStream = socket.inputStream
         private val outputStream: OutputStream = socket.outputStream
@@ -319,9 +327,10 @@ class BudsConnectionManager(private val context: Context) {
                 lastRightStatus = wearing.rightStatus
             }
             if (wearing.caseStatus >= 0) lastCaseStatus = wearing.caseStatus
-            val l = if (lastLeftInCase) "IN-CASE" else "out"
-            val r = if (lastRightInCase) "IN-CASE" else "out"
-            log("WEAR ${if (fromEvent) "EVT" else "QRY"}: L=$l R=$r")
+            log("WEAR ${if (fromEvent) "EVT" else "QRY"}: " +
+                "L=${wearLabel(lastLeftStatus)} " +
+                "R=${wearLabel(lastRightStatus)} " +
+                "case=${wearLabel(lastCaseStatus)}")
             handler.post {
                 listeners.forEach {
                     it.onEarStatus(lastLeftInCase, lastRightInCase)

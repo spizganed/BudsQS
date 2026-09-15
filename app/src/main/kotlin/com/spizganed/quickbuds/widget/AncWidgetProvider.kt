@@ -28,8 +28,10 @@ class AncWidgetProvider : AppWidgetProvider() {
 
     companion object {
 
-        // ---- Icon color (tweak freely) ----
-        private const val COLOR_ICON = 0xFF9AA0A6.toInt()   // gray
+        // ---- Icon colors (match widget palette) ----
+        // white: bud in ear. grey: bud out of ear. hidden: bud in case.
+        private fun colorActive(context: Context) = context.getColor(R.color.widget_text_primary)   // #FFFFFF
+        private fun colorIdle(context: Context)   = context.getColor(R.color.widget_text_secondary) // #8A8A8A
 
         fun refreshAll(context: Context) {
             val mgr = AppWidgetManager.getInstance(context)
@@ -39,28 +41,23 @@ class AncWidgetProvider : AppWidgetProvider() {
             for (id in ids) updateWidget(context, mgr, id)
         }
 
-        /** Bud state -> icon mode. st: 4=in case, 0=in case asleep, 3/7=in ear, 1/5=out idle */
-        private fun budMode(status: Int): Int = when (status) {
-            4, 0 -> WidgetIcons.MODE_GONE
-            3, 7 -> WidgetIcons.MODE_FILLED
-            else -> WidgetIcons.MODE_OUTLINE
+        /** Bud state -> (mode, color). st: 4=in case, 0=in case asleep, 3/7=in ear, 1/5=out idle */
+        private fun budStyle(context: Context, status: Int): Pair<Int, Int> = when (status) {
+            4, 0 -> WidgetIcons.MODE_GONE to colorIdle(context)
+            3, 7 -> WidgetIcons.MODE_FILLED to colorActive(context)
+            else -> WidgetIcons.MODE_FILLED to colorIdle(context)
         }
 
         private fun applyIcon(
             context: Context, views: RemoteViews,
-            viewId: Int, resId: Int, mode: Int
+            viewId: Int, resId: Int, style: Pair<Int, Int>
         ) {
-            when (mode) {
-                WidgetIcons.MODE_GONE ->
-                    views.setViewVisibility(viewId, View.INVISIBLE)
-                WidgetIcons.MODE_FILLED -> {
-                    views.setViewVisibility(viewId, View.VISIBLE)
-                    views.setImageViewBitmap(viewId, WidgetIcons.filled(context, resId, COLOR_ICON))
-                }
-                else -> {
-                    views.setViewVisibility(viewId, View.VISIBLE)
-                    views.setImageViewBitmap(viewId, WidgetIcons.outline(context, resId, COLOR_ICON))
-                }
+            val (mode, color) = style
+            if (mode == WidgetIcons.MODE_GONE) {
+                views.setViewVisibility(viewId, View.INVISIBLE)
+            } else {
+                views.setViewVisibility(viewId, View.VISIBLE)
+                views.setImageViewBitmap(viewId, WidgetIcons.tinted(context, resId, color))
             }
         }
 
@@ -92,19 +89,11 @@ class AncWidgetProvider : AppWidgetProvider() {
                 if (state.hasCase()) View.VISIBLE else View.INVISIBLE
             )
 
-            // Buds: hidden in case; filled in ear; outline when out & not worn
-            applyIcon(context, views, R.id.widget_bud_left, R.drawable.ic_bud_left, budMode(state.leftStatus))
-            applyIcon(context, views, R.id.widget_bud_right, R.drawable.ic_bud_right, budMode(state.rightStatus))
-
-            // Case: hidden when disconnected; filled when closed (but linked via a bud);
-            // outline when open. A bud reporting st=0 means the lid is closed.
-            val anyAsleep = state.leftStatus == 0 || state.rightStatus == 0
-            val caseMode = when {
-                state.caseLidClosed -> WidgetIcons.MODE_GONE
-                anyAsleep -> WidgetIcons.MODE_FILLED
-                else -> WidgetIcons.MODE_OUTLINE
-            }
-            applyIcon(context, views, R.id.widget_bud_case, R.drawable.ic_case, caseMode)
+            // Buds: white filled in ear; grey filled out of ear; hidden in case
+            applyIcon(context, views, R.id.widget_bud_left,
+                R.drawable.ic_bud_left, budStyle(context, state.leftStatus))
+            applyIcon(context, views, R.id.widget_bud_right,
+                R.drawable.ic_bud_right, budStyle(context, state.rightStatus))
 
             setSegment(views, R.id.widget_seg_off,   state.offIsActive())
             setSegment(views, R.id.widget_seg_trans, state.transIsActive())

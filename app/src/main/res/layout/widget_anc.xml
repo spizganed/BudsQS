@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="6dp"
+    android:padding="4dp"
     android:background="@drawable/widget_outer_bg">
 
     <LinearLayout
@@ -12,50 +12,34 @@
         android:layout_height="0dp"
         android:layout_weight="3"
         android:orientation="horizontal"
-        android:padding="10dp"
+        android:padding="7dp"
         android:background="@drawable/widget_card_bg"
         android:gravity="center_vertical">
 
         <LinearLayout
-            android:layout_width="84dp"
+            android:layout_width="70dp"
             android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:gravity="center">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1"
-                android:orientation="horizontal"
-                android:gravity="center">
-
-                <ImageView
-                    android:id="@+id/widget_bud_left"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:scaleType="fitCenter"
-                    android:src="@drawable/ic_bud_left"
-                    android:contentDescription="@string/widget_battery_left" />
-
-                <ImageView
-                    android:id="@+id/widget_bud_right"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:scaleType="fitCenter"
-                    android:src="@drawable/ic_bud_right"
-                    android:contentDescription="@string/widget_battery_right" />
-            </LinearLayout>
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:padding="6dp">
 
             <ImageView
-                android:id="@+id/widget_bud_case"
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
+                android:id="@+id/widget_bud_left"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
                 android:layout_weight="1"
                 android:scaleType="fitCenter"
-                android:src="@drawable/ic_case"
-                android:contentDescription="@string/widget_battery_case" />
+                android:src="@drawable/ic_bud_left"
+                android:contentDescription="@string/widget_battery_left" />
+
+            <ImageView
+                android:id="@+id/widget_bud_right"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_bud_right"
+                android:contentDescription="@string/widget_battery_right" />
         </LinearLayout>
 
         <LinearLayout
@@ -71,7 +55,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:layout_marginBottom="5dp">
+                android:layout_marginBottom="4dp">
 
                 <TextView
                     android:layout_width="14dp"
@@ -104,49 +88,12 @@
             </LinearLayout>
 
             <LinearLayout
-                android:id="@+id/widget_row_right"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_marginBottom="5dp">
-
-                <TextView
-                    android:layout_width="14dp"
-                    android:layout_height="wrap_content"
-                    android:text="@string/widget_battery_right"
-                    android:textColor="@color/widget_text_primary"
-                    android:textSize="11sp"
-                    android:textStyle="bold" />
-
-                <ProgressBar
-                    android:id="@+id/widget_bar_right"
-                    style="@android:style/Widget.ProgressBar.Horizontal"
-                    android:layout_width="0dp"
-                    android:layout_height="5dp"
-                    android:layout_weight="1"
-                    android:layout_marginStart="8dp"
-                    android:layout_marginEnd="6dp"
-                    android:max="100"
-                    android:progress="0"
-                    android:progressDrawable="@drawable/widget_battery_bar" />
-
-                <TextView
-                    android:id="@+id/widget_text_right"
-                    android:layout_width="28dp"
-                    android:layout_height="wrap_content"
-                    android:text=""
-                    android:textColor="@color/widget_text_primary"
-                    android:textSize="10sp"
-                    android:gravity="end" />
-            </LinearLayout>
-
-            <LinearLayout
                 android:id="@+id/widget_row_case"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:gravity="center_vertical">
+                android:gravity="center_vertical"
+                android:layout_marginBottom="4dp">
 
                 <TextView
                     android:layout_width="14dp"
@@ -177,6 +124,43 @@
                     android:textSize="10sp"
                     android:gravity="end" />
             </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/widget_row_right"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:layout_width="14dp"
+                    android:layout_height="wrap_content"
+                    android:text="@string/widget_battery_right"
+                    android:textColor="@color/widget_text_primary"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+                <ProgressBar
+                    android:id="@+id/widget_bar_right"
+                    style="@android:style/Widget.ProgressBar.Horizontal"
+                    android:layout_width="0dp"
+                    android:layout_height="5dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="8dp"
+                    android:layout_marginEnd="6dp"
+                    android:max="100"
+                    android:progress="0"
+                    android:progressDrawable="@drawable/widget_battery_bar" />
+
+                <TextView
+                    android:id="@+id/widget_text_right"
+                    android:layout_width="28dp"
+                    android:layout_height="wrap_content"
+                    android:text=""
+                    android:textColor="@color/widget_text_primary"
+                    android:textSize="10sp"
+                    android:gravity="end" />
+            </LinearLayout>
         </LinearLayout>
     </LinearLayout>
 
@@ -185,7 +169,7 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:layout_marginTop="6dp"
+        android:layout_marginTop="4dp"
         android:orientation="horizontal"
         android:padding="2dp"
         android:background="@drawable/widget_segment_container">
@@ -236,10 +220,10 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:layout_marginTop="6dp"
+        android:layout_marginTop="4dp"
         android:orientation="horizontal"
-        android:paddingStart="12dp"
-        android:paddingEnd="12dp"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
         android:background="@drawable/widget_card_bg"
         android:gravity="center_vertical">
 
@@ -267,5 +251,4 @@
             android:textStyle="bold"
             android:background="@drawable/widget_button_bg" />
     </LinearLayout>
-
 </LinearLayout>

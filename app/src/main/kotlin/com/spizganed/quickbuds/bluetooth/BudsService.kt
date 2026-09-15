@@ -206,15 +206,12 @@ class BudsService : Service(), BudsConnectionManager.Listener {
 
     override fun onConnected(connected: Boolean) {
         val st = WidgetStateStore.read(this)
+        st.connected = connected
         if (connected) {
             statusLog("[SVC] Connected")
-            if (st.caseLidClosed || st.leftDocked || st.rightDocked) {
-                st.caseLidClosed = false
-                st.leftDocked = false
-                st.rightDocked = false
-                WidgetStateStore.write(this, st)
-                AncWidgetProvider.refreshAll(this)
-            }
+            st.caseLidClosed = false
+            st.leftDocked = false
+            st.rightDocked = false
         } else {
             statusLog("[SVC] Disconnected")
             st.leftBattery = -1
@@ -228,9 +225,9 @@ class BudsService : Service(), BudsConnectionManager.Listener {
                 st.leftDocked = (st.leftStatus == 4 || st.leftStatus == 0)
                 st.rightDocked = (st.rightStatus == 4 || st.rightStatus == 0)
             }
-            WidgetStateStore.write(this, st)
-            AncWidgetProvider.refreshAll(this)
         }
+        WidgetStateStore.write(this, st)
+        AncWidgetProvider.refreshAll(this)
     }
 
     override fun onPacketReceived(bytes: ByteArray) {}
@@ -243,7 +240,11 @@ class BudsService : Service(), BudsConnectionManager.Listener {
                 "(chg: $chargingLeft/$chargingCase/$chargingRight)")
         val st = WidgetStateStore.read(this)
         if (left != null) st.leftBattery = left
-        if (case != null) st.caseBattery = case
+        if (case != null) {
+            st.caseBattery = case
+            // heartbeat: a closed lid stops these, so freshness == lid open
+            st.caseBatteryAt = System.currentTimeMillis()
+        }
         if (right != null) st.rightBattery = right
         WidgetStateStore.write(this, st)
         AncWidgetProvider.refreshAll(this)

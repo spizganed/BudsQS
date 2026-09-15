@@ -1,7 +1,7 @@
-# BudsQS - Development Roadmap & Priority List
+## QuickBuds (BudsQS) - Development Roadmap & Priority List
 
 > Living document. Updated as items complete or priorities shift.
-> Last updated: 2026-09-14
+> Last updated: 2026-09-15 (end of Kimi widget/icons session)
 
 ## Working principles
 
@@ -9,61 +9,68 @@
 - AI (Kimi) handles heavy logic: reverse-engineering, parsers, protocol work.
 - Human handles: device testing, Termux commands, git operations, design decisions.
 - Feature philosophy: **only what I want** - every new idea is filtered through this list before any work starts.
+- North star for 1.1: **match the original HeyMelody functionality as much as possible**, with our smart-pause improvements on top.
+- App identity: package `com.spizganed.quickbuds` (final, already in place). App name: **QuickBuds** (working name, may still change).
 - No desktop Android Studio. Ever.
 
-## Priority list
+## Priority 1 - Foundation & debugging - DONE
 
-### Priority 1 - Foundation & debugging (ASAP)
+| #| Item| Status|
+| ---| ---| ---|
+| 1| Packet logging foundation - all received AA frames + sent commands, timestamped| Done|
+| 2| Bud icon states on widget (hidden in case / grey out-of-ear / white in-ear)| Done|
+| 3| Battery rows: always show last known values, update on every hardware packet (poll or pushed event); hidden only while disconnected. No manual refresh - react as fast as hardware allows| Done + spec locked 2026-09-15|
 
-| # | Item | Why / when | Est. time | Type |
-|---|------|-----------|-----------|------|
-| 1 | **Packet logging foundation** - dump all received AA frames + sent commands with timestamps to a log file, behind a debug flag | Everything below depends on seeing what the Buds 4 actually sends. No more blind debugging. | 15-30 min | Quick |
-| 2 | **Bud icons hide when bud is in case** (0x010D parse + widget visibility) | Core widget feature. Driven by real data from #1. | 1-2 h | Debug/fix |
+## Priority 2 - 1.1 release content
 
-### Priority 2 - 1.1 release content
+| #| Item| Why / when| Est. time| Type|
+| ---| ---| ---| ---| ---| ---| ---|
+| 4| **Widget wear-change latency**: (a) build Dev Tools human-readable log first (#7) - it will show exactly when wear info arrives; (b) test wearing poll 5s -> 2s - confirm nothing breaks; (c) if 0x0204 wear push events (F2) are confirmed arriving, instant updates already work| Icons react on the 5s poll for wear changes; battery is already instant via pushes| 1 h| Quick|
+| 5| **FGS notification**: research hiding it - try programmatic cancel-after-N-seconds; fallback = user disables the notification channel (long-press -> settings), service keeps running| Serves no user purpose; annoying. Not officially supported on Android 15 - spike| 30 min| Spike|
+| 6| **Adaptive app icon** built from the traced bud vectors (foreground = L+R bud pair, simple dark background like the widget). Termux icon pipeline. Adaptive like Calendar/Clock| Replaces placeholder; user has concept idea, no full design yet| 1-2 h| Medium|
+| 7| **Dev Tools screen** - separate menu in-app (out of the settings cog where manual connect/disconnect currently sits with themes): (a) human-readable log ("L bud: in ear", "ANC -> Deep", "Battery L=70"), (b) raw hex log (current one, expanded) keeping hold-to-copy + new export-to-file button| Raw log is hard to read; also the diagnostic tool for #4| 2-3 h| Medium|
+| 8| **Auto play/pause, two phases**: (a) firmware toggle button in app UI (autoPlayPauseOn/Off commands already exist in manager), near ANC/Game Mode or in settings; (b) Smart Pause v2 - app-handled: both buds out -> pause; single out -> keep playing; never auto-resume; never fight manual user playback. Latency target 0-250 ms, depends on #4| Firmware version resumes accidentally when holding a removed bud; software rules fix it| a: 30 min / b: 2-3 h| Quick + Medium|
 
-| # | Item | Why / when | Est. time | Type |
-|---|------|-----------|-----------|------|
-| 3 | **Battery rows + case status hide logic** - battery row hides when its bud is in case; case battery hides if no response; **widget refresh button** that manually requests status/battery (improvement over HeyMelody, which only displays what it has) | Direct extension of #1/#2, same parser. Do immediately after #2 while context is fresh. | 1-2 h | Medium |
-| 4 | **Silent foreground service notification** | Small UX win, quick to slot in anytime. | 15-30 min | Quick |
-| 5 | **Verify git/GitHub setup in CodeAssist** + correct `.gitignore` | Before the big edits, so commits stay clean. | 30 min | Quick check |
-| 6 | **Proper app icon** - stylised left+right bud pair, dot-matrix concept | Release blocker for 1.1. Existing Termux icon pipeline applies. | 1-3 h | Medium |
-| 7 | **Full dev mode UI** - hidden-by-default switch revealing debug tools: log viewer, packet inspector (Stage B of #1) | Polish once #1-#3 are proven stable. | 1-2 h | Medium |
+## Priority 3 - Features & research (parity with original app)
 
-### Priority 3 - Before the final step
+| #| Item| Details from app screenshots| Est. time| Type|
+| ---| ---| ---| ---| ---| ---| ---| ---| ---| ---|
+| 9| **Easy parity batch**: spatial sound switch (commands exist), find my earbuds (loud beep), alert-sound volume slider (More settings shows it as a slider), game mode done| Quick wins, commands mostly exist| 2-3 h| Medium|
+| 10| **Medium parity batch + spikes**: dual device ("connect 2 devices and switch"), ANC-Smart behavior (spike: app adapts or buds themselves?), Hi-Res mode (switch BT codec - LHDC; screenshot shows simple toggle), earbud fit test (unknown)| Listed for parity| spikes 30 min each| Spike -> Medium|
+| 11| **Hard parity batch - EQ + Golden Sound + controls**: EQ = 6 bands (62/250/1k/4k/8k/16k Hz), +/-6 dB, presets (Balanced/Clear Vocals/Bass), custom presets with rename, BassWave dynamic-bass toggle + intensity slider. Golden Sound = one-time hearing test, likely produces an EQ profile. Earbud controls = per-bud single/double/triple tap + slide + touch&hold, separate "when not on a call" / "when on a call" sections (screenshots 22:02)| Complex, long-term; needs packet research vs reference projects| many hours| Big|
+| 12| **Case lid state research**: read Leaf-lsgtky/OppoPods + Zhaoyi-ya/OppoPodsManager - do buds/case report lid open/closed (0x8105 ear-status bit 0x04?)? KEEP current case code + ic_case.xml until resolved. Note: verified HeyMelody also cannot read case battery when buds are out + lid closed| Case icon comeback depends on this; parked by user decision 2026-09-15| 1-2 h research| Spike|
+| 13| **Lock screen widget** feasibility research (Android 15 / Nothing OS)| Worth a peek, low importance| 30 min| Spike|
 
-| # | Item | Why / when | Est. time | Type |
-|---|------|-----------|-----------|------|
-| 8 | **Lock screen widget feasibility research** (Android 15) | Unknown if possible at all - research before committing effort. | 30 min research | Spike - possibly not doable |
-| 9 | **Credits section** - in-app + README: GitHub projects used (Leaf-lsgtky/OppoPods, Zhaoyi-ya/OppoPodsManager) with authors, tools used (CodeAssist, Termux, decompile.com, etc.), thanks to all authors | Moral + GPL-3.0 obligation. Must ship with 1.1. | 1 h | Quick-medium |
-| 10 | **Source cleanup pass** - delete unused files, dead classes, junk in source folder; verify `.gitignore` | Must happen BEFORE the redesign so the new UI is built on a clean base, not on accumulated junk. | 1-2 h | Medium |
-| 11 | **Package rename + final app name** | Do together with #12 - touching every file twice is wasted work. | 1-2 h | Medium |
+## Priority 4 - Before release
 
-### Priority 4 - The final step
+| #| Item| Why / when| Est. time| Type|
+| ---| ---| ---| ---| ---| ---| ---| ---|
+| 14| Credits section - in-app + README: Leaf-lsgtky/OppoPods, Zhaoyi-ya/OppoPodsManager, tools, thanks. GPL-3.0 obligation| Ships with 1.1| 1 h| Quick|
+| 15| Source cleanup pass - unused files/dead code (ic_case.xml stays - parked per #12), verify .gitignore| Before redesign| 1-2 h| Medium|
+| 16| ~~Package rename~~ - CLOSED: package is already `com.spizganed.quickbuds`; app name QuickBuds pending final decision with #6| -| -| -|
 
-| # | Item | Why / when | Est. time | Type |
-|---|------|-----------|-----------|------|
-| 12 | **Full app UI redesign + polish (v1.1)** - mimic finished widget style, only wanted functions | Last, by design: builds on locked widget logic (#1-#3), clean source (#10), final identity (#11), proper credits (#9). | many hours (full day+ across sessions) | Big |
+## Priority 5 - The final step
+
+| #| Item| Why / when| Est. time| Type|
+| ---| ---| ---| ---| ---|
+| 17| **Full app UI v1.1** - bottom navigation (Device / Earbud controls / About) exactly like the original app's structure, mimic finished widget style, only wanted functions, hosts features #9-#11 as they land| Last by design| full day+ across sessions| Big|
 
 ## Execution order
 
-    1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> (research 8) -> 9 -> 10 -> 11 -> 12
+```
+7 -> 4 -> 5 -> 6 -> 8a -> 9 (easy batch)
+-> 8b (needs #4) -> 10/12/13 spikes anytime
+-> 14 -> 15 -> 17 (with 10/11 slotted in as the UI grows)
+```
 
-Rationale:
-- 1-2-3 is one continuous debugging arc - the parser and logging built in #1 serve #2 and #3 directly.
-- 4-7 are independent quick/medium wins, any order.
-- 8 is a research spike that may be dropped.
-- 9-11 are the pre-redesign gate: credits, cleanup, identity.
-- 12 happens only when everything above is done. No exceptions - redesigning on unstable logic or dirty source doubles the work.
-
-## Credits (draft for #9)
+## Credits (draft for #14)
 
 ### Reference projects (protocol reverse engineering)
 
 - **Leaf-lsgtky/OppoPods** - OPPO earbud protocol reverse engineering
 - **Zhaoyi-ya/OppoPodsManager** - OPPO earbud protocol reference and feature implementation
 
-BudsQS is licensed GPL-3.0, same as both projects above.
+QuickBuds is licensed GPL-3.0, same as both projects above.
 
 ### Tools
 
