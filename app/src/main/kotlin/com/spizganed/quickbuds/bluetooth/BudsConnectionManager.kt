@@ -64,6 +64,24 @@ class BudsConnectionManager(private val context: Context) {
     private var reconnectAttempts = 0
     private var pollingStarted = false
 
+    /**
+     * Poll period for status + wearing queries.
+     *
+     * Wearing DOES have a push path. Registering 0x0205 with payload 02 01 02
+     * (count=2: battery + wearing) makes the firmware emit 0x0204 subtype 02 on
+     * every wear change, so this poll is no longer the wear-update latency.
+     *
+     * The earlier payload 01 01 02 02 was the bug: read as count=1 (battery
+     * only), so wear was silently never pushed and this interval WAS the
+     * latency. Do not revert to that literal.
+     *
+     * Battery also pushes (0x0204 subtype 01). Kept at 5s as a safety-net
+     * refresh for status (game mode / spatial / dual device) without extra
+     * radio cost. 0x010D is a fixed wake packet and may double as a keep-alive,
+     * so widen this rather than dropping the packet outright.
+     */
+    private val POLL_INTERVAL_SECONDS = 5L
+
     private var lastLeft: BatteryParser.Info? = null
     private var lastRight: BatteryParser.Info? = null
     private var lastCase: BatteryParser.Info? = null
@@ -183,7 +201,7 @@ class BudsConnectionManager(private val context: Context) {
                     sendRaw(OpoProtocol.queryWearingStatus(), "poll wearing")
                 } catch (_: Exception) {}
             }
-        }, 5, 5, java.util.concurrent.TimeUnit.SECONDS)
+        }, POLL_INTERVAL_SECONDS, POLL_INTERVAL_SECONDS, java.util.concurrent.TimeUnit.SECONDS)
     }
 
     fun disconnect() {

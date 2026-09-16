@@ -5,12 +5,7 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.bluetooth.BluetoothManager
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.ComponentName
-import android.content.Context
-import android.content.Intent
-import android.content.ServiceConnection
+import android.content.*
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Build
@@ -18,16 +13,12 @@ import android.os.Bundle
 import android.os.IBinder
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
-import android.widget.LinearLayout
-import android.widget.PopupMenu
-import android.widget.ScrollView
-import android.widget.TextView
-import android.widget.Toast
+import android.widget.*
 import com.spizganed.quickbuds.R
 import com.spizganed.quickbuds.bluetooth.BudsConnectionManager
 import com.spizganed.quickbuds.bluetooth.BudsService
 import com.spizganed.quickbuds.widget.AncWidgetProvider
+import com.spizganed.quickbuds.widget.WidgetIcons
 import com.spizganed.quickbuds.widget.WidgetStateStore
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -40,16 +31,31 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
     private lateinit var manager: BudsConnectionManager
     private lateinit var mainLayout: LinearLayout
 
-    private lateinit var batteryLeftText: TextView
-    private lateinit var batteryCaseText: TextView
-    private lateinit var batteryRightText: TextView
-    private lateinit var btnToggleLog: Button
-    private lateinit var btnAncMode: Button
-    private lateinit var btnTransparency: Button
-    private lateinit var btnAncOff: Button
-    private lateinit var btnGameOn: Button
-    private lateinit var btnGameOff: Button
     private lateinit var btnSettings: Button
+    private lateinit var btnDevTools: Button
+
+    // --- In-app status panel (mirrors the widget visuals) ---
+    private lateinit var statusRowLeft: LinearLayout
+    private lateinit var statusRowCase: LinearLayout
+    private lateinit var statusRowRight: LinearLayout
+    private lateinit var statusBarLeft: ProgressBar
+    private lateinit var statusBarCase: ProgressBar
+    private lateinit var statusBarRight: ProgressBar
+    private lateinit var statusTextLeft: TextView
+    private lateinit var statusTextCase: TextView
+    private lateinit var statusTextRight: TextView
+    private lateinit var statusBudLeft: ImageView
+    private lateinit var statusBudRight: ImageView
+    private lateinit var statusSegOff: TextView
+    private lateinit var statusSegTrans: TextView
+    private lateinit var statusSegLow: TextView
+    private lateinit var statusSegMed: TextView
+    private lateinit var statusSegHigh: TextView
+    private lateinit var statusGameRow: LinearLayout
+    private lateinit var statusGameSwitch: TextView
+
+    /** Last state rendered into the panel, so we don't redo work on every notify. */
+    private var lastRendered: WidgetStateStore.State? = null
 
     private val TARGET_MAC = "A8:E6:E8:92:C1:25"
     private val REQUEST_PERMISSIONS = 1001
@@ -59,7 +65,7 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
     private val THEME_LIGHT = 2
     private var currentTheme = THEME_OLED
 
-    private val timeFormat = SimpleDateFormat("HH:mm:ss.SSS", Locale.US)
+    private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.US)
 
     private var activeAncMode: String = "Off"
     private var gameModeOn = false
@@ -89,15 +95,10 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
         if (ancChanged || gameChanged) {
             activeAncMode = state.ancMode
             gameModeOn = state.gameMode
-            updateAncButtons()
-            updateGameButtons()
             appendStatus("Sync -> $activeAncMode (game=$gameModeOn)")
         }
-        runOnUiThread {
-            batteryLeftText.text  = if (state.hasLeft())  "L: ${state.leftBattery}"  else "L: --"
-            batteryCaseText.text  = if (state.hasCase())  "C: ${state.caseBattery}"  else "C: --"
-            batteryRightText.text = if (state.hasRight()) "R: ${state.rightBattery}" else "R: --"
-        }
+        lastRendered = state
+        renderStatusPanel(state)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -111,16 +112,28 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
         mainLayout = findViewById<LinearLayout>(R.id.mainLayout)
         statusText = findViewById<TextView>(R.id.statusText)
         scroll = findViewById<ScrollView>(R.id.scroll)
-        batteryLeftText = findViewById<TextView>(R.id.batteryLeftText)
-        batteryCaseText = findViewById<TextView>(R.id.batteryCaseText)
-        batteryRightText = findViewById<TextView>(R.id.batteryRightText)
-        btnToggleLog = findViewById<Button>(R.id.btnToggleLog)
-        btnAncMode = findViewById<Button>(R.id.btnAncMode)
-        btnTransparency = findViewById<Button>(R.id.btnTransparency)
-        btnAncOff = findViewById<Button>(R.id.btnAncOff)
-        btnGameOn = findViewById<Button>(R.id.btnGameOn)
-        btnGameOff = findViewById<Button>(R.id.btnGameOff)
         btnSettings = findViewById<Button>(R.id.btnSettings)
+        btnDevTools = findViewById<Button>(R.id.btnDevTools)
+
+        // In-app status panel (widget-mirroring visuals)
+        statusRowLeft = findViewById<LinearLayout>(R.id.status_row_left)
+        statusRowCase = findViewById<LinearLayout>(R.id.status_row_case)
+        statusRowRight = findViewById<LinearLayout>(R.id.status_row_right)
+        statusBarLeft = findViewById<ProgressBar>(R.id.status_bar_left)
+        statusBarCase = findViewById<ProgressBar>(R.id.status_bar_case)
+        statusBarRight = findViewById<ProgressBar>(R.id.status_bar_right)
+        statusTextLeft = findViewById<TextView>(R.id.status_text_left)
+        statusTextCase = findViewById<TextView>(R.id.status_text_case)
+        statusTextRight = findViewById<TextView>(R.id.status_text_right)
+        statusBudLeft = findViewById<ImageView>(R.id.status_bud_left)
+        statusBudRight = findViewById<ImageView>(R.id.status_bud_right)
+        statusSegOff = findViewById<TextView>(R.id.status_seg_off)
+        statusSegTrans = findViewById<TextView>(R.id.status_seg_trans)
+        statusSegLow = findViewById<TextView>(R.id.status_seg_low)
+        statusSegMed = findViewById<TextView>(R.id.status_seg_med)
+        statusSegHigh = findViewById<TextView>(R.id.status_seg_high)
+        statusGameRow = findViewById<LinearLayout>(R.id.status_game_row)
+        statusGameSwitch = findViewById<TextView>(R.id.status_game_switch)
 
         WidgetStateStore.addListener(storeListener)
         val initial = WidgetStateStore.read(this)
@@ -132,50 +145,19 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
         applyTheme(currentTheme)
 
         btnSettings.setOnClickListener { showSettingsDialog() }
-        btnToggleLog.setOnClickListener {
-            if (scroll.visibility == View.GONE) {
-                scroll.visibility = View.VISIBLE
-                btnToggleLog.text = "Hide Log"
-            } else {
-                scroll.visibility = View.GONE
-                btnToggleLog.text = "Show Log"
-            }
+        btnDevTools.setOnClickListener {
+            startActivity(Intent(this, DevToolsActivity::class.java))
         }
 
-        btnAncMode.setOnClickListener { view -> showAncPopup(view) }
+        // --- Status panel tap handlers (same commands the widget fires) ---
+        statusSegOff.setOnClickListener { selectAnc("Off") }
+        statusSegTrans.setOnClickListener { selectAnc("Transparency") }
+        statusSegLow.setOnClickListener { selectAnc("ANC-Light") }
+        statusSegMed.setOnClickListener { selectAnc("ANC-Medium") }
+        statusSegHigh.setOnClickListener { selectAnc("ANC-Deep") }
+        statusGameRow.setOnClickListener { toggleGameMode() }
 
-        btnTransparency.setOnClickListener {
-            activeAncMode = "Transparency"
-            appendStatus("ANC -> Transparency")
-            manager.sendAncTransparency()
-            updateAncButtons()
-            syncWidgetState()
-        }
-        btnAncOff.setOnClickListener {
-            activeAncMode = "Off"
-            appendStatus("ANC -> Off")
-            manager.sendAncOff()
-            updateAncButtons()
-            syncWidgetState()
-        }
-
-        btnGameOn.setOnClickListener {
-            appendStatus("Game Mode ON")
-            manager.setGameMode(true)
-            gameModeOn = true
-            updateGameButtons()
-            syncWidgetState()
-        }
-        btnGameOff.setOnClickListener {
-            appendStatus("Game Mode OFF")
-            manager.setGameMode(false)
-            gameModeOn = false
-            updateGameButtons()
-            syncWidgetState()
-        }
-
-        updateAncButtons()
-        updateGameButtons()
+        renderStatusPanel(WidgetStateStore.read(this))
         checkPermissions()
     }
 
@@ -183,6 +165,35 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
         WidgetStateStore.removeListener(storeListener)
         super.onDestroy()
     }
+
+    /** Applies an ANC mode: sends the command, updates state, repaints panel + widget. */
+    private fun selectAnc(mode: String) {
+        when (mode) {
+            "Off" -> manager.sendAncOff()
+            "Transparency" -> manager.sendAncTransparency()
+            "ANC-Light" -> manager.sendAncLight()
+            "ANC-Medium" -> manager.sendAncMedium()
+            "ANC-Deep" -> manager.sendAncDeep()
+            "ANC-Smart" -> manager.sendAncSmart()
+        }
+        activeAncMode = mode
+        appendStatus("ANC -> ${ancLabel(mode)}")
+        syncWidgetState()
+        renderStatusPanel(WidgetStateStore.read(this))
+    }
+
+    private fun toggleGameMode() {
+        val next = !gameModeOn
+        manager.setGameMode(next)
+        gameModeOn = next
+        appendStatus("Game Mode ${if (next) "ON" else "OFF"}")
+        syncWidgetState()
+        renderStatusPanel(WidgetStateStore.read(this))
+    }
+
+    /** "ANC-Deep" -> "Deep", "Transparency" -> "Transparency" */
+    private fun ancLabel(mode: String): String =
+        if (mode.startsWith("ANC-")) mode.substring(4) else mode
 
     private fun syncWidgetState() {
         val state = WidgetStateStore.read(this)
@@ -192,75 +203,66 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
         AncWidgetProvider.refreshAll(this)
     }
 
-    private fun showAncPopup(anchor: View) {
-        val popup = PopupMenu(this, anchor)
-        popup.menu.add("Deep")
-        popup.menu.add("Medium")
-        popup.menu.add("Light")
-        popup.menu.add("Smart")
-        popup.setOnMenuItemClickListener { item ->
-            when (item.title) {
-                "Deep" -> { activeAncMode = "ANC-Deep"; manager.sendAncDeep(); appendStatus("ANC -> Deep") }
-                "Medium" -> { activeAncMode = "ANC-Medium"; manager.sendAncMedium(); appendStatus("ANC -> Medium") }
-                "Light" -> { activeAncMode = "ANC-Light"; manager.sendAncLight(); appendStatus("ANC -> Light") }
-                "Smart" -> { activeAncMode = "ANC-Smart"; manager.sendAncSmart(); appendStatus("ANC -> Smart") }
-            }
-            updateAncButtons()
-            syncWidgetState()
-            true
-        }
-        popup.show()
-    }
-
-    private fun updateAncButtons() {
+    /**
+     * Renders the in-app status panel from a WidgetStateStore snapshot.
+     *
+     * Uses the same icon rule as AncWidgetProvider.budStyle():
+     *   status 4/0 = in case  -> icon hidden
+     *   status 3/7 = in ear   -> icon tinted white (primary)
+     *   otherwise  = out idle -> icon tinted grey (secondary)
+     */
+    private fun renderStatusPanel(state: WidgetStateStore.State) {
         runOnUiThread {
-            btnAncMode.setBackgroundColor(inactiveBtnColor)
-            btnTransparency.setBackgroundColor(inactiveBtnColor)
-            btnAncOff.setBackgroundColor(inactiveBtnColor)
-            btnAncMode.setTextColor(textColor)
-            btnTransparency.setTextColor(textColor)
-            btnAncOff.setTextColor(textColor)
+            statusBarLeft.progress = state.leftProgress()
+            statusBarCase.progress = state.caseProgress()
+            statusBarRight.progress = state.rightProgress()
 
-            when {
-                activeAncMode == "Off" -> {
-                    btnAncOff.setBackgroundColor(accentColor)
-                    btnAncOff.setTextColor(Color.WHITE)
-                    btnAncMode.text = "ANC"
-                }
-                activeAncMode == "Transparency" -> {
-                    btnTransparency.setBackgroundColor(accentColor)
-                    btnTransparency.setTextColor(Color.WHITE)
-                    btnAncMode.text = "ANC"
-                }
-                activeAncMode.startsWith("ANC-") -> {
-                    btnAncMode.setBackgroundColor(accentColor)
-                    btnAncMode.setTextColor(Color.WHITE)
-                    btnAncMode.text = when (activeAncMode) {
-                        "ANC-Deep" -> "ANC: Deep"
-                        "ANC-Medium" -> "ANC: Med"
-                        "ANC-Light" -> "ANC: Light"
-                        "ANC-Smart" -> "ANC: Smart"
-                        else -> "ANC"
-                    }
-                }
-            }
+            statusTextLeft.text = state.leftText()
+            statusTextCase.text = state.caseText()
+            statusTextRight.text = state.rightText()
+
+            statusRowLeft.visibility = if (state.hasLeft()) View.VISIBLE else View.INVISIBLE
+            statusRowCase.visibility = if (state.hasCase()) View.VISIBLE else View.INVISIBLE
+            statusRowRight.visibility = if (state.hasRight()) View.VISIBLE else View.INVISIBLE
+
+            applyBudIcon(statusBudLeft, R.drawable.ic_bud_left, state.leftStatus)
+            applyBudIcon(statusBudRight, R.drawable.ic_bud_right, state.rightStatus)
+
+            setSegment(statusSegOff, state.offIsActive())
+            setSegment(statusSegTrans, state.transIsActive())
+            setSegment(statusSegLow, state.lowIsActive())
+            setSegment(statusSegMed, state.medIsActive())
+            setSegment(statusSegHigh, state.highIsActive())
+
+            statusGameSwitch.text = if (state.gameMode) "ON" else "OFF"
+            statusGameSwitch.setBackgroundResource(
+                if (state.gameMode) R.drawable.widget_button_bg_active
+                else R.drawable.widget_button_bg
+            )
         }
     }
 
-    private fun updateGameButtons() {
-        runOnUiThread {
-            if (gameModeOn) {
-                btnGameOn.setBackgroundColor(accentColor)
-                btnGameOn.setTextColor(Color.WHITE)
-                btnGameOff.setBackgroundColor(inactiveBtnColor)
-                btnGameOff.setTextColor(textColor)
-            } else {
-                btnGameOn.setBackgroundColor(inactiveBtnColor)
-                btnGameOn.setTextColor(textColor)
-                btnGameOff.setBackgroundColor(accentColor)
-                btnGameOff.setTextColor(Color.WHITE)
+    private fun applyBudIcon(view: ImageView, resId: Int, status: Int) {
+        when (status) {
+            4, 0 -> view.visibility = View.INVISIBLE
+            else -> {
+                view.visibility = View.VISIBLE
+                val color = if (status == 3 || status == 7) {
+                    getColor(R.color.widget_text_primary)
+                } else {
+                    getColor(R.color.widget_text_secondary)
+                }
+                view.setImageBitmap(WidgetIcons.tinted(this, resId, color))
             }
         }
+    }
+
+    private fun setSegment(view: TextView, active: Boolean) {
+        view.setBackgroundResource(
+            if (active) R.drawable.widget_segment_bg_active
+            else R.drawable.widget_segment_bg
+        )
+        view.setTextColor(if (active) 0xFF000000.toInt() else 0xFF8A8A8A.toInt())
     }
 
     override fun onStart() {
@@ -332,9 +334,15 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
             else Color.parseColor("#111111")
         )
         statusText.setTextColor(textColor)
-        applyColorsToViews(mainLayout, textColor, inactiveBtnColor)
-        updateAncButtons()
-        updateGameButtons()
+
+        // Recolor header buttons/labels, but leave the status panel alone —
+        // it uses the widget's own fixed palette on its own card backgrounds.
+        for (i in 0 until mainLayout.childCount) {
+            val child = mainLayout.getChildAt(i)
+            if (child.id == R.id.statusPanel) continue
+            applyColorsToViews(child, textColor, inactiveBtnColor)
+        }
+
         statusText.setOnLongClickListener {
             val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             cm.setPrimaryClip(ClipData.newPlainText("QuickBuds Log", statusText.text.toString()))
@@ -405,8 +413,13 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
         runOnUiThread {
             try {
                 val ts = timeFormat.format(Date())
+                // Follow the log only when the user is already at the bottom,
+                // so scrolling back through history isn't yanked away.
+                val wasAtBottom = !scroll.canScrollVertically(1)
                 statusText.append("\n[$ts] $msg")
-                scroll.post { scroll.fullScroll(ScrollView.FOCUS_DOWN) }
+                if (wasAtBottom) {
+                    scroll.post { scroll.fullScroll(ScrollView.FOCUS_DOWN) }
+                }
             } catch (_: Exception) {}
         }
     }

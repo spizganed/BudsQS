@@ -9,6 +9,7 @@
     android:paddingBottom="16dp"
     android:paddingTop="48dp">
 
+    <!-- Header: device name + Dev Tools + settings -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -25,6 +26,15 @@
             android:textStyle="bold" />
 
         <Button
+            android:id="@+id/btnDevTools"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="0dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:text="Dev" />
+
+        <Button
             android:id="@+id/btnSettings"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -34,122 +44,24 @@
             android:text="⚙" />
     </LinearLayout>
 
-    <LinearLayout
+    <!-- Status panel: ~1/3 of the screen, weight 1 vs the log's weight 2 -->
+    <include
+        android:id="@+id/statusPanel"
+        layout="@layout/activity_status_panel"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:paddingTop="4dp"
-        android:paddingBottom="16dp">
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="12dp" />
 
-        <TextView
-            android:id="@+id/batteryLeftText"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="L: --%"
-            android:textSize="15sp"
-            android:textStyle="bold"
-            android:paddingEnd="16dp" />
-
-        <TextView
-            android:id="@+id/batteryCaseText"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="C: --%"
-            android:textSize="15sp"
-            android:textStyle="bold"
-            android:paddingEnd="16dp" />
-
-        <TextView
-            android:id="@+id/batteryRightText"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="R: --%"
-            android:textSize="15sp"
-            android:textStyle="bold" />
-    </LinearLayout>
-
-    <!-- ANC -->
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="ANC"
-        android:paddingBottom="4dp" />
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
-
-        <Button
-            android:id="@+id/btnAncMode"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="ANC"
-            android:textStyle="bold" />
-
-        <Button
-            android:id="@+id/btnTransparency"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Transparency" />
-
-        <Button
-            android:id="@+id/btnAncOff"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Off" />
-    </LinearLayout>
-
-    <!-- Game Mode -->
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Game Mode"
-        android:paddingTop="12dp"
-        android:paddingBottom="4dp" />
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
-
-        <Button
-            android:id="@+id/btnGameOn"
-            android:layout_width="0dp"
-            android:layout_height="40dp"
-            android:layout_weight="1"
-            android:layout_marginEnd="4dp"
-            android:text="ON" />
-
-        <Button
-            android:id="@+id/btnGameOff"
-            android:layout_width="0dp"
-            android:layout_height="40dp"
-            android:layout_weight="1"
-            android:layout_marginStart="4dp"
-            android:text="OFF" />
-    </LinearLayout>
-
-    <Button
-        android:id="@+id/btnToggleLog"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:text="Show Log" />
-
+    <!-- Human-readable log -->
     <ScrollView
         android:id="@+id/scroll"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_weight="2"
         android:background="#EEEEEE"
         android:padding="8dp"
-        android:layout_marginTop="8dp"
-        android:visibility="gone">
+        android:layout_marginTop="12dp">
 
         <TextView
             android:id="@+id/statusText"

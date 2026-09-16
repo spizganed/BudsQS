@@ -1,7 +1,7 @@
 ## QuickBuds (BudsQS) - Development Roadmap & Priority List
 
 > Living document. Updated as items complete or priorities shift.
-> Last updated: 2026-09-15 (end of Kimi widget/icons session)
+> Last updated: 2026-02-14 (wear push fix)
 
 ## Working principles
 
@@ -25,7 +25,7 @@
 
 | #| Item| Why / when| Est. time| Type|
 | ---| ---| ---| ---| ---| ---| ---|
-| 4| **Widget wear-change latency**: (a) build Dev Tools human-readable log first (#7) - it will show exactly when wear info arrives; (b) test wearing poll 5s -> 2s - confirm nothing breaks; (c) if 0x0204 wear push events (F2) are confirmed arriving, instant updates already work| Icons react on the 5s poll for wear changes; battery is already instant via pushes| 1 h| Quick|
+| 4| **Widget wear-change latency** — DONE 2026-02-14. Root cause was `0x0205`'s payload: it is count-then-event-ids, and the old literal `01 01 02 02` registered battery only, so wear was never pushed and lagged a 5s poll. Sending `02 01 02` registers battery + wear. Icons now react in milliseconds; residual ~2s is the bud's hardware debounce| Icons felt poll-bound and inconsistent (0-4s). Push makes it feel instant| Done| Quick|
 | 5| **FGS notification**: research hiding it - try programmatic cancel-after-N-seconds; fallback = user disables the notification channel (long-press -> settings), service keeps running| Serves no user purpose; annoying. Not officially supported on Android 15 - spike| 30 min| Spike|
 | 6| **Adaptive app icon** built from the traced bud vectors (foreground = L+R bud pair, simple dark background like the widget). Termux icon pipeline. Adaptive like Calendar/Clock| Replaces placeholder; user has concept idea, no full design yet| 1-2 h| Medium|
 | 7| **Dev Tools screen** - separate menu in-app (out of the settings cog where manual connect/disconnect currently sits with themes): (a) human-readable log ("L bud: in ear", "ANC -> Deep", "Battery L=70"), (b) raw hex log (current one, expanded) keeping hold-to-copy + new export-to-file button| Raw log is hard to read; also the diagnostic tool for #4| 2-3 h| Medium|

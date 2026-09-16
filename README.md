@@ -16,13 +16,15 @@ The official apps are heavy, account-bound, and push features you don't want. Qu
 
 **Connection & control**
 - Direct RFCOMM to the earbuds (UUID `0000079A-D102-11E1-9B23-00025B00A5A5`, with fallbacks)
-- Full init handshake, then the buds **push** battery/wearing events to the app
+- Full init handshake, then the buds **push** both battery and wearing events to the app
+  (see *Push vs poll* below — wear updates are effectively instant)
 - ANC: Off / Transparency / Light / Medium / Deep (+ Smart command ready)
 - Game Mode toggle
 - Auto-retry connection logic (survives the buds being busy)
 
 **Home-screen widget (3x2)**
 - Battery bars for Left / Case / Right — always showing last-known values, updated on every hardware packet (poll or push)
+- Wear icons update instantly: the buds **push** wear events, so tap-to-icon latency is milliseconds, not poll-bound
 - Bud status icons: **white** = in ear, **grey** = out of ear, **hidden** = in case
 - 5-segment ANC switcher + Game Mode row — works even with the app closed
 - Nothing to configure; reacts as fast as the hardware reports
@@ -59,8 +61,22 @@ WidgetActionReceiver  ->  BudsService  ->  BudsConnectionManager (RFCOMM)
 Key protocol facts (observed on Buds 4):
 - Battery query `0x01F0` -> components `(01,L) (02,R) (03,C)`
 - Wearing query `0x01F2` -> status codes: `4` = in case, `1/5` = out idle, `3/7` = wearing
-- `0x0205` registration makes the buds push `0x0204` events (battery confirmed; wear events under investigation)
+- `0x0205` registration makes the buds push `0x0204` events. The payload is
+  `02 01 02` — a **count** byte followed by event ids (count=2: battery `01` + wearing `02`).
+  Registering both makes wear changes arrive instantly, no polling.
 - Closing the lid with buds docked kills the RFCOMM socket — used as one of the lid-state signals
+
+### Push vs poll (the latency story)
+
+The buds report wear state two ways: on demand via `0x01F2`, or spontaneously as `0x0204`
+events once `0x0205` registration succeeds. QuickBuds originally registered battery only, so
+wear lagged behind a 5-second poll — which is why bud icons used to update late, and
+inconsistently (0–4 s depending on when you acted within a poll window).
+
+The fix was one line: `0x0205`'s payload is a count followed by event ids, and the old
+literal `01 01 02 02` read as *count=1* (battery only), silently dropping wear. Sending
+`02 01 02` registers both. Measured result: wear changes now surface within a few
+milliseconds, and the only remaining delay is the bud's own ~2 s hardware debounce.
 
 ## Development workflow
 
@@ -70,7 +86,11 @@ Key protocol facts (observed on Buds 4):
 
 ## Project status
 
-Actively developed against [ROADMAP.md](./ROADMAP.md). Handoff notes for future sessions live in [HANDOFF.md](./HANDOFF.md). Recent milestone: widget overhaul — vector icons traced from the originals (fixes pixelation), locked white/grey/hidden state logic, 3x2 layout, case icon removed after verifying even HeyMelody can't read lid state in all scenarios.
+Actively developed against [ROADMAP.md](./ROADMAP.md). Handoff notes for future sessions live in [HANDOFF.md](./HANDOFF.md).
+
+Recent milestones:
+- **Instant wear updates** — identified why wear lagged behind a 5 s poll and fixed it (see *Push vs poll*). Bud icons now react to the physical action within milliseconds.
+- Widget overhaul — vector icons traced from the originals (fixes pixelation), locked white/grey/hidden state logic, 3x2 layout, case icon removed after verifying even HeyMelody can't read lid state in all scenarios.
 
 ## Screenshots
 

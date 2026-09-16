@@ -2,6 +2,9 @@ package com.spizganed.quickbuds.protocol
 
 object BatteryParser {
 
+    /** SubType for 0x0204 active reports that carry a battery update. */
+    const val EVT_BATTERY = 0x01
+
     data class Info(val level: Int, val isCharging: Boolean)
     data class Result(val left: Info?, val right: Info?, val case: Info?)
 

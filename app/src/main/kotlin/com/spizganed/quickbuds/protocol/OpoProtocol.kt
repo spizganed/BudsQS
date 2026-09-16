@@ -69,9 +69,23 @@ object OpoProtocol {
     /** getEarBudsStatus (0x0109) — returns [count][comp,st] pairs, st=4 means in case. */
     fun queryWearingStatus(): ByteArray = buildPacket(CMD_QUERY_WEARING, seq = 0xF2)
 
-    /** Subscribe to spontaneous 0x0204 notifications (battery + wearing), per reference impl. */
+    /**
+     * Subscribe to spontaneous 0x0204 notifications (battery + wearing).
+     *
+     * Payload is canonical: a count byte followed by event ids. count=2 with
+     * events battery (0x01) + wearing (0x02), i.e. 02 01 02.
+     *
+     * CONFIRMED on device: the ACK comes back listing BOTH events, and the buds
+     * then emit 0x0204 subtype 02 on every wear change. Wear updates are
+     * effectively instant — no polling needed.
+     *
+     * The old legacy literal 01 01 02 02 was a misread: under the count-first
+     * shape it means count=1 (register battery only) with 02 02 left over. The
+     * firmware ACKed that happily and silently never sent wear events, which is
+     * why wear appeared to be poll-only. Do NOT revert.
+     */
     fun registerNotifications(): ByteArray =
-        buildPacket(CMD_REGISTER_NOTIFY, payload = byteArrayOf(0x01, 0x01, 0x02, 0x02))
+        buildPacket(CMD_REGISTER_NOTIFY, payload = byteArrayOf(0x02, 0x01, 0x02))
 
     private fun ancPayload(index: Int): ByteArray {
         val byteCount = index / 8 + 1

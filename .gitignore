@@ -18,5 +18,8 @@ Thumbs.db
 
 # Logs
 *.log
+*.log.txt
+commit-title.txt
+testlogs/
 module.toml
 *.toml
