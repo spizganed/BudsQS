@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Status-bar small icon for the foreground service notification.
+
+  Replaces android.R.drawable.stat_sys_headset (a generic system framework icon).
+
+  Important: Android renders small icons as a SILHOUETTE — it uses only the alpha
+  channel and tints the result, discarding all colour. It must therefore be a
+  solid single-colour shape with no fine detail, because anything subtle turns to
+  mush at ~24dp. The full traced bud pair (ic_launcher_foreground) is far too
+  detailed to read at status-bar size, so this is a deliberately simplified bud.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!--
+      Single bud, outlined so it stays legible when tinted: a rounded head that
+      tapers into a stem, drawn as a stroked path (stroke-only reads cleaner than
+      a filled blob at this size).
+    -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M12,2.4m-4,0a4,4 0 1,0 8,0a4,4 0 1,0 -8,0" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M9.2,6.1L9.2,16.4a2.8,2.8 0 0,0 5.6,0L14.8,6.1" />
+</vector>

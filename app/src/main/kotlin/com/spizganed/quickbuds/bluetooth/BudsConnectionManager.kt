@@ -65,22 +65,23 @@ class BudsConnectionManager(private val context: Context) {
     private var pollingStarted = false
 
     /**
-     * Poll period for status + wearing queries.
+     * Poll period for the status query (0x010D).
      *
-     * Wearing DOES have a push path. Registering 0x0205 with payload 02 01 02
-     * (count=2: battery + wearing) makes the firmware emit 0x0204 subtype 02 on
-     * every wear change, so this poll is no longer the wear-update latency.
+     * Why 60s and not 5s: every wear change is now PUSHED by the buds as 0x0204
+     * subtype 02, so the poll no longer drives any UI update we care about
+     * instantly. At 5s we were sending ~12 packets/minute, i.e. constantly
+     * waking the radio for nothing. 60s keeps a sensible safety-net refresh.
      *
-     * The earlier payload 01 01 02 02 was the bug: read as count=1 (battery
-     * only), so wear was silently never pushed and this interval WAS the
-     * latency. Do not revert to that literal.
+     * The wear query (0x0109) is deliberately NOT polled any more — push covers
+     * it fully. See pollStatusOnce below.
      *
-     * Battery also pushes (0x0204 subtype 01). Kept at 5s as a safety-net
-     * refresh for status (game mode / spatial / dual device) without extra
-     * radio cost. 0x010D is a fixed wake packet and may double as a keep-alive,
-     * so widen this rather than dropping the packet outright.
+     * Do NOT remove the 0x010D packet outright: the reference sources describe
+     * it as a FIXED packet that wakes the earbuds and likely acts as a
+     * keep-alive. Widening is safe; deleting risks the buds sleeping and the
+     * link going stale. If battery proves to push on change (needs a long
+     * capture to confirm), this can be widened much further or dropped.
      */
-    private val POLL_INTERVAL_SECONDS = 5L
+    private val POLL_INTERVAL_SECONDS = 60L
 
     private var lastLeft: BatteryParser.Info? = null
     private var lastRight: BatteryParser.Info? = null
@@ -197,8 +198,10 @@ class BudsConnectionManager(private val context: Context) {
         pollExecutor.scheduleWithFixedDelay({
             if (isReady) {
                 try {
+                    // Status query only. The wear query (0x0109) is intentionally
+                    // not polled — the buds push wear changes as 0x0204 subtype 02,
+                    // measured at 1-3 ms, so polling it just wastes radio time.
                     sendRaw(OpoProtocol.queryStatus(), "poll status")
-                    sendRaw(OpoProtocol.queryWearingStatus(), "poll wearing")
                 } catch (_: Exception) {}
             }
         }, POLL_INTERVAL_SECONDS, POLL_INTERVAL_SECONDS, java.util.concurrent.TimeUnit.SECONDS)

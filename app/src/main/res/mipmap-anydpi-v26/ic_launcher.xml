@@ -2,4 +2,10 @@
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@color/ic_launcher_background"/>
     <foreground android:drawable="@drawable/ic_launcher_foreground"/>
+    <!--
+      Explicit monochrome layer for Android 13+ themed icons. Providing our own
+      stops the launcher/theme engine from synthesising one, which on Nothing OS
+      previously meant our artwork being wrapped in a white circle.
+    -->
+    <monochrome android:drawable="@drawable/ic_launcher_foreground"/>
 </adaptive-icon>

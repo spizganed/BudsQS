@@ -16,6 +16,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
 import android.util.Log
+import com.spizganed.quickbuds.R
 import com.spizganed.quickbuds.widget.AncWidgetProvider
 import com.spizganed.quickbuds.widget.WidgetStateStore
 
@@ -169,7 +170,7 @@ class BudsService : Service(), BudsConnectionManager.Listener {
             Notification.Builder(this, channelId)
                 .setContentTitle("QuickBuds")
                 .setContentText("Maintaining connection to earbuds")
-                .setSmallIcon(android.R.drawable.stat_sys_headset)
+                .setSmallIcon(R.drawable.ic_stat_buds)
                 .setOngoing(false)
                 .setShowWhen(false)
                 .setPriority(Notification.PRIORITY_MIN)
@@ -179,7 +180,7 @@ class BudsService : Service(), BudsConnectionManager.Listener {
             Notification.Builder(this)
                 .setContentTitle("QuickBuds")
                 .setContentText("Maintaining connection to earbuds")
-                .setSmallIcon(android.R.drawable.stat_sys_headset)
+                .setSmallIcon(R.drawable.ic_stat_buds)
                 .setOngoing(false)
                 .setShowWhen(false)
                 .setPriority(Notification.PRIORITY_MIN)
