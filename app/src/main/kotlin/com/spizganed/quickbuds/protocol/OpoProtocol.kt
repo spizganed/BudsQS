@@ -23,6 +23,7 @@ object OpoProtocol {
     const val CMD_ACTIVE_REPORT = 0x0204      // spontaneous notification, payload[0] = subType
     const val CMD_REGISTER_NOTIFY = 0x0205    // subscribe to spontaneous notifications
     const val EVT_WEARING = 0x02              // 0x0204 subType: wearing status changed
+    const val EVT_GAME_MODE = 0x05            // 0x0204 subType: game mode changed
 
     // Legacy misnomers — 0x0105 is actually getRemoteVersion (returns firmware CSV).
     // Kept only so the old unused EarStatusParser still compiles; do NOT call.

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Settings cog, drawn to match the bud silhouettes.
+
+  Style rules taken from ic_bud_left/ic_bud_right so the set reads as one family:
+  a single filled white path, no strokes, no holes for fine detail, and shape
+  carried by outer silhouette rather than internal lines. Filled rather than
+  outlined deliberately: the buds are solid fills, so an outlined cog would look
+  borrowed from another icon set.
+
+  Teeth are trapezoid-ish stubs on a ring, drawn as one continuous path so the
+  vector has no overdraw seams. The centre hole is a real hole (drawn with the
+  even-odd fill rule), because a filled disc with a drawn circle on top would not
+  match the monotone buds and would disappear against dark backgrounds.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M12,8.35a3.65,3.65 0 1,0 0,7.3a3.65,3.65 0 1,0 0,-7.3M12,10.55a1.45,1.45 0 1,1 0,2.9a1.45,1.45 0 1,1 0,-2.9Z
+            M10.9,1.5h2.2l0.35,2.62 1.6,0.66 2.03,-1.68 1.56,1.56 -1.68,2.03 0.66,1.6 2.62,0.35v2.2l-2.62,0.35 -0.66,1.6 1.68,2.03 -1.56,1.56 -2.03,-1.68 -1.6,0.66 -0.35,2.62h-2.2l-0.35,-2.62 -1.6,-0.66 -2.03,1.68 -1.56,-1.56 1.68,-2.03 -0.66,-1.6 -2.62,-0.35v-2.2l2.62,-0.35 0.66,-1.6 -1.68,-2.03 1.56,-1.56 2.03,1.68 1.6,-0.66Z" />
+</vector>

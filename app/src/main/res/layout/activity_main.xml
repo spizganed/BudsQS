@@ -1,4 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Main screen.
+
+  Structure:
+    Header (fixed)
+    Row: status panel (left, fixed 2x2-ish) + free column (right)
+    Feature list (fills the rest; ready for switches/settings rows)
+    Toasts surface status events instead of an on-screen log
+
+  The status panel is a visual mirror of the home-screen widget, but deliberately
+  NOT the widget's full 3x2 shape: it is capped in BOTH width and height
+  (@dimen/widget_panel_width / widget_panel_height) so it reads as a compact card
+  and leaves usable room for the feature list below and to its right.
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/mainLayout"
     android:layout_width="match_parent"
@@ -9,7 +23,11 @@
     android:paddingBottom="16dp"
     android:paddingTop="48dp">
 
-    <!-- Header: device name + Dev Tools + settings -->
+    <!-- Header: device name + Dev Tools + settings.
+         Both actions are ICON buttons (ic_dev_tools / ic_settings_cog) drawn in the
+         bud-silhouette style, sitting in header_icon_bg so they match the widget's
+         card language instead of looking like default platform buttons.
+         contentDescription is kept for TalkBack. -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -22,53 +40,107 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="OnePlus Buds 4"
-            android:textSize="20sp"
-            android:textStyle="bold" />
+            android:textSize="@dimen/header_title_size"
+            android:textStyle="bold"
+            android:textColor="@color/widget_text_primary" />
 
-        <Button
+        <ImageButton
             android:id="@+id/btnDevTools"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:minWidth="0dp"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
-            android:text="Dev" />
+            android:layout_width="@dimen/header_icon_button"
+            android:layout_height="@dimen/header_icon_button"
+            android:background="@drawable/header_icon_bg"
+            android:padding="7dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_dev_tools"
+            android:contentDescription="@string/action_dev_tools" />
 
-        <Button
+        <ImageButton
             android:id="@+id/btnSettings"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:minWidth="0dp"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
-            android:text="⚙" />
+            android:layout_width="@dimen/header_icon_button"
+            android:layout_height="@dimen/header_icon_button"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/header_icon_bg"
+            android:padding="7dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_settings_cog"
+            android:contentDescription="@string/action_settings" />
     </LinearLayout>
 
-    <!-- Status panel: ~1/3 of the screen, weight 1 vs the log's weight 2 -->
-    <include
-        android:id="@+id/statusPanel"
-        layout="@layout/activity_status_panel"
+    <!--
+      Everything below the header scrolls. It starts with the panel + feature-list
+      block, so on a short screen the feature rows stay reachable instead of being
+      pushed off the bottom by a fixed panel.
+    -->
+    <ScrollView
+        android:id="@+id/mainScroll"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:layout_marginTop="12dp" />
+        android:layout_marginTop="12dp"
+        android:fillViewport="true"
+        android:scrollbars="none">
 
-    <!-- Human-readable log -->
-    <ScrollView
-        android:id="@+id/scroll"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="2"
-        android:background="#EEEEEE"
-        android:padding="8dp"
-        android:layout_marginTop="12dp">
-
-        <TextView
-            android:id="@+id/statusText"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Status log will appear here."
-            android:textSize="11sp"
-            android:typeface="monospace" />
+            android:orientation="vertical">
+
+            <!--
+              Panel row. The panel keeps the widget's compact width and a capped
+              height; the column to its RIGHT is reserved for future content.
+              Note: the panel is deliberately top-aligned, not vertically centred,
+              so the card sits flush with the top of the feature list beneath it.
+            -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="top">
+
+                <include
+                    android:id="@+id/statusPanel"
+                    layout="@layout/activity_status_panel"
+                    android:layout_width="@dimen/widget_panel_width"
+                    android:layout_height="@dimen/widget_panel_height" />
+
+                <!--
+                  Reserved column to the right of the panel. Kept as a weighted
+                  spacer so the panel stays hard against the left padding; add
+                  content here only if it is panel-height or smaller, otherwise
+                  put it in the feature list below instead.
+                -->
+                <View
+                    android:id="@+id/panelSideSlot"
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="1" />
+            </LinearLayout>
+
+            <!--
+              FEATURE LIST — the space that was previously dead.
+
+              Empty by design for now: this is where the upcoming controls go
+              (dual device, spatial audio, codec switching, equalizer, find my
+              earbuds). Rows should be built as a reusable "setting row" style
+              (label on the left, switch/chevron on the right) to match the
+              widget's card colours rather than platform defaults.
+
+              The list scrolls with the panel above it, so it can grow past the
+              screen without pushing anything out of reach.
+            -->
+            <LinearLayout
+                android:id="@+id/featureList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="12dp" />
+        </LinearLayout>
     </ScrollView>
+
+    <!--
+      The on-screen human-readable status log was REMOVED from this screen: the
+      same data is available in Dev Tools, which has both the human-readable and
+      raw-hex views plus Export. It was duplicating them and eating two thirds of
+      the main screen. Status/timeline events are surfaced as toasts instead.
+    -->
 </LinearLayout>

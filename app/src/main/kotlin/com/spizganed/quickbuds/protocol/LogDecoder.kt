@@ -160,6 +160,12 @@ object LogDecoder {
                                 appendWearing(sb, w)
                             }
                         }
+                        OpoProtocol.EVT_GAME_MODE -> {
+                            sb.append("Active report: game mode")
+                            GameModeParser.parseActive(payload)?.let { on ->
+                                sb.append(if (on) " ON" else " OFF")
+                            }
+                        }
                         else -> sb.append("Active report: subType=0x${"%02X".format(subType)}")
                     }
                 } else {

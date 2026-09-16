@@ -9,6 +9,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import com.spizganed.quickbuds.protocol.BatteryParser
+import com.spizganed.quickbuds.protocol.GameModeParser
 import com.spizganed.quickbuds.protocol.OpoProtocol
 import com.spizganed.quickbuds.protocol.OppoPacketFramer
 import com.spizganed.quickbuds.protocol.WearingStatusParser
@@ -40,6 +41,19 @@ class BudsConnectionManager(private val context: Context) {
          * caseSt is the raw code reported by the case component (comp 3), -1 if absent.
          */
         fun onWearState(left: Int, right: Int, caseSt: Int) {}
+
+        /**
+         * Game mode changed on the BUDS themselves (0x0204 subType 0x05).
+         *
+         * This fires both when we set game mode and when the user toggles it with a
+         * buds gesture — the buds push the new state either way, so it is the
+         * authoritative source. Implementers should persist it to WidgetStateStore
+         * so the widget and app buttons reflect reality rather than our last command.
+         *
+         * NOTE: the buds raise NO equivalent event for ANC changes, so ANC cannot be
+         * synced this way.
+         */
+        fun onGameModeState(on: Boolean) {}
     }
 
     private val listeners = CopyOnWriteArrayList<Listener>()
@@ -213,6 +227,12 @@ class BudsConnectionManager(private val context: Context) {
         connectedThread?.cancel()
         connectedThread = null
         bluetoothSocket = null
+        // Clear the poll-latch so the NEXT connection starts a fresh poller.
+        // Without this, pollingStarted stayed true for the process lifetime and
+        // startBatteryPolling() short-circuited on every reconnect ("Polling
+        // already running"), silently depending on the previous session's
+        // executor still being alive. Seen in packets_export_20260916_133141.
+        pollingStarted = false
         handler.post { listeners.forEach { it.onConnected(false) } }
         log("Disconnected")
     }
@@ -357,6 +377,22 @@ class BudsConnectionManager(private val context: Context) {
                     it.onEarStatus(lastLeftInCase, lastRightInCase)
                     it.onWearState(lastLeftStatus, lastRightStatus, lastCaseStatus)
                 }
+            }
+            return
+        }
+
+        // --- Game mode changed on the buds: 0x0204 spontaneous event, subType 0x05 ---
+        // Raised for BOTH our own setGameMode() and the user's buds gesture, so this
+        // is what keeps the widget/app buttons honest. Previously this frame fell
+        // through to the battery checks below, matched neither, and was discarded —
+        // which is why the buttons never updated after a gesture.
+        // Payload is only 2 bytes, so this must come before any length assumption.
+        if (cmd == OpoProtocol.CMD_ACTIVE_REPORT &&
+            GameModeParser.isGameModeEvent(payload)) {
+            val on = GameModeParser.parseActive(payload)
+            if (on != null) {
+                log("GAME EVT: ${if (on) "ON" else "OFF"}")
+                handler.post { listeners.forEach { it.onGameModeState(on) } }
             }
             return
         }

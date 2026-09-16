@@ -2,6 +2,8 @@ package com.spizganed.quickbuds.ui
 
 import android.Manifest
 import android.app.Activity
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
@@ -147,6 +149,34 @@ class DevToolsActivity : Activity() {
             if (checkStoragePermission()) {
                 exportLog()
             }
+        }
+
+        // Long-press the log to copy its whole visible contents.
+        //
+        // This was previously missing: the TextView had textIsSelectable, so text
+        // COULD be selected, but there was no one-gesture copy and no clipboard
+        // write at all — which is why copying felt broken. Selectable stays on so
+        // precise partial selection still works; long-press now copies everything
+        // at once, which is what is actually wanted when pasting a capture out.
+        //
+        // Copies the CURRENTLY DISPLAYED tab (human-readable or raw hex), matching
+        // what is on screen, and says which so the toast is self-explanatory.
+        logText.setOnLongClickListener {
+            val body = logText.text?.toString().orEmpty()
+            if (body.isBlank()) {
+                Toast.makeText(this, "Nothing to copy", Toast.LENGTH_SHORT).show()
+                return@setOnLongClickListener true
+            }
+            val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val label = if (isHumanTab) "QuickBuds Log (human)" else "QuickBuds Log (raw)"
+            cm.setPrimaryClip(ClipData.newPlainText(label, body))
+            val tabName = if (isHumanTab) "human-readable" else "raw hex"
+            Toast.makeText(
+                this,
+                "Copied ${body.count { it == '\n' }} lines ($tabName)",
+                Toast.LENGTH_SHORT
+            ).show()
+            true
         }
 
         updateTabButtons()

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Square icon button frame matching the widget's visual language.
+
+  Deliberately reuses the widget's OWN colours and corner language rather than
+  inventing a look: outer bg #1A1A1A with 24dp corners (widget_outer_bg) and the
+  card fill #242424 (widget_bg_card). Radius is 12dp here, i.e. the card's 16dp
+  scaled down for a small control, which is what the widget does between its
+  outer shell and its inner card.
+
+  Used as the background of the main-screen header icon buttons so the cog and
+  the dev-tools glyph read as part of the same design system as the bud icons.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/widget_bg_card" />
+    <corners android:radius="12dp" />
+    <stroke
+        android:width="1dp"
+        android:color="@color/widget_bar_track" />
+</shape>

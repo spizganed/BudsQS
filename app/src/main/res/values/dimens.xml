@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Width of the in-app status panel (activity_status_panel.xml).
+
+      The panel mirrors the home-screen widget, whose provider declares a 3x2
+      footprint (see xml/widget_anc_info.xml). On a phone, letting that design
+      run to match_parent stretched the battery bars across the whole screen and
+      looked wrong, so the panel is capped to something close to the widget's own
+      proportions and the remaining width is left free on the right.
+
+      200dp is deliberately a hair narrower than the 3-cell width (3 x 72dp minus
+      padding) so it reads as a compact card rather than a full-width bar. Raise
+      this one value to widen the panel; nothing else needs changing.
+    -->
+    <dimen name="widget_panel_width">200dp</dimen>
+
+    <!--
+      Height of the in-app status panel.
+
+      The panel is a 3-row stack (battery card : ANC switcher : game row, weights
+      3:1:1). Previously its parent gave it match_parent height, so it stretched to
+      the bottom of the screen — which left a large dead area beside it AND left no
+      room for the feature list below. It is now capped to a compact, roughly 2x2
+      card shape, and the space underneath is reserved for the feature rows
+      (dual device, spatial audio, codec, EQ, find my earbuds).
+
+      148dp is sized to fit the three rows at their natural weights with the 88dp
+      bud column still readable. Raise it if the rows look cramped; the weights
+      re-distribute automatically.
+    -->
+    <dimen name="widget_panel_height">148dp</dimen>
+
+    <!-- Header icon button size (settings cog / dev tools). -->
+    <dimen name="header_icon_button">36dp</dimen>
+
+    <!-- Header title size, matched to the widget's primary label weight. -->
+    <dimen name="header_title_size">16sp</dimen>
+</resources>

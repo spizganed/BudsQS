@@ -26,13 +26,11 @@ import java.util.Locale
 
 class MainActivity : Activity(), BudsConnectionManager.Listener {
 
-    private lateinit var statusText: TextView
-    private lateinit var scroll: ScrollView
     private lateinit var manager: BudsConnectionManager
     private lateinit var mainLayout: LinearLayout
 
-    private lateinit var btnSettings: Button
-    private lateinit var btnDevTools: Button
+    private lateinit var btnSettings: ImageButton
+    private lateinit var btnDevTools: ImageButton
 
     // --- In-app status panel (mirrors the widget visuals) ---
     private lateinit var statusRowLeft: LinearLayout
@@ -56,6 +54,10 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
 
     /** Last state rendered into the panel, so we don't redo work on every notify. */
     private var lastRendered: WidgetStateStore.State? = null
+
+    /** Bounded ring of recent status messages; see appendStatus(). */
+    private val statusTail = ArrayDeque<String>()
+    private val MAX_STATUS_TAIL = 50
 
     private val TARGET_MAC = "A8:E6:E8:92:C1:25"
     private val REQUEST_PERMISSIONS = 1001
@@ -110,10 +112,8 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
         else startService(serviceIntent)
 
         mainLayout = findViewById<LinearLayout>(R.id.mainLayout)
-        statusText = findViewById<TextView>(R.id.statusText)
-        scroll = findViewById<ScrollView>(R.id.scroll)
-        btnSettings = findViewById<Button>(R.id.btnSettings)
-        btnDevTools = findViewById<Button>(R.id.btnDevTools)
+        btnSettings = findViewById<ImageButton>(R.id.btnSettings)
+        btnDevTools = findViewById<ImageButton>(R.id.btnDevTools)
 
         // In-app status panel (widget-mirroring visuals)
         statusRowLeft = findViewById<LinearLayout>(R.id.status_row_left)
@@ -329,36 +329,40 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
         accentColor = newAccent
 
         mainLayout.setBackgroundColor(bgColor)
-        scroll.setBackgroundColor(
-            if (theme == THEME_LIGHT) Color.parseColor("#F5F5F5")
-            else Color.parseColor("#111111")
-        )
-        statusText.setTextColor(textColor)
 
-        // Recolor header buttons/labels, but leave the status panel alone —
-        // it uses the widget's own fixed palette on its own card backgrounds.
+        // The status panel now lives inside a horizontal row (so it can keep the
+        // widget's compact width, with free space to its right). Find it by id
+        // rather than assuming it is a direct child of mainLayout.
+        val panel = mainLayout.findViewById<View>(R.id.statusPanel)
+
+        // Recolor header labels, but leave the status panel alone — it uses the
+        // widget's own fixed palette on its own card backgrounds.
         for (i in 0 until mainLayout.childCount) {
             val child = mainLayout.getChildAt(i)
-            if (child.id == R.id.statusPanel) continue
-            applyColorsToViews(child, textColor, inactiveBtnColor)
-        }
-
-        statusText.setOnLongClickListener {
-            val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            cm.setPrimaryClip(ClipData.newPlainText("QuickBuds Log", statusText.text.toString()))
-            Toast.makeText(this, "Log copied", Toast.LENGTH_SHORT).show()
-            true
+            applyColorsToViews(child, textColor, panel)
         }
     }
 
-    private fun applyColorsToViews(view: View, tc: Int, btnBg: Int) {
+    /**
+     * Recolor non-panel views for the active theme.
+     *
+     * The header actions are now ImageButtons carrying their own widget-styled
+     * frame (header_icon_bg) and a white vector glyph. They must NOT be given a
+     * flat background colour the way the old text Buttons were: that would erase
+     * the frame and leave a bare white glyph on a solid block, which is exactly
+     * the look the redesign moved away from. So ImageButtons are skipped, and
+     * their glyphs stay white in every theme because the frame is always dark.
+     */
+    private fun applyColorsToViews(view: View, tc: Int, skip: View?) {
+        if (view === skip || (skip != null && view.id == skip.id)) return
+        if (view is ImageButton) return
         if (view is TextView) view.setTextColor(tc)
         if (view is Button) {
-            view.setBackgroundColor(btnBg)
+            view.setBackgroundColor(inactiveBtnColor)
             view.setTextColor(tc)
         }
         if (view is ViewGroup) {
-            for (i in 0 until view.childCount) applyColorsToViews(view.getChildAt(i), tc, btnBg)
+            for (i in 0 until view.childCount) applyColorsToViews(view.getChildAt(i), tc, skip)
         }
     }
 
@@ -409,18 +413,25 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
         runOnUiThread { appendStatus("Bud state: $state") }
     }
 
+    /**
+     * Status sink for the main screen.
+     *
+     * The on-screen scrollback was removed because Dev Tools already owns the logs
+     * (human-readable + raw hex, with Export). This function deliberately shows
+     * NOTHING: an earlier revision routed these messages to toasts, which was
+     * wrong — several call sites (`onStatus`, `onBudState`) fire on essentially
+     * every packet, so the result was a continuous toast storm over the UI.
+     *
+     * Messages are still recorded in a bounded in-memory tail so a future screen
+     * can display recent history if wanted. Nothing is user-visible here.
+     *
+     * If you ever DO want a user-facing message, show a toast at that call site
+     * explicitly, and only for a one-off user action — never from a packet
+     * listener.
+     */
     private fun appendStatus(msg: String) {
-        runOnUiThread {
-            try {
-                val ts = timeFormat.format(Date())
-                // Follow the log only when the user is already at the bottom,
-                // so scrolling back through history isn't yanked away.
-                val wasAtBottom = !scroll.canScrollVertically(1)
-                statusText.append("\n[$ts] $msg")
-                if (wasAtBottom) {
-                    scroll.post { scroll.fullScroll(ScrollView.FOCUS_DOWN) }
-                }
-            } catch (_: Exception) {}
-        }
+        val ts = timeFormat.format(Date())
+        statusTail.add("[$ts] $msg")
+        while (statusTail.size > MAX_STATUS_TAIL) statusTail.removeAt(0)
     }
 }

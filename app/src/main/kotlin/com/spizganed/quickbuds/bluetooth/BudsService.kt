@@ -275,6 +275,23 @@ class BudsService : Service(), BudsConnectionManager.Listener {
         }
     }
 
+    /**
+     * Game mode changed ON THE BUDS (0x0204 subType 0x05).
+     *
+     * This fires for our own setGameMode() AND for the user's buds gesture, so it is
+     * the authoritative state. Persisting it here is all that is needed to refresh
+     * BOTH UIs: the widget renders from this store, and MainActivity re-renders via
+     * its WidgetStateStore listener — no view code has to know about this event.
+     */
+    override fun onGameModeState(on: Boolean) {
+        val st = WidgetStateStore.read(this)
+        if (st.gameMode == on) return
+        st.gameMode = on
+        statusLog("[SVC] Game mode (from buds): ${if (on) "ON" else "OFF"}")
+        WidgetStateStore.write(this, st)
+        AncWidgetProvider.refreshAll(this)
+    }
+
     companion object {
         const val ACTION_FORCE_CONNECT = "com.spizganed.quickbuds.FORCE_CONNECT"
         const val ACTION_FORCE_DISCONNECT = "com.spizganed.quickbuds.FORCE_DISCONNECT"

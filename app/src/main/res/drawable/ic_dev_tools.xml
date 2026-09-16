@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Dev Tools icon: a terminal prompt chevron plus a cursor block.
+
+  Chosen over a wrench/wire/bug because the Dev Tools screen is a live PACKET
+  LOG viewer (human-readable tab + raw hex tab + Export), so the honest metaphor
+  is "command output", not "repair". A chevron-and-cursor reads instantly at
+  button size and is the most universally understood dev glyph.
+
+  Matches the bud silhouettes: single filled white path, flat edges, no strokes.
+  The chevron is drawn as a thick two-segment stroke rather than a filled polygon
+  so its weight visually matches the cog's solid body next to it in the header.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- Prompt chevron ">" -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.1"
+        android:strokeLineCap="square"
+        android:strokeLineJoin="miter"
+        android:pathData="M6.4,6.6L12.2,12L6.4,17.4" />
+
+    <!-- Cursor block "_" -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M13.6,15.9L19.6,15.9L19.6,18.1L13.6,18.1Z" />
+</vector>

@@ -15,4 +15,8 @@
     <string name="widget_anc_med">Med</string>
     <string name="widget_anc_high">High</string>
     <string name="widget_game_mode_label">Game Mode</string>
+
+    <!-- Main screen header actions (icon buttons) -->
+    <string name="action_dev_tools">Dev tools</string>
+    <string name="action_settings">Settings</string>
 </resources>

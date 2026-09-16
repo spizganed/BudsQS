@@ -5,12 +5,23 @@
 
     Shares the widget's drawables and colors so the two never drift visually,
     while keeping a separate layout so widget-only tweaks can't break the app.
-    Roadmap #7 follow-up: home screen redesign.
+
+    SIZE: the panel is deliberately NOT a copy of the widget's full 3x2 footprint.
+    It is capped in BOTH dimensions — @dimen/widget_panel_width and
+    @dimen/widget_panel_height — so it reads as a compact card rather than a
+    full-width bar, and so the space below it is free for the feature list
+    (dual device, spatial audio, codec, EQ, find my earbuds).
+
+    Using wrap_content height would let the three weighted rows collapse to
+    nothing, because a weight-only child with no intrinsic height has no height
+    of its own to resolve against. The parent therefore sets an explicit height
+    and the 3:1:1 weights divide THAT. Both values live in dimens.xml so the
+    panel stays self-contained and one value retunes it.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/statusPanelRoot"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
+    android:layout_width="@dimen/widget_panel_width"
+    android:layout_height="@dimen/widget_panel_height"
     android:orientation="vertical"
     android:padding="4dp"
     android:background="@drawable/widget_outer_bg">
@@ -26,11 +37,14 @@
         android:gravity="center_vertical">
 
         <LinearLayout
-            android:layout_width="70dp"
+            android:layout_width="88dp"
             android:layout_height="match_parent"
             android:orientation="horizontal"
             android:gravity="center"
-            android:padding="6dp">
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
+            android:paddingStart="2dp"
+            android:paddingEnd="2dp">
 
             <ImageView
                 android:id="@+id/status_bud_left"

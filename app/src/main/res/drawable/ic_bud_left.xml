@@ -1,7 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Left bud, used by the widget (ImageView widget_bud_left).
+
+  The traced path data is verbatim; only the transform is added. It exists to
+  CENTRE THE INK IN THE VIEWPORT, which the raw trace does not do:
+
+      raw ink bounds: x 8.6 -> 38.1 (centre 23.35), y 0.3 -> 47.5 (centre 23.90)
+      viewport centre: 24, 24
+
+  The ink is therefore 0.65 units left of centre and 0.10 units above it. This
+  matters because the ImageView uses scaleType="fitCenter", which centres an
+  icon by its BOUNDS, not by its ink — so an off-centre drawing stays off-centre
+  on screen no matter how the layout is tuned.
+
+  Scaling by 0.98 about the viewport centre and nudging by the residual offset
+  puts the ink centre at (24, 24) with a little clearance at the edges. The
+  0.98 factor also keeps the 0.3-unit top overhang from touching y = 0.
+
+  If the artwork is ever retraced, RECOMPUTE these numbers — they are derived
+  from the ink bounds above, not eyeballed.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="48dp" android:height="48dp"
     android:viewportWidth="48" android:viewportHeight="48">
-    <path android:fillColor="#FFFFFF"
-        android:pathData="M 25.8 47.5 L 22.7 47.2 L 21.4 46.4 L 20.0 44.9 L 19.3 43.0 L 19.1 39.7 L 19.1 27.3 L 16.6 27.2 L 14.6 26.7 L 12.4 25.4 L 10.4 23.4 L 9.1 21.2 L 8.6 19.4 L 8.6 16.1 L 9.1 14.2 L 10.8 11.4 L 13.8 9.0 L 15.8 5.5 L 18.5 3.0 L 22.9 0.8 L 25.3 0.3 L 29.0 0.3 L 32.7 1.6 L 36.5 5.2 L 37.9 8.5 L 38.1 12.6 L 37.4 15.1 L 35.5 18.3 L 33.4 20.6 L 30.4 22.9 L 30.6 43.2 L 29.6 45.2 L 28.4 46.4 Z" />
+    <group
+        android:scaleX="0.98"
+        android:scaleY="0.98"
+        android:translateX="0.867"
+        android:translateY="0.082">
+        <path android:fillColor="#FFFFFF"
+            android:pathData="M 25.8 47.5 L 22.7 47.2 L 21.4 46.4 L 20.0 44.9 L 19.3 43.0 L 19.1 39.7 L 19.1 27.3 L 16.6 27.2 L 14.6 26.7 L 12.4 25.4 L 10.4 23.4 L 9.1 21.2 L 8.6 19.4 L 8.6 16.1 L 9.1 14.2 L 10.8 11.4 L 13.8 9.0 L 15.8 5.5 L 18.5 3.0 L 22.9 0.8 L 25.3 0.3 L 29.0 0.3 L 32.7 1.6 L 36.5 5.2 L 37.9 8.5 L 38.1 12.6 L 37.4 15.1 L 35.5 18.3 L 33.4 20.6 L 30.4 22.9 L 30.6 43.2 L 29.6 45.2 L 28.4 46.4 Z" />
+    </group>
 </vector>

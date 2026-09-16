@@ -9,27 +9,41 @@
   solid single-colour shape with no fine detail, because anything subtle turns to
   mush at ~24dp. The full traced bud pair (ic_launcher_foreground) is far too
   detailed to read at status-bar size, so this is a deliberately simplified bud.
+
+  GEOMETRY NOTES
+  The previous revision drew the head as a circle of radius 4 centred at (12, 2.4).
+  Its top reached y = -1.6, i.e. OUTSIDE the 24x24 viewport, so the vector
+  clipped the head's top tip. That was the cropping visible in the shade; it was
+  not a centering problem.
+
+  This revision keeps all strokes inside the viewport with margin to spare:
+      head circle : centre (12, 6.2), r = 4.0  -> y 2.2 -> 10.2, x 8.0 -> 16.0
+      stem        : y 10.0 -> 16.6 + 2.6 round tip, half-width 2.6
+      stroke width 1.6 -> outermost ink y 1.4 -> 20.6, x 7.2 -> 16.8
+  Ink centre is (12.0, 11.0); the viewport centre is (12, 12). The 1-unit rise is
+  deliberate: an arc's visual mass sits below its topmost point, so centring the
+  raw ink box reads as slightly low. Nothing reaches the viewport edge, so no
+  clipping is possible.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
-    <!--
-      Single bud, outlined so it stays legible when tinted: a rounded head that
-      tapers into a stem, drawn as a stroked path (stroke-only reads cleaner than
-      a filled blob at this size).
-    -->
+
+    <!-- Head: closed circle, drawn as two arcs so it stays inside the viewport. -->
     <path
         android:strokeColor="#FFFFFF"
         android:strokeWidth="1.6"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
-        android:pathData="M12,2.4m-4,0a4,4 0 1,0 8,0a4,4 0 1,0 -8,0" />
+        android:pathData="M8,6.2a4,4 0 1,0 8,0a4,4 0 1,0 -8,0" />
+
+    <!-- Stem: falls from the head and rounds off at the tip. -->
     <path
         android:strokeColor="#FFFFFF"
         android:strokeWidth="1.6"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
-        android:pathData="M9.2,6.1L9.2,16.4a2.8,2.8 0 0,0 5.6,0L14.8,6.1" />
+        android:pathData="M9.4,10L9.4,16.6a2.6,2.6 0 0,0 5.2,0L14.6,10" />
 </vector>
