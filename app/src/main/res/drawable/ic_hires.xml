@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Hi-Res / codec. Two stacked horizontal bars with a rising third: reads as
+  "higher bitrate" without resorting to a literal "HD" text mark.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 3 17.6 L 8.4 17.6 L 8.4 19.4 L 3 19.4 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 3 12.1 L 13.2 12.1 L 13.2 13.9 L 3 13.9 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 3 6.6 L 18.0 6.6 L 18.0 8.4 L 3 8.4 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 19.6 5.2 L 21.6 5.2 L 21.6 19.4 L 19.6 19.4 Z" />
+</vector>

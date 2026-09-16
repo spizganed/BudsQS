@@ -16,13 +16,58 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
+    <!--
+      Needed only so the app can hand a downloaded APK to Android's own package
+      installer. The app never installs anything itself, and the user still
+      confirms in the system dialog, so this is the narrow version of the
+      permission rather than an installer role.
+    -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
+      ONLY for the crash reporter's API<=28 fallback path, where there is no
+      MediaStore.Downloads to write through. On API 29+ this declaration is
+      ignored and MediaStore is used instead, so no runtime prompt is ever shown
+      on a modern device. Do not raise maxSdkVersion.
+    -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+
+    <!--
+      versionName/versionCode live HERE, not in build.gradle.kts: CodeAssist's
+      generated build script omits defaultConfig.versionName, so BuildConfig is
+      only guaranteed to exist if the version is declared somewhere the merged
+      manifest carries. UpdateActivity reads the installed version through
+      PackageManager rather than BuildConfig for exactly that reason — do not
+      "simplify" it back to BuildConfig without first confirming the generated
+      build script actually emits one.
+    -->
+    <!--
+      NO android:theme on <application>, deliberately.
+
+      Declaring a theme here makes the framework resolve it during Activity
+      attach, which counts as an asset/resources access BEFORE onCreate runs. That
+      left applyOverrideConfiguration() unusable: it threw
+      "getResources() or getAssets() has already been called" on every launch, no
+      matter how early in onCreate it was called (the trace pointed at
+      ContextThemeWrapper.applyOverrideConfiguration).
+
+      The per-activity theme is set by ThemeRes.apply() before super.onCreate
+      instead, which runs before this attribute would ever have been read. If a
+      theme is added back here, the app crashes on launch again.
+    -->
     <application
+        android:versionCode="1"
+        android:versionName="0.4.0"
+        android:name=".QuickBudsApp"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
-        android:supportsRtl="true"
-        android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar">
+        android:supportsRtl="true">
+
 
         <activity
             android:name=".ui.MainActivity"
@@ -36,6 +81,35 @@
         <activity
             android:name=".ui.DevToolsActivity"
             android:exported="false" />
+
+        <activity
+            android:name=".ui.EqActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.FindBudsActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.UpdateActivity"
+            android:exported="false" />
+
+        <!--
+          FileProvider for the app-update flow. The downloaded APK lives in the
+          app's private cache, which the package installer cannot read directly,
+          so it is handed over as a content:// URI granting temporary read access.
+          Authority must match UpdateActivity's FileProvider.getUriForFile call
+          ("${applicationId}.fileprovider").
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
         <service
             android:name=".bluetooth.BudsService"

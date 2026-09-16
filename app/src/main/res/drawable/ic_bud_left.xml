@@ -1,34 +1,96 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Left bud, used by the widget (ImageView widget_bud_left).
+  LEFT earbud — the user's latest SVG, in its UNMIRRORED orientation.
 
-  The traced path data is verbatim; only the transform is added. It exists to
-  CENTRE THE INK IN THE VIEWPORT, which the raw trace does not do:
+  WHY THE PAIR IS NOW SET UP THIS WAY:
+  The right bud drawable was mirrored per the user's request, and the left bud
+  previously held a stale drawing from an earlier round, so the two icons did not
+  match. This file is the same latest SVG as ic_bud_right.xml but WITHOUT the extra
+  mirror, so the two are guaranteed to be the same artwork in the two orientations
+  the user wants — and any future edit to one has an obvious counterpart in the
+  other.
 
-      raw ink bounds: x 8.6 -> 38.1 (centre 23.35), y 0.3 -> 47.5 (centre 23.90)
-      viewport centre: 24, 24
+  COLOUR RULE (the user's own): white = transparent, black = icon colour.
+    fill="#000000"                 -> ink
+    stroke="#ffffff"               -> converted to an ink STROKE, shape left hollow
+    fill="#ffffff" (grille centre) -> a cut-out
+    fill="#000000" (micro-ports)   -> omitted, below renderable size
 
-  The ink is therefore 0.65 units left of centre and 0.10 units above it. This
-  matters because the ImageView uses scaleType="fitCenter", which centres an
-  icon by its BOUNDS, not by its ink — so an off-centre drawing stays off-centre
-  on screen no matter how the layout is tuned.
+  TRANSFORM: source 400x500 -> 48x48, scale 0.096 by the long side.
+      X = x*0.096 + 5.58      Y = y*0.096
+  (This is the fit that centres the shape in the viewport; see ic_bud_right.xml for
+  the mirror form, which is X = 48 - x*0.096.)
 
-  Scaling by 0.98 about the viewport centre and nudging by the residual offset
-  puts the ink centre at (24, 24) with a little clearance at the edges. The
-  0.98 factor also keeps the 0.3-unit top overhang from touching y = 0.
+    body     70,160 -> 12.30,15.36    250,160 -> 29.58,15.36   r 90 -> 8.64
+             240,225-> 28.62,21.60    150,210 -> 19.98,20.16   150,250 -> 19.98,24.00
+             150,380-> 19.98,36.48     70,380 -> 12.30,36.48   r 40 -> 3.84
+    glass    centre 85,108 -> 13.74,10.37  (half-length 1.63, angle -38)
+    ear tip  200,210 -> 24.78,20.16   rx 6.14  ry 5.18
+    nozzle   218,222 -> 26.51,21.31   rx 1.73  ry 2.69
+    grille   218,222 -> 26.51,21.31   rx 1.15  ry 1.92
 
-  If the artwork is ever retraced, RECOMPUTE these numbers — they are derived
-  from the ink bounds above, not eyeballed.
+  Same two simplifications as the right bud, for the same reasons: stroke widths
+  raised from sub-pixel values to 1.2, and the three micro-ports omitted.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="48dp" android:height="48dp"
     android:viewportWidth="48" android:viewportHeight="48">
-    <group
-        android:scaleX="0.98"
-        android:scaleY="0.98"
-        android:translateX="0.867"
-        android:translateY="0.082">
-        <path android:fillColor="#FFFFFF"
-            android:pathData="M 25.8 47.5 L 22.7 47.2 L 21.4 46.4 L 20.0 44.9 L 19.3 43.0 L 19.1 39.7 L 19.1 27.3 L 16.6 27.2 L 14.6 26.7 L 12.4 25.4 L 10.4 23.4 L 9.1 21.2 L 8.6 19.4 L 8.6 16.1 L 9.1 14.2 L 10.8 11.4 L 13.8 9.0 L 15.8 5.5 L 18.5 3.0 L 22.9 0.8 L 25.3 0.3 L 29.0 0.3 L 32.7 1.6 L 36.5 5.2 L 37.9 8.5 L 38.1 12.6 L 37.4 15.1 L 35.5 18.3 L 33.4 20.6 L 30.4 22.9 L 30.6 43.2 L 29.6 45.2 L 28.4 46.4 Z" />
-    </group>
+
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="
+            M 12.3 15.36
+            A 8.64 8.64 0 0 1 29.58 15.36
+            C 28.62 21.6 19.98 20.16 19.98 24
+            L 19.98 36.48
+            A 3.84 3.84 0 0 1 12.3 36.48
+            Z
+
+            M 13.74 9.37
+            C 14.22 8.99 14.77 9.0 14.75 9.75
+            C 14.72 10.38 14.32 10.86 13.07 11.63
+            C 11.82 12.4 11.18 12.99 10.58 12.7
+            C 9.88 12.36 10.12 11.66 11.18 11.37
+            C 12.22 11.09 13.26 9.75 13.74 9.37
+            Z" />
+
+    <!-- Ear tip rim: stroked, not filled. -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.2"
+        android:pathData="
+            M 24.78 14.98
+            C 28.17 14.98 30.92 17.35 30.92 20.16
+            C 30.92 22.97 28.17 25.34 24.78 25.34
+            C 21.39 25.34 18.64 22.97 18.64 20.16
+            C 18.64 17.35 21.39 14.98 24.78 14.98
+            Z" />
+
+    <!-- Nozzle rim: also stroked. -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.2"
+        android:pathData="
+            M 26.51 18.62
+            C 27.73 19.19 28.39 20.19 28.39 21.31
+            C 28.39 22.43 27.73 23.43 26.51 24
+            C 25.29 24.57 24.05 24.57 24.83 23.43
+            C 25.61 22.29 25.61 20.33 24.83 19.19
+            C 24.05 18.05 25.29 18.05 26.51 18.62
+            Z" />
+
+    <!-- Grille centre: a cut-out. -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="
+            M 25.36 21.31
+            C 25.36 20.64 25.93 20.11 26.63 20.11
+            C 27.33 20.11 27.9 20.64 27.9 21.31
+            C 27.9 21.98 27.33 22.51 26.63 22.51
+            C 25.93 22.51 25.36 21.98 25.36 21.31
+            Z" />
 </vector>

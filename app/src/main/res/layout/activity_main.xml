@@ -1,33 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Main screen.
+  Main screen, redesigned.
 
-  Structure:
-    Header (fixed)
-    Row: status panel (left, fixed 2x2-ish) + free column (right)
-    Feature list (fills the rest; ready for switches/settings rows)
-    Toasts surface status events instead of an on-screen log
+  PAINT: nothing here carries a hardcoded colour. Every colour comes from a theme
+  attribute (?attr/appColor*) so the OLED / Dark / Light swap is a resource
+  qualifier change rather than a view-tree recolor. The one exception is the
+  icons, which are vector drawables and therefore tinted in Kotlin (see
+  MainActivity.applyThemeTints).
 
-  The status panel is a visual mirror of the home-screen widget, but deliberately
-  NOT the widget's full 3x2 shape: it is capped in BOTH width and height
-  (@dimen/widget_panel_width / widget_panel_height) so it reads as a compact card
-  and leaves usable room for the feature list below and to its right.
+  STRUCTURE, top to bottom:
+    1. header      - device name + dev tools + settings cog (no left button)
+    2. scroll
+       2a. battery card   - L/R bud icons + case icon, three labelled bars
+       2b. ANC row        - four circles; tapping the active one opens the
+                            mode chooser (see MainActivity.showAncChooser)
+       2c. settings card  - game mode, hi-res codec, spatial audio (switches)
+                            equalizer, find my earbuds, app update (chevrons)
+
+  The settings rows are NOT written out here. They are built in MainActivity
+  (buildFeatureRows) because each one needs live state, a themed icon tint and a
+  click handler, and duplicating six near-identical row layouts in XML would mean
+  six places to edit every time a row changes. The container (#featureList) is
+  declared empty here on purpose.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/mainLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
+    android:background="?attr/appColorBg"
     android:paddingStart="16dp"
     android:paddingEnd="16dp"
-    android:paddingBottom="16dp"
-    android:paddingTop="48dp">
+    android:paddingTop="44dp"
+    android:paddingBottom="12dp">
 
-    <!-- Header: device name + Dev Tools + settings.
-         Both actions are ICON buttons (ic_dev_tools / ic_settings_cog) drawn in the
-         bud-silhouette style, sitting in header_icon_bg so they match the widget's
-         card language instead of looking like default platform buttons.
-         contentDescription is kept for TalkBack. -->
+    <!-- Header. Left action intentionally absent: the redesign drops it. -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -39,10 +46,10 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="OnePlus Buds 4"
+            android:text="@string/default_device_name"
             android:textSize="@dimen/header_title_size"
             android:textStyle="bold"
-            android:textColor="@color/widget_text_primary" />
+            android:textColor="?attr/appColorTextPrimary" />
 
         <ImageButton
             android:id="@+id/btnDevTools"
@@ -66,17 +73,12 @@
             android:contentDescription="@string/action_settings" />
     </LinearLayout>
 
-    <!--
-      Everything below the header scrolls. It starts with the panel + feature-list
-      block, so on a short screen the feature rows stay reachable instead of being
-      pushed off the bottom by a fixed panel.
-    -->
     <ScrollView
         android:id="@+id/mainScroll"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:layout_marginTop="12dp"
+        android:layout_marginTop="14dp"
         android:fillViewport="true"
         android:scrollbars="none">
 
@@ -85,62 +87,268 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <!--
-              Panel row. The panel keeps the widget's compact width and a capped
-              height; the column to its RIGHT is reserved for future content.
-              Note: the panel is deliberately top-aligned, not vertically centred,
-              so the card sits flush with the top of the feature list beneath it.
-            -->
+            <!-- ============ 1. BATTERY CARD ============
+                 Two halves: icons on the left, labelled bars on the right.
+
+                 ICON LOGIC IS A PORT OF THE WIDGET'S (see renderWear): white in ear,
+                 grey out of ear, hidden in case. Colours are the widget's own, not
+                 themed, so this panel matches the home screen in every app theme.
+
+                 SPACING: the two buds sit at the outer edges with a gap between them
+                 for the case icon, which is why they are weighted rather than packed
+                 together. The case is centred in that gap. -->
             <LinearLayout
+                android:id="@+id/batteryCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:gravity="top">
+                android:padding="@dimen/battery_card_padding"
+                android:paddingTop="@dimen/battery_card_padding_v"
+                android:paddingBottom="@dimen/battery_card_padding_v"
+                android:background="@drawable/app_card_outline_bg"
+                android:gravity="center_vertical">
 
-                <include
-                    android:id="@+id/statusPanel"
-                    layout="@layout/activity_status_panel"
-                    android:layout_width="@dimen/widget_panel_width"
-                    android:layout_height="@dimen/widget_panel_height" />
-
-                <!--
-                  Reserved column to the right of the panel. Kept as a weighted
-                  spacer so the panel stays hard against the left padding; add
-                  content here only if it is panel-height or smaller, otherwise
-                  put it in the feature list below instead.
-                -->
-                <View
-                    android:id="@+id/panelSideSlot"
+                <!-- LEFT HALF: bud, space, case, space, bud -->
+                <LinearLayout
                     android:layout_width="0dp"
-                    android:layout_height="1dp"
-                    android:layout_weight="1" />
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <ImageView
+                        android:id="@+id/status_bud_left"
+                        android:layout_width="@dimen/battery_bud_size"
+                        android:layout_height="@dimen/battery_bud_size"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/ic_bud_left"
+                        android:contentDescription="@string/widget_battery_left" />
+
+                    <FrameLayout
+                        android:layout_width="0dp"
+                        android:layout_height="@dimen/battery_case_height"
+                        android:layout_weight="1">
+
+                        <ImageView
+                            android:id="@+id/status_case_icon"
+                            android:layout_width="@dimen/battery_case_width"
+                            android:layout_height="@dimen/battery_case_height"
+                            android:layout_gravity="center"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/ic_case"
+                            android:contentDescription="@string/widget_battery_case" />
+                    </FrameLayout>
+
+                    <ImageView
+                        android:id="@+id/status_bud_right"
+                        android:layout_width="@dimen/battery_bud_size"
+                        android:layout_height="@dimen/battery_bud_size"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/ic_bud_right"
+                        android:contentDescription="@string/widget_battery_right" />
+                </LinearLayout>
+
+                <!-- RIGHT HALF: three labelled bars, no numeric labels on the
+                     outside — the numbers now live INSIDE the segments. -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:layout_marginStart="14dp">
+
+                    <LinearLayout
+                        android:id="@+id/status_row_left"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginBottom="@dimen/battery_row_spacing">
+
+                        <TextView
+                            android:layout_width="@dimen/battery_letter_size"
+                            android:layout_height="wrap_content"
+                            android:gravity="center"
+                            android:text="@string/widget_battery_left"
+                            android:textColor="?attr/appColorLetter"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
+
+                        <FrameLayout
+                            android:layout_width="0dp"
+                            android:layout_height="@dimen/battery_bar_height"
+                            android:layout_weight="1"
+                            android:layout_marginStart="10dp">
+
+                            <ProgressBar
+                                android:id="@+id/status_bar_left"
+                                style="@android:style/Widget.ProgressBar.Horizontal"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:max="100"
+                                android:progress="0" />
+
+                            <TextView
+                                android:id="@+id/status_text_left"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:gravity="center"
+                                android:textColor="?attr/appColorBarLabelOnTrack"
+                                android:textSize="9sp"
+                                android:textStyle="bold" />
+                        </FrameLayout>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/status_row_case"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginBottom="@dimen/battery_row_spacing">
+
+                        <TextView
+                            android:layout_width="@dimen/battery_letter_size"
+                            android:layout_height="wrap_content"
+                            android:gravity="center"
+                            android:text="@string/widget_battery_case"
+                            android:textColor="?attr/appColorLetter"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
+
+                        <FrameLayout
+                            android:layout_width="0dp"
+                            android:layout_height="@dimen/battery_bar_height"
+                            android:layout_weight="1"
+                            android:layout_marginStart="10dp">
+
+                            <ProgressBar
+                                android:id="@+id/status_bar_case"
+                                style="@android:style/Widget.ProgressBar.Horizontal"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:max="100"
+                                android:progress="0" />
+
+                            <TextView
+                                android:id="@+id/status_text_case"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:gravity="center"
+                                android:textColor="?attr/appColorBarLabelOnTrack"
+                                android:textSize="9sp"
+                                android:textStyle="bold" />
+                        </FrameLayout>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/status_row_right"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:layout_width="@dimen/battery_letter_size"
+                            android:layout_height="wrap_content"
+                            android:gravity="center"
+                            android:text="@string/widget_battery_right"
+                            android:textColor="?attr/appColorLetter"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
+
+                        <FrameLayout
+                            android:layout_width="0dp"
+                            android:layout_height="@dimen/battery_bar_height"
+                            android:layout_weight="1"
+                            android:layout_marginStart="10dp">
+
+                            <ProgressBar
+                                android:id="@+id/status_bar_right"
+                                style="@android:style/Widget.ProgressBar.Horizontal"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:max="100"
+                                android:progress="0" />
+
+                            <TextView
+                                android:id="@+id/status_text_right"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:gravity="center"
+                                android:textColor="?attr/appColorBarLabelOnTrack"
+                                android:textSize="9sp"
+                                android:textStyle="bold" />
+                        </FrameLayout>
+                    </LinearLayout>
+                </LinearLayout>
             </LinearLayout>
 
+            <!-- ============ 2. ANC CIRCLES ============ -->
             <!--
-              FEATURE LIST — the space that was previously dead.
-
-              Empty by design for now: this is where the upcoming controls go
-              (dual device, spatial audio, codec switching, equalizer, find my
-              earbuds). Rows should be built as a reusable "setting row" style
-              (label on the left, switch/chevron on the right) to match the
-              widget's card colours rather than platform defaults.
-
-              The list scrolls with the panel above it, so it can grow past the
-              screen without pushing anything out of reach.
+              Four buttons only. The chooser for the full mode list opens from the
+              ACTIVE button (see MainActivity.showAncChooser), which is why there
+              are four and not five: one slot per conceptual state, with the
+              sub-variants of noise cancelling behind the ANC button.
             -->
+            <LinearLayout
+                android:id="@+id/ancRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:orientation="horizontal"
+                android:weightSum="3">
+
+                <TextView
+                    android:id="@+id/anc_btn_off"
+                    android:layout_width="0dp"
+                    android:layout_height="@dimen/anc_button_height"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="@string/app_anc_off"
+                    android:textSize="@dimen/anc_circle_text_size"
+                    android:textStyle="bold"
+                    android:textColor="?attr/appColorSegText"
+                    android:background="@drawable/anc_circle_bg" />
+
+                <TextView
+                    android:id="@+id/anc_btn_anc"
+                    android:layout_width="0dp"
+                    android:layout_height="@dimen/anc_button_height"
+                    android:layout_weight="1"
+                    android:layout_marginStart="@dimen/anc_circle_gap"
+                    android:gravity="center"
+                    android:text="@string/app_anc_anc"
+                    android:textSize="@dimen/anc_circle_text_size"
+                    android:textStyle="bold"
+                    android:textColor="?attr/appColorSegText"
+                    android:background="@drawable/anc_circle_bg" />
+
+                <TextView
+                    android:id="@+id/anc_btn_trans"
+                    android:layout_width="0dp"
+                    android:layout_height="@dimen/anc_button_height"
+                    android:layout_weight="1"
+                    android:layout_marginStart="@dimen/anc_circle_gap"
+                    android:gravity="center"
+                    android:text="@string/app_anc_trans"
+                    android:textSize="@dimen/anc_circle_text_size"
+                    android:textStyle="bold"
+                    android:textColor="?attr/appColorSegText"
+                    android:background="@drawable/anc_circle_bg" />
+            </LinearLayout>
+
+            <!-- ============ 3. SETTINGS ROWS ============
+                 Built in code; see the class comment at the top of this file.
+                 Uses the same outlined rounded box as the battery card and the ANC
+                 buttons, so all three groups share one visual treatment. -->
             <LinearLayout
                 android:id="@+id/featureList"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:layout_marginTop="12dp" />
+                android:layout_marginTop="18dp"
+                android:background="@drawable/app_card_outline_bg" />
         </LinearLayout>
     </ScrollView>
-
-    <!--
-      The on-screen human-readable status log was REMOVED from this screen: the
-      same data is available in Dev Tools, which has both the human-readable and
-      raw-hex views plus Export. It was duplicating them and eating two thirds of
-      the main screen. Status/timeline events are surfaced as toasts instead.
-    -->
 </LinearLayout>

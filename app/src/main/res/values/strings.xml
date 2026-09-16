@@ -2,6 +2,9 @@
 <resources>
     <string name="app_name">QuickBuds</string>
 
+    <!-- Device title shown before the buds report their name. -->
+    <string name="default_device_name">OnePlus Buds 4</string>
+
     <string name="widget_anc_label">ANC</string>
     <string name="widget_game_label">Game</string>
     <string name="widget_buds_desc">Earbuds</string>
@@ -19,4 +22,68 @@
     <!-- Main screen header actions (icon buttons) -->
     <string name="action_dev_tools">Dev tools</string>
     <string name="action_settings">Settings</string>
+
+    <!-- ==================== Redesigned home screen ==================== -->
+
+    <!-- ANC circle labels. Short by necessity: they must fit inside 62dp.
+         The ANC circle swaps to the -L/-M/-H form once a level is selected, so
+         the current strength is visible without opening the chooser. -->
+    <string name="app_anc_off">OFF</string>
+    <string name="app_anc_anc">ANC</string>
+    <string name="app_anc_trans">TRANS</string>
+    <string name="app_anc_light">ANC-L</string>
+    <string name="app_anc_medium">ANC-M</string>
+    <string name="app_anc_high">ANC-H</string>
+
+    <!-- ANC mode chooser. Title is just "ANC"; the options are the three strengths
+         in plain words, not the protocol's long "Noise cancelling - Light" form. -->
+    <string name="anc_chooser_title">ANC</string>
+    <string name="anc_mode_low">Low</string>
+    <string name="anc_mode_medium">Medium</string>
+    <string name="anc_mode_high">High</string>
+
+    <!-- Settings rows: label and one-line description. -->
+    <string name="row_game_title">Low latency mode</string>
+    <string name="row_game_sub">Stays in sync with video</string>
+    <string name="row_hires_title">Hi-Res audio</string>
+    <string name="row_hires_sub">LHDC codec</string>
+    <string name="row_hires_sub_off">Using AAC</string>
+    <string name="row_spatial_title">3D audio</string>
+    <string name="row_spatial_sub">Spatial sound with head tracking</string>
+    <string name="row_eq_title">Equalizer</string>
+    <string name="row_eq_sub">Sound profiles</string>
+    <string name="row_find_title">Find my earbuds</string>
+    <string name="row_find_sub">Play a chime on one bud</string>
+    <string name="row_update_title">App update</string>
+    <string name="row_update_sub">Check GitHub for a newer build</string>
+
+    <!-- Find my earbuds screen. -->
+    <string name="find_title">Find my earbuds</string>
+    <string name="find_hint">Tap a bud to play a locating chime on it.</string>
+    <string name="find_stop">Stop</string>
+    <string name="find_playing_left">Playing on the left bud</string>
+    <string name="find_playing_right">Playing on the right bud</string>
+    <string name="find_no_hardware_tone">The earbuds have no built-in locator tone on this firmware, so a quiet chime is played from the phone.</string>
+
+    <!-- Equalizer placeholder. -->
+    <string name="eq_title">Equalizer</string>
+    <string name="eq_placeholder">Not implemented yet.</string>
+    <string name="eq_placeholder_detail">The buds expose their equalizer over the same RFCOMM link used for noise control. This screen will list the presets once the command is wired up and verified against a capture.</string>
+
+    <!-- App update. -->
+    <string name="update_title">App update</string>
+    <string name="update_check">Check for updates</string>
+    <string name="update_never_auto">Nothing is checked automatically. This runs only when you press the button.</string>
+    <string name="update_checking">Checking GitHub releases&#8230;</string>
+    <string name="update_up_to_date">You are on the latest build.</string>
+    <string name="update_available">Version %1$s is available (you have %2$s).</string>
+    <string name="update_download">Download</string>
+    <string name="update_downloading">Downloading&#8230;</string>
+    <string name="update_downloaded">Downloaded. Press Install to hand it to Android.</string>
+    <string name="update_install">Install</string>
+    <string name="update_failed">Could not check for updates: %1$s</string>
+
+    <!-- Misc -->
+    <string name="dialog_close">Close</string>
+    <string name="theme_title">Theme</string>
 </resources>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Dev Tools button, ACTIVE state (the selected tab).
+
+  The request was that the active log button should not render as red. It did,
+  because DevToolsActivity set the active tab to its own hardcoded accent
+  (#CC0000). This uses the same accent token as the main screen — but as a
+  FILLED chip with high-contrast text and no red stroke, so selected-vs-unselected
+  is obvious from the fill alone.
+
+  If this still reads as too loud on the OLED theme, the alternative is a filled
+  neutral (appColorSegBgActive) with dark text, which is how the main screen marks
+  the selected ANC circle. Say the word and it is a one-line change of the solid.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="?attr/appColorAccent" />
+    <corners android:radius="10dp" />
+</shape>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Outlined card surface — the battery box and the settings rows.
+
+  Same as app_card_bg except that it is guaranteed to draw a visible 1dp border in
+  every theme. The border is what the user asked for on the battery box ("the box
+  around the top part should be rounded in corners") and it is what makes the
+  battery box, the ANC buttons and the settings rows read as one family of
+  bordered surfaces.
+
+  Theme-aware via attributes, so the border follows the in-app theme rather than
+  the system dark-mode setting.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="?attr/appColorCard" />
+    <corners android:radius="16dp" />
+    <stroke
+        android:width="1dp"
+        android:color="?attr/appColorOutline" />
+</shape>

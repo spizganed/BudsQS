@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  App-side colour palette.
+
+  DELIBERATELY A COPY OF THE WIDGET'S PALETTE (colors.xml widget_* names), under
+  its own `app_` prefix. The two must not alias the SAME resource name: the
+  widget's palette is fixed by design (it renders on whatever wallpaper the user
+  has, so it stays dark), whereas the app has three themes. Aliasing would make
+  a theme change repaint the home-screen widget too.
+
+  The redesign's whole point is that the app and the widget look like one
+  product, so these values are copied from the widget palette verbatim (OLED =
+  widget colours) and only Dark/Light diverge.
+
+  WHY THIS EXISTS AT ALL: the old MainActivity.applyTheme() walked the view tree
+  and called setBackgroundColor()/setTextColor() on every TextView/Button it
+  found. That worked for a header plus a panel, but it cannot express "this row
+  is a card, this circle is an active segment, this chevron is secondary text" —
+  it would flatten every new control to the same colour. With this many controls
+  the only maintainable path is: colours live in resources, the layout references
+  them, and Kotlin never touches colours except to retint the vector icons.
+
+  HOW THE THREE THEMES SELECT FROM THIS FILE
+  These are the OLED values (the default). Dark and Light live in
+  values-night/app_colors_dark.xml and values-notnight/app_colors_light.xml, and
+  are selected by the STYLE set on the activity (see values/themes.xml and
+  ThemeRes.select), not by a runtime configuration override. The earlier
+  applyOverrideConfiguration approach crashed on launch and is documented as
+  unusable in ThemeRes — do not bring it back.
+-->
+<resources>
+    <!-- Screen background behind everything. -->
+    <color name="app_bg">#000000</color>
+
+    <!-- Card / panel surfaces. Two levels, same as the widget's outer shell + card. -->
+    <color name="app_bg_outer">#1A1A1A</color>
+    <color name="app_bg_card">#242424</color>
+
+    <!-- Interactive surfaces: switch tracks, circles, chevron buttons. -->
+    <color name="app_bg_button">#2E2E2E</color>
+
+    <!-- The red accent, same value the widget uses for an "on" toggle. -->
+    <color name="app_accent">#D71921</color>
+
+    <color name="app_text_primary">#FFFFFF</color>
+    <color name="app_text_secondary">#8A8A8A</color>
+
+    <!-- Circular ANC buttons + switches: inactive surface, active surface. -->
+    <color name="app_seg_bg">#2E2E2E</color>
+    <color name="app_seg_bg_active">#FFFFFF</color>
+    <color name="app_seg_text">#8A8A8A</color>
+    <color name="app_seg_text_active">#000000</color>
+
+    <!-- Ring around a control that is NOT active but must still read as a button. -->
+    <color name="app_outline">#404040</color>
+
+    <!-- Battery bar track. -->
+    <color name="app_bar_track">#404040</color>
+
+    <!--
+      Icon tint for every vector glyph in the app (buds, case, chevron, cog).
+      Kept as a token because vectors are tinted in Kotlin (setColorFilter), not
+      in XML, so the theme switch has to hand this value over by name.
+    -->
+    <color name="app_icon_tint">#FFFFFF</color>
+
+    <!--
+      The L / C / R letters in the battery card.
+
+      Deliberately brighter than app_text_primary in the OLED theme: the letters
+      were reported as hard to read. A separate token rather than reusing
+      app_text_primary means the letters can be tuned without affecting body text.
+
+      On the LIGHT theme this is dark, not white — white letters on a light chip
+      would be invisible. See values-notnight/app_colors_light.xml.
+    -->
+    <color name="app_letter">#FFFFFF</color>
+</resources>

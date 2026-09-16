@@ -166,7 +166,17 @@ object LogDecoder {
                                 sb.append(if (on) " ON" else " OFF")
                             }
                         }
-                        else -> sb.append("Active report: subType=0x${"%02X".format(subType)}")
+                        UserInteractionParser.EVT_USER_INTERACTION -> {
+                            sb.append("Button/gesture: ")
+                            sb.append(UserInteractionParser.describe(payload))
+                        }
+                        else -> {
+                            // A subType we don't decode. Annotated with its payload head
+                            // so an unattributed gesture frame (e.g. subType 0xFF /
+                            // "02 FF 06 00 F1 ...") stays visible on this screen.
+                            val head = payload.take(6).joinToString(" ") { "%02X".format(it) }
+                            sb.append("Unattributed active report: subType=0x${"%02X".format(subType)} [$head]")
+                        }
                     }
                 } else {
                     sb.append("Active report (empty payload)")

@@ -36,4 +36,87 @@
 
     <!-- Header title size, matched to the widget's primary label weight. -->
     <dimen name="header_title_size">16sp</dimen>
+
+    <!-- ==================== Redesigned home screen ==================== -->
+
+    <!--
+      Battery card. Mirrors the home-screen widget, so its numbers stay close to the
+      widget's own rather than being scaled up for the app.
+    -->
+    <!--
+      Battery card. Mirrors the home-screen widget, so its numbers stay close to the
+      widget's own rather than being scaled up for the app.
+    -->
+    <dimen name="battery_card_padding">14dp</dimen>
+    <!--
+      Vertical padding spends height WITHOUT inflating any child. The user asked for
+      a visibly bigger box three times and the previous 18dp was not enough, so this
+      is now 24dp — the card grows by ~48dp of padding alone, which is the difference
+      that makes the box read as deliberately large rather than as a tight strip.
+    -->
+    <dimen name="battery_card_padding_v">24dp</dimen>
+
+    <!--
+      ICON SIZES — aligned so the buds and the case share a common centre line.
+
+      THE ALIGNMENT PROBLEM: the buds are portrait and the case is landscape. With a
+      40dp square bud and a 40x32 case, the two have different vertical centres once
+      the row centres them, so the case sat visibly high or low against the buds.
+
+      The fix is to give them a COMMON HEIGHT and let each fill its own width:
+          bud   40 x 40   (portrait, fills its square)
+          case  48 x 40   (landscape, fills its wider slot)
+      Both are 40dp tall, so `gravity="center_vertical"` on the row aligns them
+      exactly, and the case's greater width no longer implies a different height.
+      This is also what stops the case being clipped: its slot is now the full 40dp
+      tall, which is what the drawable's intrinsic size expects.
+    -->
+    <dimen name="battery_bud_size">52dp</dimen>
+    <dimen name="battery_case_width">52dp</dimen>
+    <dimen name="battery_case_height">52dp</dimen>
+    <dimen name="battery_letter_size">14dp</dimen>
+
+    <!--
+      Battery bar height. Raised so the 10 segment dividers stay legible and the
+      in-bar number has room: at 10dp the dividers were crowding the digits, which
+      was reported as "the text is hard to read". 13dp gives the numerals real
+      clearance.
+    -->
+    <dimen name="battery_bar_height">13dp</dimen>
+    <dimen name="battery_row_spacing">9dp</dimen>
+
+    <!--
+      Circular ANC buttons. Diameter is driven by the four needing to fit across
+      a 5" screen with margins: 4 x 62dp + 3 x 12dp gaps = 284dp, which leaves
+      room inside the 16dp screen padding on a 320dp-wide screen.
+    -->
+    <dimen name="anc_circle_size">62dp</dimen>
+    <dimen name="anc_circle_gap">12dp</dimen>
+    <dimen name="anc_circle_ring">2dp</dimen>
+    <dimen name="anc_circle_text_size">11sp</dimen>
+    <!--
+      ANC buttons are rounded RECTANGLES now, not circles, and stretch to fill the
+      row so there is no empty space at the left and right edges. Height is
+      independent of the old diameter; the width is driven by weight.
+    -->
+    <dimen name="anc_button_height">52dp</dimen>
+    <dimen name="anc_button_radius">14dp</dimen>
+
+    <!-- Settings rows: label left, control right. -->
+    <dimen name="setting_row_height">56dp</dimen>
+    <dimen name="setting_row_padding_horizontal">14dp</dimen>
+    <dimen name="setting_label_size">15sp</dimen>
+    <dimen name="setting_sub_label_size">12sp</dimen>
+
+    <!-- Switch track / thumb. Sized here because the switch is tinted in code. -->
+    <dimen name="setting_switch_width">44dp</dimen>
+    <dimen name="setting_switch_height">26dp</dimen>
+    <dimen name="setting_switch_thumb">22dp</dimen>
+
+    <!-- Chevron button at the right of a row that opens another screen. -->
+    <dimen name="setting_chevron_size">32dp</dimen>
+    <dimen name="setting_icon_size">22dp</dimen>
+
+    <!-- Card corner radius, matching widget_card_bg's 16dp. -->
+    <dimen name="app_card_radius">16dp</dimen>
 </resources>

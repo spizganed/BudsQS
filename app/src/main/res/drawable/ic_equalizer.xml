@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Equalizer. Four vertical sliders at different heights.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 3.2 4 L 5.2 4 L 5.2 20 L 3.2 20 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 3.2 12.6 L 5.2 12.6 L 5.2 14.6 L 3.2 14.6 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 8.2 4 L 10.2 4 L 10.2 20 L 8.2 20 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 8.2 7.4 L 10.2 7.4 L 10.2 9.4 L 8.2 9.4 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 13.8 4 L 15.8 4 L 15.8 20 L 13.8 20 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 13.8 14.6 L 15.8 14.6 L 15.8 16.6 L 13.8 16.6 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 18.8 4 L 20.8 4 L 20.8 20 L 18.8 20 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 18.8 9.4 L 20.8 9.4 L 20.8 11.4 L 18.8 11.4 Z" />
+</vector>

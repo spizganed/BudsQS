@@ -1,7 +1,8 @@
 ## QuickBuds (BudsQS) - Development Roadmap & Priority List
 
 > Living document. Updated as items complete or priorities shift.
-> Last updated: 2026-09-16 (battery + game mode push; UI/icon pass)
+> Last updated: 2026-09-17 (battery icon alignment fixed + verified; 50:50 battery card, icons 52dp;
+> layout-report dev tool; Q2/Q3/Q4 answered; Light theme slated for removal)
 
 ## Working principles
 
@@ -32,11 +33,23 @@
 | 7| **Dev Tools screen** - DONE. Separate in-app screen with (a) a human-readable log ("L bud: in ear", "ANC -> Deep", "Battery L=70"), (b) a raw-hex log, plus hold-to-copy on the current tab and export-to-file via MediaStore Downloads. Mark / Clear / Export all live here, so the main screen carries no log at all — status events there are silent by design. **An earlier revision toasted them, which stormed the UI because several call sites fire once per packet; do not put user-visible output on a packet listener.**| Raw log is hard to read; also the diagnostic tool for #4| Done| Medium|
 | 8| **Auto play/pause, two phases**: (a) firmware toggle button in app UI (autoPlayPauseOn/Off commands already exist in manager), near ANC/Game Mode or in settings; (b) Smart Pause v2 - app-handled: both buds out -> pause; single out -> keep playing; never auto-resume; never fight manual user playback. Latency target 0-250 ms, depends on #4| Firmware version resumes accidentally when holding a removed bud; software rules fix it| a: 30 min / b: 2-3 h| Quick + Medium|
 
+### Priority 2 follow-ups (added 2026-09-16)
+
+| #| Item| Why / when| Est. time| Type|
+| ---| ---| ---| ---| ---|
+| 18| **Settings-card rows + secondary screens** — DONE 2026-09-16. The reserved `featureList` area is now a real card: Game Mode (live, driven by the pushed `0x0204` subType `0x05`), Hi-Res codec (preference toggle only — the feature id is not captured, see below), spatial audio (legacy feature `0x1B`), Equalizer, Find my earbuds, App update. Rows are built in code by `ui/SettingRowFactory.kt` (one place for row shape + themed icon tint) instead of six near-identical XML blocks. New screens: `ui/EqActivity.kt`, `ui/FindBudsActivity.kt`, `ui/UpdateActivity.kt` (never auto-updates), `ui/ChimePlayer.kt`, `ui/SegmentedBarDrawable.kt` (number drawn inside the bar), `bluetooth/KeepAliveReceiver.kt`| Parity with the original app's settings list; the main screen needed real content below the battery block| Done| Medium|
+| 19| **ANC gesture sync** — IN PROGRESS. ANC raises **no** push event (verified 3x), so a bud-side ANC gesture is invisible to us. The planned route is a one-shot `0x810C` (query ANC) after the gesture is inferred; if the gesture produces nothing at all, the fallback is polling `0x810C` on a short timer while connected. **Not yet confirmed from a capture** — the gesture log has not been analysed| ANC set from the buds must be reflected in the widget/app circles| 1-2 h| Medium|
+| 20| **Hi-Res codec honesty** — the row currently toggles only its own subtitle; no codec set/get command has been captured on this firmware. Needs a capture of the reference implementation to find the feature id (LHDC). Until then the row is deliberately a preference stub, not a lie| A switch that silently does nothing is worse than one that is honest| 1-2 h + capture| Spike|
+| 21| **Layout-report dev tool** — DONE 2026-09-17. `devtool/LayoutReport.kt` writes the measured view tree as TEXT (bounds, weights, margins, padding, gravity, text size/style/colour, drawable intrinsic vs actual) plus a `SIBLING GAPS` section, because the AI agent **cannot read images** and `screenshots/*.png` are opaque to it. MainActivity parks a report in `onResume`; Dev Tools reads it (cached or live) and it lands in `testlogs/`. This is now the primary way layout bugs are diagnosed, and it is what made the icon fix verifiable rather than a guess. `collectGaps` must report DIRECT children only, each container against its own origin and on its own axis — two earlier versions broke this (see HANDOFF)| Descriptions of a layout ("the card looks too close to the header") failed because the agent had to guess which of ~30 view ids was meant, and a wrong guess cost a build cycle| Done| Medium|
+| 22| **Battery icon alignment** — DONE + VERIFIED 2026-09-17. He reported "the icons are misaligned different sizes". Every measured *box* was correct and every aspect ratio matched, so all the obvious suspects were innocent. The cause was **fill fraction**: the case was a 48x40 viewport on a 1:1 slot (ellipse edge to edge, 100% fill) while the buds were inset to ~79% of their viewport, so a case unit was 48/48dp against a bud's 40/48dp — it drew ~20% larger per unit and sat on a different optical line. Fixed by rescaling `ic_case.xml` to the buds' ~79% fill on a shared 48x48 viewport. Confirmed by measurement: equal gaps either side of the case (`0.0dp`/`0.0dp`; previously 114px vs 135px). **If one icon's frame or insets change, the others must be rescaled to match or this returns**| Visible on every screen, every session| Done| Medium|
+| 23| **Battery card 50:50 + bigger icons** — DONE (built 2026-09-17, not yet captured). Halves were `weight 0.8 / 1.2`; now `1 / 1` so the icon side gains ~33dp. Icons 40dp -> 52dp (`battery_bud_size`, `battery_case_width`, `battery_case_height`). **The on-device result is verified arithmetically but not visually** — capture a layout report to confirm. If the card (now ~12dp taller) squeezes the feature list, trim `battery_card_padding_v` (24dp) rather than shrinking the icons| He wanted more room on the left and larger icons| Done| Quick|
+| 24| **Remove the Light/white theme** — DECIDED 2026-09-17: he does not use it and it "introduces problems". It is the source of two recurring awkward cases (white L/C/R letters and a white in-case state are both invisible on a light background) and it is a whole colour-qualifier branch to keep in sync. Touches `ThemeRes.kt` (LIGHT = 2, the three-style selection), the `Theme.App.Light` style, and the light colour qualifier files. **Not started — do not begin until asked.** Once gone, the theme-aware colour logic in Q2/Q4 becomes simpler| Fewer moving parts; removes a class of invisible-on-light bugs| 1-2 h| Medium|
+
 ## Priority 3 - Features & research (parity with original app)
 
 | #| Item| Details from app screenshots| Est. time| Type|
 | ---| ---| ---| ---| ---| ---| ---| ---| ---| ---|
-| 9| **Easy parity batch**: spatial sound switch (commands exist), find my earbuds (loud beep), alert-sound volume slider (More settings shows it as a slider), game mode done| Quick wins, commands mostly exist| 2-3 h| Medium|
+| 9| **Easy parity batch**: spatial sound switch (commands exist), find my earbuds (loud beep), alert-sound volume slider (More settings shows it as a slider), game mode done| Quick wins, commands mostly exist — the switch, beep screen and game mode are already in (2026-09-16); the volume slider is not| 2-3 h| Medium|
 | 10| **Medium parity batch + spikes**: dual device ("connect 2 devices and switch"), ANC-Smart behavior (spike: app adapts or buds themselves?), Hi-Res mode (switch BT codec - LHDC; screenshot shows simple toggle), earbud fit test (unknown)| Listed for parity| spikes 30 min each| Spike -> Medium|
 | 11| **Hard parity batch - EQ + Golden Sound + controls**: EQ = 6 bands (62/250/1k/4k/8k/16k Hz), +/-6 dB, presets (Balanced/Clear Vocals/Bass), custom presets with rename, BassWave dynamic-bass toggle + intensity slider. Golden Sound = one-time hearing test, likely produces an EQ profile. Earbud controls = per-bud single/double/triple tap + slide + touch&hold, separate "when not on a call" / "when on a call" sections (screenshots 22:02)| Complex, long-term; needs packet research vs reference projects| many hours| Big|
 | 12| **Case lid state research**: read Leaf-lsgtky/OppoPods + Zhaoyi-ya/OppoPodsManager - do buds/case report lid open/closed (0x8105 ear-status bit 0x04?)? KEEP current case code + ic_case.xml until resolved. Note: verified HeyMelody also cannot read case battery when buds are out + lid closed| Case icon comeback depends on this; parked by user decision 2026-09-15| 1-2 h research| Spike|
@@ -59,17 +72,43 @@
 ## Execution order
 
 ```
-4b -> 7 -> ANC gesture sync -> feature rows (dual device / spatial / codec / EQ / find buds)
--> 5 -> 8a -> 9 (easy batch)
--> 8b (needs #4) -> 10/12/13/6? spikes anytime
+4b -> 7 -> ANC gesture sync (IN PROGRESS, capture not handed over) -> icon rework (his brief)
+-> #24 remove Light theme -> dual device / codec feature ids (capture first)
+-> 5 -> 8a -> 9 (easy batch: alert-sound volume slider)
+-> widget colour states (Q4 rule) -> 8b (needs #4) -> 10/12/13/6? spikes anytime
 -> 14 -> 15 -> 17 (with 10/11 slotted in as the UI grows)
 ```
 
-Next up: **ANC gesture sync.** ANC cannot be pushed (the buds emit no event for it — verified
-three times), so the route is a one-shot `0x810C` query after a bud-side gesture. Before
-building the feature rows, CAPTURE what the buds reply for the feature get/set commands
-(`FEATURE_DUAL_DEVICE=0x11`, `FEATURE_SPATIAL_SOUND=0x1B`, `FEATURE_AUTO_PLAY_PAUSE=0x04`)
-rather than assuming the shapes.
+Next up: **the icon rework (his brief, not written yet)** and **ANC gesture sync (#19)**. ANC
+cannot be pushed (the buds emit no event for it — verified three times), so the route is a
+one-shot `0x810C` query after a bud-side gesture, or a short `0x810C` poll if the gesture emits
+nothing the app can see. **The gesture capture has not been handed over yet** — the brief exists
+at `testlogs/ANC-GESTURE-CAPTURE.md`, and the build logs `MARK`, `BTN EVT:` and `UNATTR RX:`,
+but no log has been analysed. That decides which of the two routes it is.
+
+## Known UI debt (honest list, 2026-09-17)
+
+Everything below is working but not finished. None of it blocks a release; all of it is
+visible to a new user.
+
+| Area | What is unfinished |
+| --- | --- |
+| 50:50 card + 52dp icons | Built and installed 2026-09-17, but **not yet captured** — the arithmetic is checked, the on-device result is not |
+| Hi-Res codec row | Toggles only its own subtitle. No codec command is captured, so it does not change the stream (see #20) |
+| Spatial audio row | Wired to the legacy feature `0x1B`; the newer three-mode `0x0422` may be what this firmware honours. Unverified |
+| Equalizer screen | Placeholder destination: presets are not yet sent to the buds |
+| Find my earbuds | Opens the buds' locate flow; volume/duration are not tunable |
+| ANC sync | The circles do not follow bud-side gestures until #19 lands |
+| Widget colour states | The Q4 rule (in-ear full strength, out-of-ear grey, in-case full strength, all theme-aware) is decided but **not implemented in the widget** — the app-side icon fix did not touch it |
+| Light theme | Still present and still a source of invisible-on-light bugs; slated for removal (#24) |
+| Localisation | All user-facing text is in `strings.xml` but only `values/` (English) exists. Hardcoded strings remain in `MainActivity` dialogs (crash report, Bluetooth permission dialog) |
+| README screenshots | The images under `screenshots/` predate the redesign. Note they are of limited use: **the agent cannot read them.** Prefer a layout report for anything geometry-related |
+
+### Resolved since the 2026-09-16 list
+- ~~Main screen polish — never confirmed visually~~ **Now confirmed via layout reports**: battery
+  card geometry, the three ANC buttons (52.2dp tall, ~118dp wide), the header and the feature rows
+  and dividers all check out. See #21 for how, and use it for any future visual complaint.
+- ~~Battery icon alignment~~ — fixed and verified (#22).
 
 ## Credits (draft for #14)
 

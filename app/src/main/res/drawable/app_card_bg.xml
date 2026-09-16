@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Card surface for a settings group, and for the battery card.
+
+  Matches widget_card_bg (16dp corners, widget_bg_card fill) but reads from the
+  app palette so the light theme can flip it to white. Ringed with app_outline at
+  1dp for the same reason the ANC circles are: in OLED the card fill (#242424) is
+  only a shade off the screen background (#000000), so without a hairline border
+  the rows float unanchored.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="?attr/appColorCard" />
+    <corners android:radius="16dp" />
+    <stroke
+        android:width="1dp"
+        android:color="?attr/appColorOutline" />
+</shape>

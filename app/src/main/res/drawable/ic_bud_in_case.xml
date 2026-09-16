@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  "Bud is in the case" state marker.
+
+  THE PROBLEM: in-ear shows a solid bud, out-of-ear shows a dimmed one, and
+  in-case previously showed NOTHING (the icon was hidden). Hiding was wrong twice
+  over: it makes the card's layout shift as buds are docked and removed, and "no
+  icon" reads as "no information" rather than as "it's in the case".
+
+  WHY NOT A BARE SILHOUETTE: a dimmed or outlined bud is indistinguishable from
+  the out-of-ear state, which is already a dimmed bud. Two states that look the
+  same are worse than one that is hidden, so a plain silhouette was rejected.
+
+  WHAT THIS DOES INSTEAD: a FILLED bullet inside a ring, centred where the bud
+  would be. The shape change carries the meaning, not the opacity:
+    - solid bud      = in ear
+    - dimmed bud     = out of ear
+    - ring + dot     = docked in the case
+  Three visually distinct treatments, so wear state is readable at a glance
+  without colour and without moving anything.
+
+  The dot is the "docked" idea: a bud sitting in its slot, seen from above. It is
+  deliberately not a bag, arrow, or checkmark — those all imply an action or a
+  direction, and this state is just a location.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp" android:height="48dp"
+    android:viewportWidth="48" android:viewportHeight="48">
+
+    <!-- Outer ring, drawn as a stroked circle via two paths (outer then inner
+         cut-out) rather than a stroke, so the ring thickness scales predictably
+         with the icon and stays crisp at every size. -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 24 8
+            C 32.8 8 40 15.2 40 24
+            C 40 32.8 32.8 40 24 40
+            C 15.2 40 8 32.8 8 24
+            C 8 15.2 15.2 8 24 8
+            Z
+            M 24 12.4
+            C 17.6 12.4 12.4 17.6 12.4 24
+            C 12.4 30.4 17.6 35.6 24 35.6
+            C 30.4 35.6 35.6 30.4 35.6 24
+            C 35.6 17.6 30.4 12.4 24 12.4
+            Z" />
+
+    <!-- The docked bud. -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 24 18.2
+            C 27.2 18.2 29.8 20.8 29.8 24
+            C 29.8 27.2 27.2 29.8 24 29.8
+            C 20.8 29.8 18.2 27.2 18.2 24
+            C 18.2 20.8 20.8 18.2 24 18.2
+            Z" />
+</vector>

@@ -1,7 +1,79 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Charging case, from the user's SVG (500x400 viewBox).
+
+  COLOUR RULE (the user's own): white = transparent, black = icon colour.
+      <ellipse cx=250 cy=200 rx=210 ry=155 fill=#000>       -> body (ink)
+      <line x1=42 y1=162 x2=458 y2=162 stroke=#fff w=4 />   -> lid slit (CUT)
+      <circle cx=250 cy=305 r=7 fill=#fff />                -> LED (CUT)
+  Both white elements are cuts in the body, not marks on it.
+
+  ==================================================================
+  SIZING: now on the SAME viewport AND the same optical scale as the buds
+  ==================================================================
+  All three battery icons (ic_bud_left, ic_bud_right, ic_case) are now authored on
+  a 48x48 viewport and drawn into a 40x40dp slot, so one vector unit means the same
+  physical distance on screen in every file: 40/48 = 0.833dp per unit.
+
+  WHY THIS FILE CHANGED (the bug it fixes):
+  Previously the case was a 48x40 viewport drawn into a 48x40dp slot (a 1:1
+  mapping), so the ellipse ran edge to edge and filled 100% of its box. The buds, on
+  a 48x48 viewport drawn into 40x40dp, have their ink inset (the source transform is
+  X = x*0.096 + 5.58, which uses roughly 38 of the 48 units, about 79% fill). So a
+  unit of case artwork was 48/48dp while a unit of bud artwork was 40/48dp: the case
+  rendered about 20% larger per unit AND sat on a different optical line. That is the
+  "icons are misaligned, different sizes" report.
+
+  Matching the VIEWPORT alone would not have fixed it: the fill fraction had to
+  match too. The ellipse is therefore scaled to the buds' ~79% ink fill and centred
+  on the 48x48 viewport.
+
+  SCALE: source ellipse is 420 units wide (2 x rx=210) in a 500-wide viewBox.
+  Target ink width = 38 units on a 48 viewport (the buds' fill).
+      factor = 38 / 420 = 0.090476
+      centre   250,200 -> 24.00, 24.00
+      radii    210,155 -> 19.00, 14.02
+      lid      y=162   -> 24 + (162-200)*0.090476 = 20.56
+      lid width 4      -> 0.36
+      lid span  42..458 -> 24 + (42-250)*f = 5.19  ..  24 + (458-250)*f = 42.81
+      LED      250,305 -> 24 + (305-200)*f = 33.50, r 7 -> 0.63
+  Vertical: y spans 24-14.02 = 9.98 .. 24+14.02 = 38.02 in the 48 viewport, so it is
+  centred with 9.98 units of clearance top and bottom.
+
+  ELLIPSE: drawn as FOUR ARCS (A commands) with the exact radii, not as beziers with
+  straight joins. An earlier draft used line segments between control points, which
+  flattens the sides into a lozenge, visible immediately at this size.
+
+  The lid slit keeps the source's rounded ends (stroke-linecap="round"), so it is a
+  stadium: height 0.36, semicircular ends of radius 0.18.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="48dp" android:height="48dp"
     android:viewportWidth="48" android:viewportHeight="48">
-    <path android:fillColor="#FFFFFF"
-        android:pathData="M 25.7 43.1 L 22.0 43.1 L 16.6 42.4 L 11.6 40.7 L 8.5 39.0 L 6.5 37.6 L 3.4 34.3 L 0.6 28.4 L 0.3 26.4 L 0.5 20.9 L 1.2 18.1 L 3.2 14.2 L 5.4 11.7 L 9.0 9.0 L 12.7 7.1 L 17.9 5.6 L 20.9 5.3 L 29.7 5.6 L 35.4 7.3 L 38.0 8.6 L 40.4 10.1 L 44.2 13.8 L 45.9 16.8 L 47.2 20.5 L 47.5 25.5 L 46.8 29.4 L 45.1 33.0 L 42.7 36.2 L 39.5 38.9 L 35.6 40.9 L 30.3 42.6 Z" />
+
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="
+            M 5 24
+            A 19 14.02 0 0 1 43 24
+            A 19 14.02 0 0 1 5 24
+            Z
+
+            M 5.19 20.38
+            C 5.19 20.28 5.27 20.2 5.38 20.2
+            L 42.62 20.2
+            C 42.73 20.2 42.81 20.28 42.81 20.38
+            L 42.81 20.74
+            C 42.81 20.84 42.73 20.92 42.62 20.92
+            L 5.38 20.92
+            C 5.27 20.92 5.19 20.84 5.19 20.74
+            Z
+
+            M 24 32.87
+            C 24.4 32.87 24.72 33.19 24.72 33.5
+            C 24.72 33.81 24.4 34.13 24 34.13
+            C 23.6 34.13 23.28 33.81 23.28 33.5
+            C 23.28 33.19 23.6 32.87 24 32.87
+            Z" />
 </vector>

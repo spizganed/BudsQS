@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  App-side palette, LIGHT theme (theme index 2 in MainActivity).
+
+  NOTE: the in-app status panel is the ONE thing that does NOT follow this file.
+  It is a mirror of the home-screen widget and keeps the widget's own dark card
+  colours in every theme (see MainActivity.renderStatusPanel, which tints those
+  icons itself). That is deliberate: the panel's job is to show what the widget
+  shows, and the widget is always dark. Everything else on this screen follows
+  the theme.
+
+  The light surfaces are NOT pure white for the same reason Dark is not pure
+  black: pure white kills the card edges, so the background is a hair grey and
+  the cards are white.
+-->
+<resources>
+    <color name="app_bg">#F2F2F2</color>
+
+    <color name="app_bg_outer">#E0E0E0</color>
+    <color name="app_bg_card">#FFFFFF</color>
+
+    <color name="app_bg_button">#E8E8E8</color>
+
+    <color name="app_text_primary">#101010</color>
+    <color name="app_text_secondary">#6B6B6B</color>
+
+    <color name="app_seg_bg">#E8E8E8</color>
+    <color name="app_seg_bg_active">#101010</color>
+    <color name="app_seg_text">#6B6B6B</color>
+    <color name="app_seg_text_active">#FFFFFF</color>
+
+    <color name="app_outline">#C4C4C4</color>
+    <color name="app_bar_track">#C4C4C4</color>
+
+    <color name="app_icon_tint">#101010</color>
+
+    <!-- Dark, not white: white letters on a light chip would be invisible. -->
+    <color name="app_letter">#101010</color>
+</resources>

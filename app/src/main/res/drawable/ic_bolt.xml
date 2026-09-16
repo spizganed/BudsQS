@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Game mode / low latency. A bolt, the universal "low latency / fast" glyph.
+  Simple two-segment chevron-bolt so it stays crisp at 22dp.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 13.6 2 L 5.2 13.2 L 11.0 13.2 L 10.4 22 L 18.8 10.8 L 13.0 10.8 Z" />
+</vector>

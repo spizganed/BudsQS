@@ -12,6 +12,7 @@ import com.spizganed.quickbuds.protocol.BatteryParser
 import com.spizganed.quickbuds.protocol.GameModeParser
 import com.spizganed.quickbuds.protocol.OpoProtocol
 import com.spizganed.quickbuds.protocol.OppoPacketFramer
+import com.spizganed.quickbuds.protocol.UserInteractionParser
 import com.spizganed.quickbuds.protocol.WearingStatusParser
 import java.io.IOException
 import java.io.InputStream
@@ -131,7 +132,7 @@ class BudsConnectionManager(private val context: Context) {
                     log("Trying UUID: $uuidStr")
                     val uuid = UUID.fromString(uuidStr)
                     socket = device.createRfcommSocketToServiceRecord(uuid)
-                    socket.connect()
+                    socket?.connect()
                     log("Connected via UUID: $uuidStr")
                     break
                 } catch (e: IOException) {
@@ -147,7 +148,7 @@ class BudsConnectionManager(private val context: Context) {
                     log("Trying RFCOMM channel 15...")
                     val m = device.javaClass.getMethod("createRfcommSocket", Int::class.javaPrimitiveType)
                     socket = m.invoke(device, 15) as BluetoothSocket
-                    socket.connect()
+                    socket?.connect()
                     log("Connected via raw channel 15")
                 } catch (e: Exception) {
                     log("Channel 15 failed: ${e.message}")
@@ -259,6 +260,20 @@ class BudsConnectionManager(private val context: Context) {
 
     fun requestFullStatus() { sendRaw(OpoProtocol.queryStatus(), "manual status") }
 
+    /** Timestamp of the last ANC command we flushed; see noteUnattributed(). */
+    private var lastAncFlushAt = 0L
+
+    /**
+     * Marks that an ANC frame is now on the wire.
+     *
+     * Called from sendRawBlocking() right after the write succeeds, so the ONLY
+     * requirement is that ANC goes through sendRaw() — which every ANC path does
+     * (service, widget, tile, app all end up in BudsConnectionManager.sendAnc*).
+     * If an ANC command is ever written directly to ConnectedThread, this must be
+     * called alongside it or the attribution probe silently stops working.
+     */
+    private fun markAncFlush() { lastAncFlushAt = System.currentTimeMillis() }
+
     private fun sendRaw(data: ByteArray, label: String = "") {
         Thread {
             sendRawBlocking(data, label)
@@ -276,8 +291,12 @@ class BudsConnectionManager(private val context: Context) {
                 log("sendRaw[$label]: socket reports not connected.")
                 return
             }
-            log("TX[$label]: ${OpoProtocol.bytesToHex(data)}")
+            // Write bytes FIRST, log after. The buds ACK most commands in under 100ms
+            // (see any handshake in testlogs), so logging first is a race: a fast reply
+            // could land in the log ABOVE our own TX line and look causally backwards.
             thread.write(data)
+            markAncFlush()
+            log("TX[$label]: ${OpoProtocol.bytesToHex(data)}")
         } catch (e: Exception) {
             log("sendRaw[$label] error: ${e.message}")
         }
@@ -340,8 +359,51 @@ class BudsConnectionManager(private val context: Context) {
         return if (end > 9) packet.copyOfRange(9, end) else ByteArray(0)
     }
 
+    /**
+     * Attribution probe for gestures that produce no known event.
+     *
+     * Why this exists: ANC changes made on the BUDS raise no 0x0204 event (verified
+     * three separate captures — Off/Light/Medium each emitted nothing identifiable).
+     * That leaves two possibilities and the raw log cannot tell them apart:
+     *
+     *   A. the buds said nothing at all, so the only fix is a poll-after-gesture;
+     *   B. the buds DID say something in a frame we don't decode yet (the recurring
+     *      `AA 0D 00 00 04 02 FF 06 00 F1 01 01 XX YY 02` shape), and it only looks
+     *      like silence because nothing in the log names it.
+     *
+     * This stamps the two cases differently so one capture decides it. It is a
+     * DIAGNOSTIC only — it never changes state and never touches the UI, so it is
+     * safe to leave in permanently; `sendAnc`'s flush flag is the only extra signal.
+     *
+     * Classification is deliberately "everything not already explained", because the
+     * frames we DO decode (handshake, battery, wear, game mode, status/ANC query
+     * replies) are handled by their own branches further down.
+     */
+    private fun noteUnattributed(packet: ByteArray) {
+        if (packet.size < 9) return
+        val cmd = (packet[4].toInt() and 0xFF) or ((packet[5].toInt() and 0xFF) shl 8)
+        val payload = payloadOf(packet)
+
+        val explained = cmd == 0x8100 ||                 // handshake
+            cmd == 0x8103 ||                             // product id
+            cmd == 0x8106 ||                             // battery query reply
+            cmd == 0x8109 ||                             // wearing query reply
+            cmd == OpoProtocol.CMD_RESP_WEARING ||
+            cmd == 0x810C ||                             // ANC query reply
+            cmd == 0x810D ||                             // status query reply
+            cmd == 0x8122 ||                             // EQ query reply
+            cmd == OpoProtocol.CMD_ACTIVE_REPORT ||
+            cmd == OpoProtocol.CMD_REGISTER_NOTIFY
+        if (explained) return
+
+        val head = payload.take(4).joinToString(" ") { "%02X".format(it) }
+        log("UNATTR RX: cmd=0x${"%04X".format(cmd)} len=${payload.size} " +
+            "head=[$head] ancFlush=${if (System.currentTimeMillis() - lastAncFlushAt < 4000) "YES" else "no"}")
+    }
+
     private fun handlePacket(packet: ByteArray) {
         log("RX: ${OpoProtocol.bytesToHex(packet)}")
+        noteUnattributed(packet)
         handler.post { listeners.forEach { it.onPacketReceived(packet) } }
 
         if (packet.size < 9) return
@@ -378,6 +440,17 @@ class BudsConnectionManager(private val context: Context) {
                     it.onWearState(lastLeftStatus, lastRightStatus, lastCaseStatus)
                 }
             }
+            return
+        }
+
+        // --- User-interaction (button/gesture) report: 0x0204 subType 0xF1 ---
+        // This is the F1 family that has been sitting unexplained in the captures.
+        // We now at least NAME it, so an ANC-gesture capture can answer the question
+        // "nothing arrived" vs "a frame arrived that we don't decode".
+        // Handled before the game-mode branch because both are 2..6 byte payloads.
+        if (cmd == OpoProtocol.CMD_ACTIVE_REPORT &&
+            UserInteractionParser.isUserInteractionEvent(payload)) {
+            log("BTN EVT: ${UserInteractionParser.describe(payload)}")
             return
         }
 

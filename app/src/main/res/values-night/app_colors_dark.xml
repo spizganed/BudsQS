@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  App-side palette, DARK theme (theme index 1 in MainActivity).
+
+  Only the surfaces and text differ from OLED; the accent stays the same red so
+  "on" means the same thing in every theme. See values/app_colors.xml for why
+  this is a separate file from the widget's colors.xml.
+
+  #121212 rather than #000000 is the point of this theme: OLED uses true black so
+  the screen shuts pixels off, Dark uses an off-black so the cards have something
+  to sit against and the UI reads as layered rather than as floating rectangles.
+-->
+<resources>
+    <color name="app_bg">#121212</color>
+
+    <color name="app_bg_outer">#1E1E1E</color>
+    <color name="app_bg_card">#2A2A2A</color>
+
+    <color name="app_bg_button">#333333</color>
+
+    <color name="app_text_primary">#E0E0E0</color>
+    <color name="app_text_secondary">#9E9E9E</color>
+
+    <color name="app_seg_bg">#333333</color>
+    <color name="app_seg_bg_active">#E0E0E0</color>
+    <color name="app_seg_text">#9E9E9E</color>
+    <color name="app_seg_text_active">#121212</color>
+
+    <color name="app_outline">#4A4A4A</color>
+    <color name="app_bar_track">#4A4A4A</color>
+
+    <color name="app_icon_tint">#E0E0E0</color>
+
+    <color name="app_letter">#FFFFFF</color>
+</resources>

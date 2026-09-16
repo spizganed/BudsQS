@@ -1,6 +1,179 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  The three app themes.
+
+  Each theme points the appPalette attribute at a different colour set, defined
+  right here as nested <color> values inside the style's own item list. Colours
+  read through ThemeRes.color(context, R.attr.appColorX) therefore follow the
+  in-app theme choice, which is the thing setTheme() alone could NOT do: a style
+  cannot change which @color/app_* resource resolves, so the first attempt at
+  styles left the palette stuck on the OLED defaults.
+
+  HISTORY, so this is not undone:
+    attempt 1  applyOverrideConfiguration(uiMode) -> crashed on launch, five times
+    attempt 2  setTheme() alone -> no crash, but colours never changed
+    attempt 3  this: attributes resolve per theme, and setTheme() selects them
+
+  The three appColor* attributes are declared in this file's <declare-styleable>
+  section below.
+-->
 <resources>
-    <style name="Theme.App" parent="android:Theme.Material.Light">
-        <item name="android:colorPrimary">@color/primary</item>
+
+    <!--
+      Attribute names. Declared here rather than in a separate attrs.xml so the
+      theme system is described in one file.
+    -->
+    <attr name="appColorBg" format="color" />
+    <attr name="appColorCard" format="color" />
+    <attr name="appColorButton" format="color" />
+    <attr name="appColorTextPrimary" format="color" />
+    <attr name="appColorTextSecondary" format="color" />
+    <attr name="appColorAccent" format="color" />
+    <attr name="appColorOutline" format="color" />
+    <attr name="appColorSegBg" format="color" />
+    <attr name="appColorSegBgActive" format="color" />
+    <attr name="appColorSegText" format="color" />
+    <attr name="appColorSegTextActive" format="color" />
+    <attr name="appColorBarTrack" format="color" />
+    <attr name="appColorIconTint" format="color" />
+    <attr name="appColorLetter" format="color" />
+    <!--
+      Muted icon colour: the "out of ear" / "disconnected" state. Named separately
+      from appColorTextSecondary so the icons' grey can be tuned without shifting
+      body text.
+    -->
+    <attr name="appColorIconMuted" format="color" />
+    <!--
+      The percentage drawn INSIDE the battery bar. Two variants because the text is
+      centred: it lands on the FILL once the bar passes halfway, and on the TRACK
+      before that. A single colour would be unreadable at one end of the range.
+    -->
+    <attr name="appColorBarLabelOnFill" format="color" />
+    <attr name="appColorBarLabelOnTrack" format="color" />
+    <!--
+      The "in ear" icon colour.
+
+      PURE BLACK on the OLED theme, by explicit request, after seeing it on the
+      device — the icons read as punchy cut-outs against the true-black background,
+      which is not what white does. It is an attribute rather than a literal because
+      on the LIGHT theme pure black is already the icon colour and on DARK the
+      off-black background makes true black invisible; each theme supplies its own.
+    -->
+    <attr name="appColorIconInEar" format="color" />
+    <!--
+      Text on the ANC buttons. White in every theme, by request, to match the
+      button look. Note this is independent of appColorSegTextActive, which is the
+      ACTIVE button's inverted label — that one has to contrast with a light fill,
+      so it stays dark.
+    -->
+    <attr name="appColorButtonText" format="color" />
+
+    <!--
+      Shared shape. No title bar; window surfaces come from the theme's own
+      appColorBg so the window background matches the palette.
+
+      colorPrimary is deliberately not set: the old value was purple from a
+      template and never matched the widget's red accent. Accent comes from
+      appColorAccent.
+    -->
+    <style name="Theme.App.Base" parent="android:Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowBackground">?attr/appColorBg</item>
+        <item name="android:colorBackground">?attr/appColorBg</item>
+        <item name="android:statusBarColor">?attr/appColorBg</item>
+        <item name="android:navigationBarColor">?attr/appColorBg</item>
+        <item name="android:windowLightStatusBar">false</item>
+
+        <!-- Fallback defaults, identical to the OLED palette. Every theme below
+             overrides all of them; these exist so a missing attribute can never
+             resolve to null and produce an invisible control. -->
+        <item name="appColorBg">#000000</item>
+        <item name="appColorCard">#242424</item>
+        <item name="appColorButton">#2E2E2E</item>
+        <item name="appColorTextPrimary">#FFFFFF</item>
+        <item name="appColorTextSecondary">#8A8A8A</item>
+        <item name="appColorAccent">#D71921</item>
+        <item name="appColorOutline">#404040</item>
+        <item name="appColorSegBg">#2E2E2E</item>
+        <item name="appColorSegBgActive">#FFFFFF</item>
+        <item name="appColorSegText">#8A8A8A</item>
+        <item name="appColorSegTextActive">#000000</item>
+        <item name="appColorBarTrack">#404040</item>
+        <item name="appColorIconTint">#FFFFFF</item>
+        <item name="appColorLetter">#FFFFFF</item>
+        <item name="appColorIconMuted">#8A8A8A</item>
+        <item name="appColorBarLabelOnFill">#000000</item>
+        <item name="appColorBarLabelOnTrack">#8A8A8A</item>
+        <!--
+          IN-EAR ICON COLOUR, OLED THEME = WHITE.
+
+          History: this was black for one build at the user's request, but pure
+          black on a #242424 card looked wrong on the device and has been reverted.
+          White is the in-ear colour; grey is out-of-ear; in-case is hidden
+          (see MainActivity.applyBudState).
+        -->
+        <item name="appColorIconInEar">#FFFFFF</item>
+        <item name="appColorButtonText">#FFFFFF</item>
     </style>
+
+    <!--
+      OLED BLACK (default). True black so the panel shuts pixels off. Matches the
+      widget's palette, which is the point: app and widget should look like one
+      product.
+    -->
+    <style name="Theme.App.OLED" parent="Theme.App.Base" />
+
+    <!--
+      DARK. Off-black surfaces (#121212) so the cards have something to sit
+      against and the UI reads as layered rather than as floating rectangles.
+    -->
+    <style name="Theme.App.Dark" parent="Theme.App.Base">
+        <item name="appColorBg">#121212</item>
+        <item name="appColorCard">#2A2A2A</item>
+        <item name="appColorButton">#333333</item>
+        <item name="appColorTextPrimary">#E0E0E0</item>
+        <item name="appColorTextSecondary">#9E9E9E</item>
+        <item name="appColorOutline">#4A4A4A</item>
+        <item name="appColorSegBg">#333333</item>
+        <item name="appColorSegBgActive">#E0E0E0</item>
+        <item name="appColorSegText">#9E9E9E</item>
+        <item name="appColorSegTextActive">#121212</item>
+        <item name="appColorBarTrack">#4A4A4A</item>
+        <item name="appColorIconTint">#E0E0E0</item>
+        <item name="appColorLetter">#FFFFFF</item>
+        <item name="appColorIconMuted">#9E9E9E</item>
+        <item name="appColorBarLabelOnFill">#121212</item>
+        <item name="appColorBarLabelOnTrack">#9E9E9E</item>
+        <item name="appColorIconInEar">#E0E0E0</item>
+        <item name="appColorButtonText">#FFFFFF</item>
+    </style>
+
+    <!--
+      LIGHT. Background is a hair grey rather than pure white for the same reason
+      Dark is not pure black: pure white kills the card edges. Status bar icons
+      flip to dark so they stay legible.
+    -->
+    <style name="Theme.App.Light" parent="Theme.App.Base">
+        <item name="appColorBg">#F2F2F2</item>
+        <item name="appColorCard">#FFFFFF</item>
+        <item name="appColorButton">#E8E8E8</item>
+        <item name="appColorTextPrimary">#101010</item>
+        <item name="appColorTextSecondary">#6B6B6B</item>
+        <item name="appColorOutline">#C4C4C4</item>
+        <item name="appColorSegBg">#E8E8E8</item>
+        <item name="appColorSegBgActive">#101010</item>
+        <item name="appColorSegText">#6B6B6B</item>
+        <item name="appColorSegTextActive">#FFFFFF</item>
+        <item name="appColorBarTrack">#C4C4C4</item>
+        <item name="appColorIconTint">#101010</item>
+        <item name="appColorLetter">#101010</item>
+        <item name="appColorIconMuted">#9E9E9E</item>
+        <item name="appColorBarLabelOnFill">#FFFFFF</item>
+        <item name="appColorBarLabelOnTrack">#6B6B6B</item>
+        <item name="appColorIconInEar">#101010</item>
+        <item name="appColorButtonText">#FFFFFF</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+
+    <!-- Kept so a stale reference lands on OLED instead of the light platform default. -->
+    <style name="Theme.App" parent="Theme.App.OLED" />
 </resources>

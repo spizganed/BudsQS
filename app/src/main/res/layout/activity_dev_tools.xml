@@ -34,6 +34,36 @@
             android:paddingEnd="12dp"
             android:text="Mark" />
 
+        <!--
+          Screenshot -> text. Diagnostic only: decodes an image on device and writes
+          the pixels out as text so the coding agent can read a layout it cannot see.
+          See ScreenshotToText.
+        -->
+        <Button
+            android:id="@+id/btnScreenshot"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="0dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:text="Shot" />
+
+        <!--
+          Layout report. Writes the measured geometry of THIS screen out as text:
+          every view's id, bounds, margins, padding, weights and text metrics.
+          This is the readable form of a screenshot for a layout question — a
+          text description of a picture is guesswork, but the numbers the
+          framework already computed are exact. See LayoutReport.
+        -->
+        <Button
+            android:id="@+id/btnLayout"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="0dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:text="Layout" />
+
         <Button
             android:id="@+id/btnClear"
             android:layout_width="wrap_content"
@@ -106,12 +136,23 @@
             android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- Log content -->
+    <!--
+      Log content.
+
+      The ScrollView itself now carries the card background (log_card_bg) so the
+      log sits inside a bordered panel, matching the main screen's cards. The
+      background is on the ScrollView rather than the inner TextView so the border
+      stays put when the content is shorter than the view, and so the padding is
+      inside the border rather than pushing it around.
+    -->
     <ScrollView
         android:id="@+id/scroll"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1">
+        android:layout_weight="1"
+        android:background="@drawable/log_card_bg"
+        android:padding="10dp"
+        android:scrollbars="vertical">
 
         <LinearLayout
             android:layout_width="match_parent"

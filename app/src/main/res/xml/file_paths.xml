@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Paths exposed by the app-update FileProvider.
+
+  Only the cache directory is exposed, and only for this one flow: the downloaded
+  APK is written to cacheDir (see UpdateActivity.APK_NAME) and handed to the
+  package installer as a content:// URI. Nothing else in the app's storage is
+  reachable through this provider.
+
+  Do not widen this to external storage: the widget and logs use their own paths,
+  and a broader file_paths.xml would let any app that is handed a granted URI
+  read more than the update file.
+-->
+<paths>
+    <cache-path
+        name="updates"
+        path="." />
+</paths>

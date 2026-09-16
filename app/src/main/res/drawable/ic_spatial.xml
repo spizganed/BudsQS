@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Spatial / 3D audio. Concentric arcs around a head-like centre: the standard
+  spatial-audio mark, recognisable at 22dp.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <!-- centre dot -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 12 10 m -2.2 0 a 2.2 2.2 0 1 0 4.4 0 a 2.2 2.2 0 1 0 -4.4 0" />
+    <!-- inner arc -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 12 5.6 C 8.4 5.6 5.4 8.2 4.6 11.6 L 6.5 11.6 C 7.2 9.3 9.4 7.5 12 7.5 C 14.6 7.5 16.8 9.3 17.5 11.6 L 19.4 11.6 C 18.6 8.2 15.6 5.6 12 5.6 Z" />
+    <!-- outer arc -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 12 1.4 C 6.6 1.4 2.1 5.2 1.1 10.2 L 3.0 10.2 C 4.0 6.3 7.7 3.3 12 3.3 C 16.3 3.3 20.0 6.3 21.0 10.2 L 22.9 10.2 C 21.9 5.2 17.4 1.4 12 1.4 Z" />
+    <!-- base, so it reads as a head not a wifi symbol -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 7.4 14.2 L 16.6 14.2 L 16.6 20.4 L 13.9 20.4 L 13.9 16.1 L 10.1 16.1 L 10.1 20.4 L 7.4 20.4 Z" />
+</vector>

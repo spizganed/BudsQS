@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Switch track. The thumb is drawn in code (Switch.setThumbTintList) because the
+  thumb has to change colour with checked state on two different axes (theme +
+  on/off), and a track+thumb pair is easier to keep consistent if the track is a
+  resource and the thumb is tinted.
+
+  A stock android.widget.Switch on Theme.Material renders a holo-coloured track
+  that ignores the theme entirely, which is what this replaces.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="?attr/appColorButton" />
+    <corners android:radius="100dp" />
+    <stroke
+        android:width="1dp"
+        android:color="?attr/appColorOutline" />
+</shape>

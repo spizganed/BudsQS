@@ -16,16 +16,18 @@ The official apps are heavy, account-bound, and push features you don't want. Qu
 
 **Connection & control**
 - Direct RFCOMM to the earbuds (UUID `0000079A-D102-11E1-9B23-00025B00A5A5`, with fallbacks)
-- Full init handshake, then the buds **push** both battery and wearing events to the app
-  (see *Push vs poll* below — wear updates are effectively instant)
+- Full init handshake, then the buds **push** battery, wearing **and Game Mode** events to the app
+  (see *Push vs poll* below — no visible lag)
 - ANC: Off / Transparency / Light / Medium / Deep (+ Smart command ready)
-- Game Mode toggle
+- Game Mode toggle — follows bud-side gestures too
 - Auto-retry connection logic (survives the buds being busy)
 
 **Home-screen widget (3x2)**
 - Battery bars for Left / Case / Right — always showing last-known values, updated on every hardware packet (poll or push)
 - Wear icons update instantly: the buds **push** wear events, so tap-to-icon latency is milliseconds, not poll-bound
-- Bud status icons: **white** = in ear, **grey** = out of ear, **hidden** = in case
+- Bud status icons: **full strength (theme colour)** = in ear, **grey** = out of ear. The in-case
+  state is due to switch to full strength too (decided 2026-09-17); the widget's recolour rules
+  are not yet updated to match the app — see ROADMAP
 - 5-segment ANC switcher + Game Mode row — works even with the app closed
 - Nothing to configure; reacts as fast as the hardware reports
 
@@ -33,9 +35,48 @@ The official apps are heavy, account-bound, and push features you don't want. Qu
 - Foreground service keeps the link alive (notification is `IMPORTANCE_MIN` and swipeable —
   Android 15 requires it for a `connectedDevice` service, so it can't be removed)
 - Quick Settings tile
-- OLED Black / Dark / Light themes
+- OLED Black / Dark themes (a Light theme still exists but is slated for removal — it is the
+  source of several invisible-on-light bugs, e.g. white L/C/R letters)
+- Main screen: battery card, circular ANC switcher (tap the active circle for the full mode
+  list), and a settings card — Game Mode (live), Hi-Res codec, spatial audio, Equalizer,
+  Find my earbuds, App update
+- Dedicated screens: **Dev Tools**, **Equalizer**, **Find my earbuds**, **App update**
 - Dev Tools screen with a human-readable log and a raw-hex log, hold-to-copy, and
   export-to-file; packet logging captures every sent command and received frame, timestamped
+- Dev Tools also dumps a **layout report**: the measured view tree as text (bounds, weights,
+  margins, text sizes, gaps between siblings). This exists because the AI that works on this
+  repo cannot read screenshots — see *Reading the layout* below
+
+> The main screen carries **no** log — Dev Tools owns logging. Status events on the main
+> screen are silent by design; a toast on a packet-listener path storms the UI.
+
+## Reading the layout (contributors and AI agents)
+
+This project is developed by an AI agent that **cannot see images**. A screenshot cannot be
+converted into anything it can read, so describing a layout bug by screenshot fails: the agent
+has to guess which of ~30 view ids you mean, and a wrong guess costs a build cycle.
+
+`devtool/LayoutReport.kt` removes the guesswork. It walks the laid-out view tree and writes the
+numbers that a screenshot only approximates — exactly, and with view ids attached:
+
+- per-view bounds in px + dp, parent-relative position
+- `layout_weight`, margins, padding, gravity
+- text size, style, colour, line count
+- for images, the **drawable's intrinsic size vs the size it is actually drawn at** (this is what
+  caught the battery icon bug — see ROADMAP #22)
+- a `SIBLING GAPS` section listing the space between adjacent siblings, so an inconsistent
+  spacing is visible at a glance
+
+To capture: open the main screen once (it parks a report in `onResume`), then
+Dev Tools → *Layout report*. Files land in `testlogs/`.
+
+**If you change `collectGaps`, keep it to direct children of each container, measured against
+that container's own origin and on its own stacking axis.** Two earlier versions broke that
+rule and produced confident nonsense — first `(no id) -> (no id) = 0.0dp` for everything, then
+phantom `-202.3dp !! OVERLAP` between full-width stacked siblings.
+
+Also note: `!! OVERLAP` on `status_bar_* -> status_text_*` is **by design** — the battery
+percentage is drawn on top of the bar. It is not a bug.
 
 ## Requirements & tested setup
 
@@ -53,9 +94,9 @@ WidgetActionReceiver  ->  BudsService  ->  BudsConnectionManager (RFCOMM)
                                      OppoPacketFramer (AA framing)
                                                   |
                               OpoProtocol: handshake, queries, 0x0205 event
-                              registration, ANC/GameMode command builders
+                              registration, ANC/GameMode/codec/spatial builders
                                                   |
-                              WearingStatusParser / BatteryParser -> state
+              WearingStatusParser / BatteryParser / GameModeParser -> state
                                                   |
                               WidgetStateStore -> AncWidgetProvider (refresh)
 ```
@@ -66,71 +107,32 @@ Key protocol facts (observed on Buds 4):
 - `0x0205` registration makes the buds push `0x0204` events. The payload is
   `02 01 02` — a **count** byte followed by event ids (count=2: battery `01` + wearing `02`).
   Registering both makes wear changes arrive instantly, no polling.
+- Game Mode is also pushed, as `0x0204` subType `0x05`, **including from bud-side gestures**
+- **ANC raises no event at all** (verified three times). ANC sync needs a one-shot query — see
+  [ROADMAP.md](./ROADMAP.md)
 - Closing the lid with buds docked kills the RFCOMM socket — used as one of the lid-state signals
 
 ### Push vs poll (the latency story)
 
-The buds report wear state two ways: on demand via `0x01F2`, or spontaneously as `0x0204`
+The buds report state two ways: on demand via a query, or spontaneously as `0x0204`
 events once `0x0205` registration succeeds. QuickBuds originally registered battery only, so
-wear lagged behind a 5-second poll — which is why bud icons used to update late, and
-inconsistently (0–4 s depending on when you acted within a poll window).
+wear lagged behind a 5-second poll — which is why bud icons used to update late,
+and Game Mode never followed a bud-side gesture at all. Registering battery **and**
+wear, plus decoding the Game Mode subType, makes all three push-driven; the icons
+react in milliseconds (the residual ~2s is the bud's own hardware debounce). Long
+captures also proved that **no** poll reply ever contained a battery byte, so the
+remaining 60-second poll is now a pure keep-alive.
 
-The fix was one line: `0x0205`'s payload is a count followed by event ids, and the old
-literal `01 01 02 02` read as *count=1* (battery only), silently dropping wear. Sending
-`02 01 02` registers both. Measured result: wear changes now surface within a few
-milliseconds, and the only remaining delay is the bud's own ~2 s hardware debounce.
+## Repo contents
 
-### Battery and Game Mode push too
-
-Both were confirmed by long captures, and both explained a "why isn't this instant?" question:
-
-- **Battery** (`0x0204` subType `01`) arrives on change. Registering it with `0x0205` was
-  already correct, but the old 5-second poll obscured the fact that it was never needed:
-  across hours of logging, **no `poll status` reply ever contained a battery byte**. The poll
-  is now 60 s and exists purely as a keep-alive.
-  One hardware quirk worth knowing: **levels are reported in tens** (100 → 90 → 80). A fast
-  ~1-hour drain of 20% produced exactly three reports, so this is the firmware's resolution,
-  not a limitation of the app. Android's own Bluetooth settings show the same steps.
-- **Game Mode** (`0x0204` subType `05`) is pushed when you toggle it *on the buds* as well as
-  from the app, so the widget and app buttons follow your earbud gestures instead of only
-  reflecting the last command the app sent.
-  Note the frame is shorter than the others (`len 0x09`), and it is **Game Mode only — the
-  buds raise no equivalent event for ANC changes.**
-
-## Development workflow
-
-- **No desktop. Ever.** CodeAssist IDE on the phone, Termux for git/build scripts, GitHub mobile for repo ops.
-- AI-assisted (Kimi) for protocol reverse-engineering, parsers, and logic; the human does device testing and design decisions.
-- App icon pipeline (Termux) documented in the repo history; the adaptive icon is done (see milestones below).
-
-## Project status
-
-Actively developed against [ROADMAP.md](./ROADMAP.md). Handoff notes for future sessions live in [HANDOFF.md](./HANDOFF.md).
-
-Recent milestones:
-- **Instant wear updates** — identified why wear lagged behind a 5 s poll and fixed it (see *Push vs poll*). Bud icons now react to the physical action within milliseconds.
-- **Battery and Game Mode push** — long captures proved both are pushed on change; the poll was cut to 60 s as a pure keep-alive, and battery resolution was pinned down to tens (a firmware trait, not an app bug).
-- **Bud-side Game Mode sync** — toggling Game Mode on the earbuds now updates the widget and app buttons, because the buds push the new state. (ANC has no equivalent event, so it can't sync the same way.)
-- Widget overhaul — vector icons traced from the originals (fixes pixelation), locked white/grey/hidden state logic, 3x2 layout, case icon removed after verifying even HeyMelody can't read lid state in all scenarios.
-- Icon and UI pass — adaptive launcher icon rebuilt from the traced buds with a monochrome layer, a dedicated status-bar glyph, and a redrawn main screen: compact status panel with a reserved area below it for upcoming controls.
-
-## Screenshots
-
-<!-- Add current screenshots here (widget states + app UI). Older shots may exist in repo history. -->
-
-## Credits
-
-Protocol reverse engineering standing on the shoulders of:
-
-- **[Leaf-lsgtky/OppoPods](https://github.com/Leaf-lsgtky/OppoPods)** — OPPO earbud protocol RE
-- **[Zhaoyi-ya/OppoPodsManager](https://github.com/Zhaoyi-ya/OppoPodsManager)** — protocol reference & feature implementation
-
-Tools: CodeAssist IDE (Tyron), Termux, decompile.com, Kimi (Moonshot AI).
+| File | What it is |
+| --- | --- |
+| [ROADMAP.md](./ROADMAP.md) | The priority list. Read this first if you want to help. |
+| [HANDOFF.md](./HANDOFF.md) | Current state, key files, storage/log paths, known issues. |
+| [GRADLE-EXPORT.md](./GRADLE-EXPORT.md) | How to take this project to a desktop Gradle setup. |
+| `testlogs/` | Not committed (git-ignored): log captures and layout reports handed over for analysis. |
+| `screenshots/` | Predate the current redesign, and **the AI agent cannot read them.** For anything about geometry or spacing, capture a layout report instead — see *Reading the layout*. |
 
 ## License
 
-GPL-3.0 — see [LICENSE](./LICENSE). Same license as the reference projects above.
-
-## Disclaimer
-
-Unofficial project, not affiliated with OnePlus, OPPO, or realme. Product names are trademarks of their respective owners. You use this software at your own risk; sending raw commands to your earbuds is generally safe but comes with no warranty.
+GPL-3.0. See [LICENSE](./LICENSE).

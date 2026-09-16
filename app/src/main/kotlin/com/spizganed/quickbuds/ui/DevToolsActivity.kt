@@ -2,10 +2,12 @@ package com.spizganed.quickbuds.ui
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.ContentValues
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Build
@@ -21,6 +23,8 @@ import android.widget.TextView
 import android.widget.Toast
 import com.spizganed.quickbuds.R
 import com.spizganed.quickbuds.bluetooth.PacketLogger
+import com.spizganed.quickbuds.devtool.LayoutReport
+import com.spizganed.quickbuds.devtool.ScreenshotToText
 import com.spizganed.quickbuds.protocol.LogDecoder
 import java.io.File
 import java.text.SimpleDateFormat
@@ -41,10 +45,16 @@ class DevToolsActivity : Activity() {
     private companion object {
         /** Folder created under Download for exported logs. */
         const val EXPORT_DIR_NAME = "QuickBudsLogs"
+
+        /** Request code for the screenshot picker. */
+        const val REQUEST_PICK_IMAGE = 2001
     }
 
     private lateinit var logText: TextView
     private lateinit var scroll: ScrollView
+    private lateinit var logScroll: ScrollView
+    private lateinit var btnScreenshot: Button
+    private lateinit var btnLayout: Button
     private lateinit var btnTabHuman: Button
     private lateinit var btnTabRaw: Button
     private lateinit var btnClear: Button
@@ -120,11 +130,19 @@ class DevToolsActivity : Activity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Theme before super.onCreate, same as every other screen. Previously this
+        // screen hardcoded its own colours and never called setTheme at all, which
+        // is part of why it did not match the rest of the app.
+        ThemeRes.select(this)
+
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_dev_tools)
 
         logText = findViewById<TextView>(R.id.logText)
         scroll = findViewById<ScrollView>(R.id.scroll)
+        logScroll = findViewById<ScrollView>(R.id.scroll)
+        btnScreenshot = findViewById<Button>(R.id.btnScreenshot)
+        btnLayout = findViewById<Button>(R.id.btnLayout)
         btnTabHuman = findViewById<Button>(R.id.btnTabHuman)
         btnTabRaw = findViewById<Button>(R.id.btnTabRaw)
         btnClear = findViewById<Button>(R.id.btnClear)
@@ -181,6 +199,236 @@ class DevToolsActivity : Activity() {
 
         updateTabButtons()
         refreshLog()
+
+        // Screenshot -> text conversion, for the coding agent.
+        //
+        // The agent cannot decode a compressed image, so a screenshot of a layout
+        // problem is unreadable to it. This runs the decode ON DEVICE (where the
+        // platform has a PNG decoder) and writes the pixels out as text into
+        // Download/QuickBudsShot/, which the agent CAN read.
+        //
+        // Kept in Dev Tools rather than the main screen because it is a diagnostic,
+        // not a feature.
+        btnScreenshot.setOnClickListener { convertScreenshot() }
+
+        // Layout -> text. Writes the measured geometry of the screen the user
+        // is LOOKING AT (the main screen, in practice) into
+        // Download/QuickBudsShot/layout_<stamp>.txt.
+        //
+        // This is the answer to "the agent cannot see my screenshot and does not
+        // understand what is wrong": instead of describing a picture, the app
+        // reports the numbers the framework already computed. It also means the
+        // report is about the ACTUAL main screen, which is the one with layout
+        // problems — Dev Tools itself is a diagnostic screen and its own layout is
+        // not interesting.
+        btnLayout.setOnClickListener { writeLayoutReport() }
+    }
+
+    /**
+     * Writes a layout report for the main screen.
+     *
+     * Dumps MainActivity's tree rather than this screen's, because the layout bugs
+     * are on the main screen. If MainActivity is not running it falls back to this
+     * screen, so the button always produces something.
+     *
+     * The report is generated after a layout pass (LayoutReport.report posts it),
+     * so it must be called after the tree has been measured — a button press is
+     * always safe.
+     */
+    private fun writeLayoutReport() {
+        // Prefer the report MainActivity took of itself while resumed. Falling back
+        // to this screen is honest about which tree is described (filename says so),
+        // but it is a fallback, not the goal: the main screen is where the layout
+        // problems are.
+        val cached = MainActivity.cachedReport
+        if (cached != null) {
+            val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+            val name = "layout_main_$stamp.txt"
+            val copied = copyTextToDownloads(name, cached)
+            showInLog(
+                "layout report (main, cached on resume): " +
+                    cached.lineSequence().count() + " lines\n" +
+                    if (copied == null) {
+                        "Downloads copy FAILED"
+                    } else {
+                        "Downloads/QuickBudsShot/$name"
+                    }
+            )
+            return
+        }
+
+        val main = MainActivity.instance
+        if (main != null) {
+            LayoutReport.report(main, File(cacheDir, "layout_main_live.txt")) { text ->
+                val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+                val name = "layout_main_$stamp.txt"
+                val copied = copyTextToDownloads(name, text)
+                showInLog(
+                    "layout report (main, live): ${text.lineSequence().count()} lines\n" +
+                        if (copied == null) "Downloads copy FAILED"
+                        else "Downloads/QuickBudsShot/$name"
+                )
+            }
+            return
+        }
+
+        // Last resort: describe this screen, and say so in the filename so the
+        // report is never mistaken for the main screen's.
+        val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        val name = "layout_devtools_$stamp.txt"
+        LayoutReport.report(this, File(cacheDir, name)) { text ->
+            val copied = copyTextToDownloads(name, text)
+            showInLog(
+                "layout report (DEV TOOLS ONLY — open the main screen once so it can " +
+                    "be cached): ${text.lineSequence().count()} lines\n" +
+                    if (copied == null) "Downloads copy FAILED"
+                    else "Downloads/QuickBudsShot/$name"
+            )
+        }
+    }
+
+    /**
+     * Copies a text file into Download/QuickBudsShot via MediaStore.
+     *
+     * Same reasoning as the screenshot outputs: public Downloads is visible to a
+     * file manager, to MTP and to Termux, whereas app-specific storage is not.
+     * Returns null on failure so the caller can report the fallback path.
+     */
+    private fun copyTextToDownloads(name: String, body: String): String? = try {
+        val values = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+            put(MediaStore.MediaColumns.MIME_TYPE, "text/plain")
+            put(
+                MediaStore.MediaColumns.RELATIVE_PATH,
+                "${Environment.DIRECTORY_DOWNLOADS}/QuickBudsShot"
+            )
+        }
+        val collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+        val item = contentResolver.insert(collection, values)
+        if (item == null) {
+            null
+        } else {
+            contentResolver.openOutputStream(item)?.use { out ->
+                out.write(body.toByteArray())
+            }
+            name
+        }
+    } catch (e: Exception) {
+        null
+    }
+
+    /**
+     * Picks a screenshot and converts it to text.
+     *
+     * Uses ACTION_OPEN_DOCUMENT so any image in any app's storage can be chosen —
+     * screenshots live in Pictures/Screenshots on most devices, but the user may
+     * have moved them.
+     */
+    private fun convertScreenshot() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "image/*"
+        }
+        @Suppress("DEPRECATION")
+        startActivityForResult(intent, REQUEST_PICK_IMAGE)
+    }
+
+    @Deprecated("Deprecated in Activity; onActivityResult still works and keeps this screen dependency-free.")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != REQUEST_PICK_IMAGE || resultCode != RESULT_OK) return
+        val uri = data?.data ?: return
+
+        val summary = writeOutputs(uri)
+
+        AlertDialog.Builder(this)
+            .setTitle("Screenshot converted")
+            .setMessage(
+                "$summary\n" +
+                    "Folder: Download/QuickBudsShot/\n\n" +
+                    "files: -ascii (layout), -grid (brightness numbers), " +
+                    "-color (per-cell hex), -rows (row brightness profile)"
+            )
+            .setPositiveButton("OK", null)
+            .show()
+    }
+
+    /**
+     * Decodes the picked image and writes the text representations to Downloads.
+     *
+     * WHY THIS GOES THROUGH MediaStore AND NOT File:
+     * this screen originally wrote with a plain File to
+     * Environment.getExternalStoragePublicDirectory(DIRECTORY_DOWNLOADS). On API 29+
+     * that is SCOPED STORAGE: the app cannot create files in the public Downloads
+     * directory directly, the write throws, and because the original code did not
+     * check the result the user was told "converted" while nothing appeared. That is
+     * the bug that produced an empty QuickBudsShot folder.
+     *
+     * MediaStore.Downloads needs no permission on API 29+ and registers each file
+     * with the media database, so the files show up to the user and to the agent
+     * immediately. The same approach is used by the crash reporter; keep them
+     * consistent.
+     *
+     * The conversion itself happens into a temp directory first, because
+     * ScreenshotToText writes four files and it is simpler to generate them locally
+     * and then copy each one into MediaStore than to make that class aware of
+     * ContentResolver.
+     */
+    private fun writeOutputs(uri: android.net.Uri): String {
+        val tmpDir = File(cacheDir, "shotout")
+        tmpDir.deleteRecursively()
+        tmpDir.mkdirs()
+
+        // The decode step needs a real path; content:// streams cannot be seeked.
+        val tmp = File(cacheDir, "picked.png")
+        try {
+            contentResolver.openInputStream(uri)?.use { input ->
+                tmp.outputStream().use { output -> input.copyTo(output) }
+            }
+        } catch (e: Exception) {
+            return "Could not read image: ${e.message}"
+        }
+
+        val summary = ScreenshotToText.convert(tmp, tmpDir)
+        tmp.delete()
+
+        // Copy each generated file into public Download/QuickBudsShot via MediaStore.
+        var copied = 0
+        val failures = mutableListOf<String>()
+        for (f in tmpDir.listFiles().orEmpty()) {
+            val ok = try {
+                val values = ContentValues().apply {
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, f.name)
+                    put(MediaStore.MediaColumns.MIME_TYPE, "text/plain")
+                    put(
+                        MediaStore.MediaColumns.RELATIVE_PATH,
+                        "${Environment.DIRECTORY_DOWNLOADS}/QuickBudsShot"
+                    )
+                }
+                val collection =
+                    MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+                val item = contentResolver.insert(collection, values)
+                if (item == null) {
+                    false
+                } else {
+                    contentResolver.openOutputStream(item)?.use { out ->
+                        f.inputStream().use { input -> input.copyTo(out) }
+                    }
+                    true
+                }
+            } catch (e: Exception) {
+                failures.add("${f.name}: ${e.message}")
+                false
+            }
+            if (ok) copied++
+        }
+        tmpDir.deleteRecursively()
+
+        return if (failures.isEmpty()) {
+            "$summary\ncopied $copied file(s) to Downloads"
+        } else {
+            "$summary\ncopied $copied, FAILED:\n" + failures.joinToString("\n")
+        }
     }
 
     override fun onResume() {
@@ -207,22 +455,51 @@ class DevToolsActivity : Activity() {
         refreshLog()
     }
 
+    /**
+     * Paints the selected tab.
+     *
+     * Rewritten to use the shared chip drawables instead of flat background
+     * colours. The old version set the active tab's background to a hardcoded
+     * #CC0000, which is why the active log button rendered as red on a screen that
+     * otherwise has no red in it. The drawables read the theme, so this now matches
+     * the rest of the app in all three themes.
+     */
     private fun updateTabButtons() {
-        if (isHumanTab) {
-            btnTabHuman.setBackgroundColor(accentColor)
-            btnTabHuman.setTextColor(Color.WHITE)
-            btnTabRaw.setBackgroundColor(inactiveBtnColor)
-            btnTabRaw.setTextColor(textColor)
-        } else {
-            btnTabRaw.setBackgroundColor(accentColor)
-            btnTabRaw.setTextColor(Color.WHITE)
-            btnTabHuman.setBackgroundColor(inactiveBtnColor)
-            btnTabHuman.setTextColor(textColor)
-        }
+        val activeText = 0xFFFFFFFF.toInt()
+        val normalText = ThemeRes.color(this, R.attr.appColorTextPrimary)
+
+        btnTabHuman.background = getDrawable(
+            if (isHumanTab) R.drawable.dev_button_bg_active else R.drawable.dev_button_bg
+        )
+        btnTabHuman.setTextColor(if (isHumanTab) activeText else normalText)
+
+        btnTabRaw.background = getDrawable(
+            if (isHumanTab) R.drawable.dev_button_bg else R.drawable.dev_button_bg_active
+        )
+        btnTabRaw.setTextColor(if (isHumanTab) normalText else activeText)
     }
 
-    private fun refreshLog() {
-        val lines = PacketLogger.getLines()
+    /**
+     * Shows a one-off diagnostic message in the log pane.
+     *
+     * Used by the layout-report button, which is not a packet and therefore has
+     * nowhere else to report to. It writes to the on-screen TextView only — NOT
+     * through PacketLogger, because injecting non-packet text into the packet
+     * timeline would corrupt a capture, and the log file is the thing being used
+     * to reason about the protocol.
+     *
+     * The result is only readable while the human tab is selected, so this checks
+     * first rather than silently writing into a hex view.
+     */
+    private fun showInLog(message: String) {
+        if (!isHumanTab) switchToHumanTab()
+        val existing = logText.text?.toString().orEmpty()
+        logText.text = existing + "\n[layout] " + message + "\n"
+        lastLineCount = PacketLogger.getLines().size
+        scroll.post { scroll.fullScroll(ScrollView.FOCUS_DOWN) }
+    }
+
+    private fun refreshLog() {        val lines = PacketLogger.getLines()
         // Nothing new since the last paint — don't rebuild or move the scroll.
         if (lines.size == lastLineCount) return
         lastLineCount = lines.size
@@ -324,50 +601,57 @@ class DevToolsActivity : Activity() {
         return "${dir.absolutePath}/$name"
     }
 
+    /**
+     * Applies the theme to this screen.
+     *
+     * REWRITTEN to read the themed @color/app_* resources instead of hardcoding
+     * hex values. The old version used Color.WHITE for the background on the LIGHT
+     * branch and Color.BLACK for text in some paths, which is how the log screen
+     * ended up with white text on a white background: two independent literals that
+     * were not guaranteed to agree, and a "theme" that did not follow the palette
+     * the rest of the app uses.
+     *
+     * Using the same resources as every other screen means this cannot drift from
+     * the main screen's colours, and a palette change is one edit in one file.
+     */
     private fun applyTheme(theme: Int) {
-        var bgColor: Int = Color.BLACK
-        var btnColor: Int = inactiveBtnColor
-        var txtColor: Int = textColor
-        when (theme) {
-            THEME_OLED -> {
-                bgColor = Color.BLACK
-                btnColor = Color.parseColor("#333333")
-                txtColor = Color.WHITE
-            }
-            THEME_DARK -> {
-                bgColor = Color.parseColor("#121212")
-                btnColor = Color.parseColor("#333333")
-                txtColor = Color.WHITE
-            }
-            THEME_LIGHT -> {
-                bgColor = Color.WHITE
-                btnColor = Color.parseColor("#DDDDDD")
-                txtColor = Color.BLACK
-            }
-            else -> {
-                bgColor = Color.BLACK
-                btnColor = Color.parseColor("#333333")
-                txtColor = Color.WHITE
-            }
-        }
+        // The theme was already selected by ThemeRes.select() before
+        // super.onCreate, so these resolve against the right palette. The `theme`
+        // parameter is kept because callers still pass it, but the colours are no
+        // longer derived from it here — the resources are authoritative.
+        @Suppress("UNUSED_PARAMETER")
+        val unused = theme
 
-        inactiveBtnColor = btnColor
+        val bgColor = ThemeRes.color(this, R.attr.appColorBg)
+        val cardColor = ThemeRes.color(this, R.attr.appColorCard)
+        val txtColor = ThemeRes.color(this, R.attr.appColorTextPrimary)
+        val secondary = ThemeRes.color(this, R.attr.appColorTextSecondary)
+
+        inactiveBtnColor = cardColor
         textColor = txtColor
 
         devToolsRoot.setBackgroundColor(bgColor)
+        logText.setBackgroundColor(cardColor)
         logText.setTextColor(txtColor)
-        clockText.setTextColor(txtColor)
-        sinceMarkText.setTextColor(txtColor)
-        btnTabHuman.setBackgroundColor(inactiveBtnColor)
-        btnTabHuman.setTextColor(txtColor)
-        btnTabRaw.setBackgroundColor(inactiveBtnColor)
-        btnTabRaw.setTextColor(txtColor)
-        btnClear.setBackgroundColor(inactiveBtnColor)
-        btnClear.setTextColor(txtColor)
-        btnMark.setBackgroundColor(inactiveBtnColor)
-        btnMark.setTextColor(txtColor)
-        btnExport.setBackgroundColor(inactiveBtnColor)
-        btnExport.setTextColor(txtColor)
+        logScroll.setBackground(getDrawable(R.drawable.log_card_bg))
+        // The title is a plain TextView with no id, so it is found by position
+        // (first TextView of the first child row). Colouring only the log and the
+        // buttons left the title rendering in the platform default, which was the
+        // other half of the "text on white background" problem.
+        findViewById<android.view.ViewGroup>(R.id.devToolsRoot)
+            .getChildAt(0)
+            ?.let { (it as? android.view.ViewGroup)?.getChildAt(0) as? TextView }
+            ?.setTextColor(txtColor)
+        clockText.setTextColor(secondary)
+        sinceMarkText.setTextColor(secondary)
+
+        // Buttons get the shared chip drawable. Mark/Clear/Export are all the
+        // "inactive" chip; the tab buttons are repainted by updateTabButtons(),
+        // which knows which one is selected.
+        for (b in listOf(btnClear, btnMark, btnExport)) {
+            b.background = getDrawable(R.drawable.dev_button_bg)
+            b.setTextColor(txtColor)
+        }
 
         // Re-apply active tab highlight
         updateTabButtons()

@@ -1,9 +1,11 @@
 # Buds QS — Handoff Document
-Date: 2026-09-16
+Date: 2026-09-17
 Status: WORKING — core features functional; wear, battery and game mode all push-driven
+Working tree: **UNCOMMITTED** (50:50 battery card + 52dp icons; layout-report tool). See
+"What is not verified" below before touching anything visual.
 
 ## What Works
-- RFCOMM on UUID 0000079A-D102-11E1-9B23-00025B00A5A5 (channel 15 fallback)
+- RFCOMM on UUID `0000079A-D102-11E1-9B23-00025B00A5A5` (channel 15 fallback)
 - Full init: HANDSHAKE -> QUERY_PRODUCT_ID -> QUERY_BROADCAST_CODES -> REGISTER_NOTIFY -> QUERY_STATUS -> QUERY_ANC -> QUERY_BATTERY -> QUERY_WEARING
 - ANC: Off(0x01) Trans(0x04) Deep(0x10) Medium(0x20) Light(0x40) Smart(0x80)
 - Game Mode: feature 0x06 — **and it is now PUSHED by the buds (0x0204 subType 0x05), so the
@@ -12,34 +14,101 @@ Status: WORKING — core features functional; wear, battery and game mode all pu
 - Bud state from AA 07
 - **Wear state pushed by the buds (0x0204 subType 02) — instant, no visible lag**
 - **Poll every 60s, status only** — it is now a pure keep-alive; see Next Tasks
-- Foreground service survives app close
+- Foreground service survives app close (`bluetooth/KeepAliveReceiver.kt`)
 - Widget (4 buttons + battery) works when app closed
 - Quick Settings tile
-- Themes: OLED / Dark / Light
-- Main screen: compact capped status panel + reserved `featureList` area below it, scrollable
+- Themes: OLED / Dark / Light (Light is slated for REMOVAL, see Next Tasks)
+- Main screen: battery card (L/case/R icons + three labelled bars), ANC circles, settings card
+- Settings card rows, built by `ui/SettingRowFactory.kt`: Game Mode (live), Hi-Res codec
+  (stub — subtitle only), Spatial audio (legacy feature `0x1B`), Equalizer, Find my earbuds,
+  App update
+- Secondary screens: `DevToolsActivity`, `EqActivity`, `FindBudsActivity`, `UpdateActivity`
+- **`devtool/LayoutReport.kt` — the layout-report tool. This is how the agent "sees" the UI.**
+
+## Reading the UI without screenshots (IMPORTANT — read this before any layout work)
+The agent working on this project **cannot read images**. `screenshots/*.png` are useless to it.
+`LayoutReport.kt` exists to close that gap: it walks the laid-out view tree and writes the
+measured geometry and content out as TEXT (bounds, weights, margins, padding, gravity, text
+size/style/colour, drawable intrinsic vs actual size) plus a `SIBLING GAPS` section.
+
+- Capture: open the main screen once (MainActivity parks a report in `onResume`), then
+  Dev Tools -> Layout report (cached on resume) / live. Files land in `testlogs/layout_main_<ts>.txt`.
+- **Order of operations for any layout/spacing/alignment complaint: capture a report FIRST.**
+  It usually answers the question outright, which avoids the build cycles that guessing cost.
+- All bounds are in pixels relative to the ROOT view, with dp alongside (density 2.625 on the
+  1080x2392 test device, so 1dp = 2.625px).
+- `!! OVERLAP` on `status_bar_* -> status_text_*` (-13dp) is **by design**: the number TextView
+  sits on top of the bar. Not a bug.
+- When changing `collectGaps`, keep it to DIRECT children of each container, measured against
+  that container's own origin and on its own stacking axis. Two earlier versions broke this:
+  one walked only unnamed direct children (every line read `(no id) -> (no id) = 0.0dp`), and
+  one flattened whole subtrees, pairing children of different containers and reading full-width
+  stacked siblings as `-202.3dp OVERLAP`, while double-reporting every pair.
 
 ## Main screen layout (settled)
-Header (fixed) / ScrollView `mainScroll` containing the panel row + feature list.
-- The status panel is capped in BOTH dimensions: `@dimen/widget_panel_width` (200dp) x
-  `@dimen/widget_panel_height` (148dp), top-aligned and flush left. It is deliberately NOT a copy
-  of the widget's full 3x2 shape, only a compact "2x2-ish" card. (An earlier revision let it fill
-  the height, which left a dead area and no room for anything else.)
-- `panelSideSlot` is a weighted spacer to the RIGHT of the panel.
-- **`featureList`** (empty LinearLayout, id `featureList`) is the reserved area BELOW the panel for
-  the upcoming controls: dual device, spatial audio, codec switching, equalizer, find my earbuds.
-  Build rows as a reusable "setting row" (label left, switch/chevron right) in the widget's card
-  colours, not platform defaults. It is inside the ScrollView so the list can grow past one screen.
-- The main screen carries NO log. Dev Tools owns logging (both views + Mark/Clear/Export).
-  **Status events on the main screen are silent by design.** An earlier revision toasted them,
-  which stormed the UI because several call sites fire once per packet — do not put user-visible
-  output on a packet-listener call path. `appendStatus()` now only appends to a bounded in-memory
-  tail.
+Header (fixed: device name + dev-tools icon + settings cog) / ScrollView `mainScroll`.
+
+**The 2026-09-16 redesign replaced the old "capped status panel" arrangement.** The current
+structure, top to bottom inside the scroll:
+1. `batteryCard` — full width, **halves now EQUAL (weight 1 / weight 1**; they were 0.8 / 1.2
+   on 2026-09-16, changed 2026-09-17 so the icon side gets more room**)**. Left half:
+   `status_bud_left`, a weighted frame holding `status_case_icon`, `status_bud_right`.
+   Right half (marginStart 14dp): three rows `status_row_left` / `status_row_case` /
+   `status_row_right`, each a letter TextView plus a `ProgressBar` (`status_bar_*`) with a
+   centred number TextView (`status_text_*`) on top. The numbers are normally empty because
+   `SegmentedBarDrawable` draws the value inside the bar; the TextViews are the fallback for a
+   non-segmented bar. See `renderBar`.
+2. ANC switcher — three circles: `anc_btn_off`, `anc_btn_anc`, `anc_btn_trans`. Tapping the
+   **active** circle opens the full mode chooser (`showAncChooser`) because three buttons
+   cannot represent five modes. Off / Transparency apply directly.
+3. `featureList` — the settings card, `@drawable/app_card_outline_bg`, filled at runtime by
+   `MainActivity.buildFeatureRows()`. Declared empty in XML on purpose: six near-identical row
+   layouts in XML would be six places to edit, and the icons need a themed tint that XML
+   cannot apply to a vector drawable. `addRow()` inserts the hairline divider before every
+   row except the first.
+
+The main screen carries NO log. Dev Tools owns logging (both views + Mark/Clear/Export).
+**Status events on the main screen are silent by design.** An earlier revision toasted them,
+which stormed the UI because several call sites fire once per packet — do not put user-visible
+output on a packet-listener call path. `appendStatus()` now only appends to a bounded in-memory
+tail.
+
+## Battery icon sizing — SOLVED, do not re-litigate
+All three battery icons (`ic_bud_left`, `ic_bud_right`, `ic_case`) are authored on a **48x48
+viewport** and drawn into same-sized slots (**52dp as of 2026-09-17**), so one vector unit means
+the same physical distance in every file: 52/48 = 1.083dp per unit.
+
+The bug that took several cycles: he reported the icons looked misaligned and different sizes.
+Every measured *box* was correct and every aspect ratio matched, so the obvious suspects were
+all innocent. The cause was **fill fraction** — the case was a 48x40 viewport on a 1:1 slot
+(ellipse edge to edge, 100% fill) while the buds were inset to ~79% of their viewport. A case
+unit was therefore 48/48dp against a bud's 40/48dp, so the case drew ~20% larger per unit and
+sat on a different optical line. Fixed by rescaling `ic_case.xml` to the buds' ~79% fill on a
+shared 48x48 viewport. **If you change one icon's frame or insets, scale the others to match or
+this comes back.**
+
+Verified from a capture: all three 40dp at the time, equal gaps either side of the case
+(`0.0dp` / `0.0dp`; previously 114px vs 135px).
+
+## What is NOT verified on device (2026-09-17)
+- **The 50:50 split and 52dp icons** (this session's change) have NOT been captured yet. The
+  arithmetic is verified, the on-device result is not.
+- **Game-mode gesture sync** (the code path is proven from captures; the on-device feel is not).
+- Widget/app icon changes, header icons, dev-menu long-press copy.
+- The three new screens (`EqActivity`, `FindBudsActivity`, `UpdateActivity`).
+
+### Now verified (previously on the "not verified" list)
+- The 2026-09-16 redesign HAS been seen via layout reports: battery card geometry, the three
+  ANC buttons (52.2dp tall, ~118dp wide), header, feature rows and dividers all check out.
+- Battery icon alignment — fixed and confirmed by measurement (see above).
+Repeated WARNING in `MainActivity`: "Use property access syntax" — cosmetic, ignore it.
+
 
 ## Key Files
 app/src/main/kotlin/com/spizganed/quickbuds/
   bluetooth/BudsConnectionManager.kt
   bluetooth/BudsService.kt
-  bluetooth/KeepAliveReceiver.kt
+  bluetooth/KeepAliveReceiver.kt     <- NEW: reconnect-after-kill receiver
   bluetooth/WidgetActions.kt
   protocol/OpoProtocol.kt
   protocol/OppoPacketFramer.kt
@@ -47,9 +116,17 @@ app/src/main/kotlin/com/spizganed/quickbuds/
   protocol/WearingStatusParser.kt
   protocol/GameModeParser.kt          <- NEW: 0x0204 subType 0x05
   protocol/LogDecoder.kt
-  ui/MainActivity.kt
+  devtool/LayoutReport.kt             <- NEW: the agent's eyes. Read its header before editing.
+  ui/MainActivity.kt                  <- REDESIGNED (see layout section)
+  ui/SettingRowFactory.kt             <- NEW: the one place a settings row is defined
+  ui/SegmentedBarDrawable.kt          <- NEW: draws the value inside a battery bar
+  ui/ThemeRes.kt                      <- theme select / dp / tint / colour helpers
   ui/AncTileService.kt
   ui/DevToolsActivity.kt
+  ui/EqActivity.kt                    <- NEW (placeholder destination)
+  ui/FindBudsActivity.kt              <- NEW
+  ui/UpdateActivity.kt                <- NEW (never auto-updates)
+  ui/ChimePlayer.kt                   <- NEW
   widget/AncWidgetProvider.kt
   widget/WidgetActionReceiver.kt
   widget/WidgetStateStore.kt
@@ -123,28 +200,49 @@ Widget tap -> AncWidgetProvider PendingIntent -> WidgetActionReceiver -> WidgetS
    three ANC-only changes produced no frame), so ANC cannot be synced by push the way game mode
    can. Test whether bud-side ANC gestures emit anything at all (prediction: nothing, or a frame
    from the unexplained `F1` family — NOT a 0x05). If nothing, the only route is a one-shot
-   `queryAncMode()` (0x810C reply, format already parsed) after a gesture.
-2. **Confirm on device** (not yet visually verified): game-mode gesture sync, the capped status
-   panel + `featureList` layout, and the widget/app icon and panel changes.
-3. **Build the feature rows** in `featureList` (id in `activity_main.xml`): dual device, spatial
-   audio, codec switching, equalizer, find my earbuds. NOTE: `OpoProtocol` already has
-   `FEATURE_DUAL_DEVICE=0x11`, `FEATURE_SPATIAL_SOUND=0x1B`, `FEATURE_AUTO_PLAY_PAUSE=0x04`
-   alongside `FEATURE_GAME_MODE=0x06`, and the init sequence queries broadcast codes — so a
-   feature get/set pattern likely exists. CAPTURE the buds' replies before building any of them.
-4. Visual widget redesign (Nothing OS style): battery-only widget with circular rings, and
+   `queryAncMode()` (0x810C reply, format already parsed) after a gesture. **A gesture capture
+   brief exists (`testlogs/ANC-GESTURE-CAPTURE.md`) and the new build logs `MARK`, `BTN EVT:`
+   and `UNATTR RX:`, but NO capture has been handed over yet.** That log decides one-shot vs
+   short poll, and it is the blocker.
+2. **Icon rework — HE HAS A BRIEF, NOT WRITTEN YET.** Outstanding request: "modify the icons
+   and the way [they are] shown". Wait for it; do not start guessing. He was explicit that this
+   is a separate session's work. Sketch in ASCII and confirm before coding — that is what saved
+   this project from repeated build cycles.
+3. **Remove the Light/white theme.** Decided 2026-09-17: he does not use it and it "introduces
+   problems". It is the source of two recurring awkwards (white L/C/R letters and a white
+   in-case state are both invisible on a light background), and it is a whole colour-qualifier
+   branch to keep in sync. Delete the Light qualifier and fold its colours into the dark/OLED
+   path. **Do not start until asked** — but this makes the theme-aware colour work in Q2/Q4
+   simpler once done.
+4. **Dual device + codec feature ids** — `OpoProtocol` already has `FEATURE_DUAL_DEVICE=0x11`,
+   `FEATURE_SPATIAL_SOUND=0x1B`, `FEATURE_AUTO_PLAY_PAUSE=0x04` alongside `FEATURE_GAME_MODE=0x06`,
+   and the init sequence queries broadcast codes, so a feature get/set pattern likely exists.
+   CAPTURE the buds' replies before building any of them, and before making the Hi-Res codec row
+   (currently a subtitle-only stub) actually switch the codec.
+5. **Widget colour states** — apply the Q4 rule (in-ear = full strength, out-of-ear = grey,
+   in-case = full strength, all theme-aware) to the widget. The widget is a separate view tree
+   and was NOT touched by the app-side icon fix.
+6. Visual widget redesign (Nothing OS style): battery-only widget with circular rings, and
    controls widget with segmented ANC.
-5. No accidental app-open on widget tap.
-6. Connection robustness: `Connection reset by peer` / `Broken pipe` during long sessions, and
+7. No accidental app-open on widget tap.
+8. Connection robustness: `Connection reset by peer` / `Broken pipe` during long sessions, and
    the primary UUID `00001107-...` appears to never connect (5 s timeout each attempt) while
    the `0000079A-...` fallback works. Consider trying the working UUID first. A 14-minute gap
    with no reconnect attempt was also observed after `Connection lost`.
-7. Decode the remaining unknown frames: the recurring `F1` family
+9. Decode the remaining unknown frames: the recurring `F1` family
    (`AA 0D 00 00 04 02 FF 06 00 F1 01 01 XX YY 02`), and `02 01 08 0C 02` / `02 01 07 0B 02`
    (carry non-multiples of ten — possible fine-grained battery/case field). Also `0x0510`
    Spatial Audio Notify. **Do not guess from a couple of samples.**
-8. LEAD: the reference projects subscribe to BLE notifications on BOTH the `0000079A` and
-   `FE2C` characteristics because responses arrive on both. We only register on the OPO
-   service. Worth trying if frames are ever noticed going missing.
+10. Alert-sound volume slider (the one remaining "easy parity" row; the rest are in).
+
+### Done
+- ~~**Confirm the redesign on device.**~~ The 2026-09-16 redesign HAS now been seen, via layout
+  reports rather than screenshots: battery card geometry, the ANC buttons, the header and the
+  feature rows all check out. See the layout-report section above for how.
+- ~~Battery icon misalignment ("icons are misaligned, different sizes")~~ — root cause was fill
+  fraction, not aspect ratio. Fixed and verified by measurement. See "Battery icon sizing".
+- ~~Battery card halves~~ — now a 50:50 split (were 0.8/1.2), icons 40dp -> 52dp. Built; the
+  on-device result is not yet captured.
 
 ### Resolved (kept for the reasoning)
 - ~~5s poll~~ -> **60s, status only.** Confirmed by long capture: the buds push battery on
