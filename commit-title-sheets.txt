@@ -1,0 +1,8 @@
+Own bottom sheets; move connect controls
+
+- Add BottomSheetDialog: a plain Dialog at the bottom, no Material
+  dependency. Theme, ANC and gesture pickers use it now.
+- It updates in place, so multi-select no longer stacks dialogs.
+- Settings cog is theme only; Reconnect/Disconnect moved to Dev Tools.
+- Tap and hold needs none or at least two actions.
+- All three taps share the filled dot icon.

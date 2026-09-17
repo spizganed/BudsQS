@@ -67,8 +67,19 @@ enum class Gesture(
 /**
  * An assignable action. LABEL ONLY — see the class comment for why there is no
  * protocol byte here yet.
+ *
+ * TWO LABELS, ON PURPOSE. [labelRes] is the full name and is what the dialog sheet
+ * shows, where there is a whole row per option and room to be unambiguous.
+ * [shortLabelRes] is used only by the row SUMMARY, where up to four actions are
+ * joined into one line — "ANC, Adapt, Trans, Off" fits where "ANC, Adaptive,
+ * Transparency, ANC off" does not, and a summary that wraps makes its row taller
+ * than every other row.
+ *
+ * Only the four ANC actions need a short form, because tap-and-hold is the only
+ * multi-select gesture and those are the only actions it offers. A short form that
+ * matches the full name is left at 0 and falls back to [labelRes].
  */
-enum class GestureAction(val labelRes: Int) {
+enum class GestureAction(val labelRes: Int, val shortLabelRes: Int = 0) {
     NONE(R.string.gesture_action_none),
     PLAY_PAUSE(R.string.gesture_action_play_pause),
     PREV_TRACK(R.string.gesture_action_prev),
@@ -78,9 +89,15 @@ enum class GestureAction(val labelRes: Int) {
     VOLUME(R.string.gesture_action_volume),
     SWITCH_TRACK(R.string.gesture_action_switch_track),
     ANC_ON(R.string.gesture_action_anc_on),
-    ANC_ADAPTIVE(R.string.gesture_action_anc_adaptive),
-    ANC_TRANSPARENCY(R.string.gesture_action_anc_transparency),
-    ANC_OFF(R.string.gesture_action_anc_off)
+    ANC_ADAPTIVE(R.string.gesture_action_anc_adaptive, R.string.gesture_action_anc_adaptive_short),
+    ANC_TRANSPARENCY(
+        R.string.gesture_action_anc_transparency,
+        R.string.gesture_action_anc_transparency_short
+    ),
+    ANC_OFF(R.string.gesture_action_anc_off, R.string.gesture_action_anc_off_short);
+
+    /** Label for the row summary — the short form when one is defined. */
+    fun summaryLabelRes(): Int = if (shortLabelRes != 0) shortLabelRes else labelRes
 }
 
 /**
@@ -136,10 +153,16 @@ object GestureConfigStore {
 
     /** What a gesture does when the user has never opened this screen. */
     fun defaultFor(gesture: Gesture): List<GestureAction> = when (gesture) {
-        // A hold with nothing bound would make the cycle unreachable, so it starts
-        // on ANC. Every other gesture starts unbound, matching the firmware's own
-        // "no action" default.
-        Gesture.TAP_HOLD -> listOf(GestureAction.ANC_ON)
+        // TAP-AND-HOLD DEFAULTS TO NOTHING, not to a single mode.
+        //
+        // It used to default to ANC alone, which the none-or-at-least-two rule now
+        // forbids — a one-item cycle is not a cycle. Of the two valid options
+        // (nothing, or a real cycle) "nothing" is the honest default: a two-mode
+        // cycle would be a guess about which modes the user wants, and this screen
+        // does not write to the buds yet, so a pre-filled cycle would be a
+        // suggestion that looks like a setting. Every other gesture defaults to
+        // NONE, so this is also consistent.
+        Gesture.TAP_HOLD -> emptyList()
         else -> listOf(GestureAction.NONE)
     }
 
@@ -165,9 +188,15 @@ object GestureConfigStore {
             .apply()
     }
 
-    /** Human-readable summary of a binding, for the row's right-hand value. */
+    /**
+     * Summary of a binding, for the row's right-hand value.
+     *
+     * Uses the SHORT labels (see GestureAction): this string is a one-line glance at
+     * what a gesture does, and up to four actions are joined into it. Full names made
+     * it wrap, and a wrapped value made the row taller than its neighbours.
+     */
     fun describe(context: Context, actions: List<GestureAction>): String = when {
         actions.isEmpty() -> context.getString(R.string.gesture_not_set)
-        else -> actions.joinToString(", ") { context.getString(it.labelRes) }
+        else -> actions.joinToString(", ") { context.getString(it.summaryLabelRes()) }
     }
 }

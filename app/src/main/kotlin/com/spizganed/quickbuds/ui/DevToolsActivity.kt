@@ -62,6 +62,8 @@ class DevToolsActivity : Activity() {
     private lateinit var btnClear: Button
     private lateinit var btnExport: Button
     private lateinit var btnMark: Button
+    private lateinit var btnReconnect: Button
+    private lateinit var btnDisconnect: Button
     private lateinit var clockText: TextView
     private lateinit var sinceMarkText: TextView
     private lateinit var devToolsRoot: LinearLayout
@@ -169,6 +171,10 @@ class DevToolsActivity : Activity() {
         // UninitializedPropertyAccessException the moment this screen opens.
         btnWidgetLayout = findViewById<Button>(R.id.btnWidgetLayout)
         btnWidgetLogic = findViewById<Button>(R.id.btnWidgetLogic)
+        // Bound here, with the other buttons, because applyTheme() paints every
+        // action button below — an unbound lateinit would throw on open.
+        btnReconnect = findViewById<Button>(R.id.btnReconnect)
+        btnDisconnect = findViewById<Button>(R.id.btnDisconnect)
         val prefs = getSharedPreferences("BudsQSPrefs", Context.MODE_PRIVATE)
         val theme = prefs.getInt("theme", THEME_OLED)
         applyTheme(theme)
@@ -185,6 +191,29 @@ class DevToolsActivity : Activity() {
             if (checkStoragePermission()) {
                 exportLog()
             }
+        }
+
+        // CONNECTION CONTROLS, moved here from the main screen's settings cog at his
+        // request. They are connection plumbing rather than a setting, and Dev Tools
+        // is where the connection is already diagnosed.
+        //
+        // Sent as a service ACTION rather than through a bound manager: this screen
+        // does not bind BudsService, and ACTION_FORCE_CONNECT / ACTION_FORCE_DISCONNECT
+        // already exist and are already handled there, so this reuses a path that is
+        // known to work instead of adding a second one.
+        btnReconnect.setOnClickListener {
+            startService(
+                Intent(this, com.spizganed.quickbuds.bluetooth.BudsService::class.java)
+                    .setAction(com.spizganed.quickbuds.bluetooth.BudsService.ACTION_FORCE_CONNECT)
+            )
+            showInLog("reconnect requested (FORCE_CONNECT)")
+        }
+        btnDisconnect.setOnClickListener {
+            startService(
+                Intent(this, com.spizganed.quickbuds.bluetooth.BudsService::class.java)
+                    .setAction(com.spizganed.quickbuds.bluetooth.BudsService.ACTION_FORCE_DISCONNECT)
+            )
+            showInLog("disconnect requested (FORCE_DISCONNECT)")
         }
 
         // Long-press the log to copy its whole visible contents.
@@ -824,7 +853,8 @@ class DevToolsActivity : Activity() {
         // repainted by updateTabButtons(), which knows which one is selected.
         for (b in listOf(
             btnClear, btnMark, btnExport,
-            btnScreenshot, btnLayout, btnWidgetLayout, btnWidgetLogic
+            btnScreenshot, btnLayout, btnWidgetLayout, btnWidgetLogic,
+            btnReconnect, btnDisconnect
         )) {
             b.background = getDrawable(R.drawable.dev_button_bg)
             b.setTextColor(txtColor)

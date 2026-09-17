@@ -1291,21 +1291,30 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
      * Order is Low -> Medium -> High, matching increasing strength.
      */
     private fun showAncChooser() {
+        val modes = ANC_LEVELS
         val labels = arrayOf(
             getString(R.string.anc_mode_low),
             getString(R.string.anc_mode_medium),
             getString(R.string.anc_mode_high)
         )
-        val modes = ANC_LEVELS
-        val checked = modes.indexOfFirst { it == activeAncMode }
+        val active = modes.indexOfFirst { it == activeAncMode }
 
-        AlertDialog.Builder(this)
-            .setTitle(R.string.anc_chooser_title)
-            .setSingleChoiceItems(labels, checked) { dialog, which ->
-                selectAnc(modes[which])
-                dialog.dismiss()
-            }
-            .setNegativeButton(R.string.dialog_close, null)
+        // A bottom sheet rather than an AlertDialog: it opens from the bottom, which
+        // is where the circle that launched it sits, and it uses the app's own
+        // palette instead of the platform's.
+        BottomSheetDialog(this)
+            .title(getString(R.string.anc_chooser_title))
+            .items(modes.mapIndexed { i, mode ->
+                BottomSheetDialog.Item(
+                    label = labels[i],
+                    selected = i == active,
+                    onClick = {
+                        // selectAnc() sends the command AND repaints (renderAnc +
+                        // syncWidgetState), so nothing else is needed here.
+                        selectAnc(mode)
+                    }
+                )
+            })
             .show()
     }
 
@@ -1488,46 +1497,49 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
 
     // ==================== Settings dialog ====================
 
+    /**
+     * The settings cog. Theme only.
+     *
+     * RECONNECT AND DISCONNECT USED TO LIVE HERE and have moved to Dev Tools at his
+     * request: they are connection plumbing, not a setting, and sitting next to
+     * "Theme" made the cog look like it might do something destructive. Dev Tools
+     * already owns the connection diagnostics, so that is where they belong.
+     */
     private fun showSettingsDialog() {
-        val options = arrayOf(
-            "Theme: ${ThemeRes.label(currentTheme)}",
-            "Reconnect",
-            "Disconnect"
-        )
-        AlertDialog.Builder(this)
-            .setTitle(R.string.action_settings)
-            .setItems(options) { dialog, which ->
-                when (which) {
-                    0 -> showThemeDialog()
-                    1 -> connectDirectly()
-                    2 -> if (isBound) manager.disconnect()
-                }
-                dialog.dismiss()
-            }
-            .show()
+        showThemeDialog()
     }
 
+    /**
+     * Theme picker, as a bottom sheet.
+     *
+     * Replaces an AlertDialog: that rendered as a centred platform box with stock
+     * accents, which is the mismatch this whole pass is fixing. The theme is
+     * applied by recreate(), so the sheet is dismissed first — leaving it up while
+     * the activity rebuilds leaves an orphaned window on some devices.
+     */
     private fun showThemeDialog() {
-        val labels = arrayOf(
-            ThemeRes.label(ThemeRes.OLED),
-            ThemeRes.label(ThemeRes.DARK),
-            ThemeRes.label(ThemeRes.LIGHT)
-        )
-        AlertDialog.Builder(this)
-            .setTitle(R.string.theme_title)
-            .setSingleChoiceItems(labels, currentTheme) { _, which ->
-                ThemeRes.save(this, which)
-                // Update currentTheme BEFORE recreating. onResume compares the
-                // saved value against this field to decide whether to rebuild;
-                // leaving it stale means the recreated activity sees a difference
-                // and recreates again, forever (the flicker bug). recreate() also
-                // re-runs onCreate, which re-reads the same value, so this stays
-                // consistent either way — but setting it here is what makes the
-                // intent obvious.
-                currentTheme = which
-                recreate()
-            }
-            .setNegativeButton(R.string.dialog_close, null)
+        val themes = intArrayOf(ThemeRes.OLED, ThemeRes.DARK, ThemeRes.LIGHT)
+        BottomSheetDialog(this)
+            .title(getString(R.string.theme_title))
+            .items(themes.map { t ->
+                BottomSheetDialog.Item(
+                    label = ThemeRes.label(t),
+                    selected = t == currentTheme,
+                    onClick = {
+                        ThemeRes.save(this, t)
+                        // Update currentTheme BEFORE recreating. onResume compares
+                        // the saved value against this field to decide whether to
+                        // rebuild; leaving it stale means the recreated activity
+                        // sees a difference and recreates again, forever (the
+                        // flicker bug). recreate() also re-runs onCreate, which
+                        // re-reads the same value, so this stays consistent either
+                        // way — but setting it here is what makes the intent
+                        // obvious.
+                        currentTheme = t
+                        recreate()
+                    }
+                )
+            })
             .show()
     }
 

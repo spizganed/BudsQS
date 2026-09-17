@@ -1,7 +1,6 @@
 package com.spizganed.quickbuds.ui
 
 import android.app.Activity
-import android.app.AlertDialog
 import android.graphics.Typeface
 import android.os.Bundle
 import android.view.Gravity
@@ -227,13 +226,19 @@ class GestureActivity : Activity() {
         trailing.addView(SettingRowFactory.buildValue(this, summary))
         trailing.addView(SettingRowFactory.buildChevron(this))
 
-        // The gesture label plus a marker for the multi-select one, so the
-        // difference is visible before opening the dialog rather than only in it.
+        // NO SUBTITLE, on any gesture row.
+        //
+        // The hold row used to carry "cycles through the actions you pick". It was
+        // removed because it made that row TALLER than the others and pushed the
+        // binding value onto an extra line — so the row grew to fit its own
+        // explanation and stood out as a different size. The behaviour is
+        // discoverable without it (the rule explains itself when it is broken), and
+        // every row now has the same shape.
         val row = SettingRowFactory.build(
             this,
             iconFor(gesture),
             gesture.labelRes,
-            if (gesture.multiSelect) R.string.gesture_hold_multi_sub else 0,
+            0,
             trailing
         ) { showActionDialog(gesture) }
 
@@ -243,70 +248,100 @@ class GestureActivity : Activity() {
     /**
      * Icon per gesture. Reuses existing drawables rather than adding five new
      * vectors: the project has no gesture glyphs, and inventing them would be
-     * guesswork about a visual language that has not been specified. The mapping is
-     * by meaning (a tap is the equalizer's dot-ish glyph, a hold is the bolt, and
-     * so on) and is easy to swap when real icons exist.
+     * guesswork about a visual language that has not been specified.
+     *
+     * ALL THREE TAPS USE THE SAME FILLED DOT. They previously differed (double tap
+     * had the hollow dot), which read as if the gestures were different KINDS of
+     * thing rather than three variants of the same one. The filled dot is used for
+     * all three, by request, for consistency.
      */
     private fun iconFor(gesture: Gesture): Int = when (gesture) {
         Gesture.SINGLE_TAP -> R.drawable.ic_status_dot_filled
-        Gesture.DOUBLE_TAP -> R.drawable.ic_status_dot_empty
+        Gesture.DOUBLE_TAP -> R.drawable.ic_status_dot_filled
         Gesture.TRIPLE_TAP -> R.drawable.ic_status_dot_filled
         Gesture.SLIDE -> R.drawable.ic_chevron_right
         Gesture.TAP_HOLD -> R.drawable.ic_bolt
     }
 
     /**
-     * Bottom dialog listing the actions this gesture may take.
+     * Bottom sheet listing the actions this gesture may take.
      *
-     * Single-select gestures close on tap. The multi-select one (tap-and-hold)
-     * toggles and stays open, with a Done button, because "add or remove several"
-     * cannot work if the first tap dismisses the sheet.
+     * SINGLE-SELECT gestures commit on tap and the sheet closes. TAP-AND-HOLD is
+     * multi-select ([dismissOnSelect] false): tapping toggles and the sheet stays
+     * open with a Done button, because "add or remove several" cannot work if the
+     * first tap dismisses it.
      *
-     * A plain AlertDialog positioned at the bottom, not a BottomSheetDialog: this
-     * project has no Material dependency (see SettingRowFactory's note on why the
-     * stock switch had to be tinted by hand), so a real bottom sheet is not
-     * available without adding one.
+     * THE TAP-AND-HOLD RULE — none, or at least two — is enforced at the moment of
+     * the attempt, and the rule is mentioned ONLY then. An empty selection
+     * (unbinding the gesture) and two-or-more (a real cycle) are both allowed;
+     * exactly one is not, because a hold bound to a single action is not a cycle and
+     * would behave differently from every other gesture for no visible reason.
+     *
+     * So pressing Done with exactly one selected does NOT save and does NOT close —
+     * it surfaces the explanation in place. That is deliberate: a permanently
+     * visible hint would be noise for the majority of the time the rule is not
+     * being broken, and a disabled button would leave the user with no idea why.
      */
     private fun showActionDialog(gesture: Gesture) {
         val options = actionsFor(gesture)
         val selected = GestureConfigStore.load(this, side, gesture).toMutableList()
 
-        val labels = options.map { getString(it.labelRes) }.toTypedArray()
-
         if (!gesture.multiSelect) {
-            // Single-select: the current binding is the pre-checked item. An empty
-            // or unrecognised binding simply shows nothing checked.
-            val checked = options.indexOfFirst { selected.contains(it) }
-            AlertDialog.Builder(this)
-                .setTitle(getString(gesture.labelRes))
-                .setSingleChoiceItems(labels, checked) { dialog, which ->
-                    GestureConfigStore.save(this, side, gesture, listOf(options[which]))
-                    dialog.dismiss()
-                    render()
-                }
-                .setNegativeButton(R.string.dialog_close, null)
+            BottomSheetDialog(this)
+                .title(getString(gesture.labelRes))
+                .items(options.map { action ->
+                    BottomSheetDialog.Item(
+                        label = getString(action.labelRes),
+                        selected = selected.contains(action),
+                        onClick = {
+                            GestureConfigStore.save(this, side, gesture, listOf(action))
+                            render()
+                        }
+                    )
+                })
                 .show()
             return
         }
 
-        // Multi-select: tap toggles, Done commits.
-        val checked = BooleanArray(options.size) { selected.contains(options[it]) }
-        val working = BooleanArray(options.size) { checked[it] }
+        // ONE sheet, updated in place. Toggling rebuilds only the rows and the
+        // message, so the sheet does not stack or flicker on every tap.
+        val working = options.filter { selected.contains(it) }.toMutableList()
 
-        AlertDialog.Builder(this)
-            .setTitle(getString(gesture.labelRes))
-            .setMultiChoiceItems(labels, checked) { _, which, isChecked ->
-                working[which] = isChecked
+        val sheet = BottomSheetDialog(this)
+        sheet.title(getString(gesture.labelRes))
+            .dismissOnSelect(false)
+            .confirm(getString(R.string.gesture_done)) {
+                if (working.size == 1) {
+                    // The attempt. Explain, and stay open so it can be fixed.
+                    sheet.message(getString(R.string.gesture_hold_rule))
+                } else {
+                    // Persist in the declared order, not tap order, so the cycle is
+                    // deterministic and matches the list the user just saw.
+                    val ordered = options.filter { working.contains(it) }
+                    GestureConfigStore.save(this, side, gesture, ordered)
+                    sheet.close()
+                    render()
+                }
             }
-            .setMessage(R.string.gesture_multi_hint)
-            .setPositiveButton(R.string.gesture_done) { _, _ ->
-                // Preserve the declared order rather than tap order, so the cycle
-                // is deterministic and matches the list the user just saw.
-                val chosen = options.filterIndexed { i, _ -> working[i] }
-                GestureConfigStore.save(this, side, gesture, chosen)
-                render()
-            }
-            .setNegativeButton(R.string.dialog_close, null)
-            .show()
+
+        fun refresh() {
+            sheet.items(options.map { action ->
+                BottomSheetDialog.Item(
+                    label = getString(action.labelRes),
+                    selected = working.contains(action),
+                    onClick = {
+                        if (working.contains(action)) working.remove(action)
+                        else working.add(action)
+                        refresh()
+                    }
+                )
+            })
+            // Clears the reminder as soon as the selection becomes valid again, so
+            // it is only ever on screen while the rule is actually broken.
+            if (working.size != 1) sheet.message(null)
+        }
+
+        refresh()
+        sheet.show()
     }
 }

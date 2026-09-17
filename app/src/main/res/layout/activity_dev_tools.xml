@@ -219,6 +219,48 @@
                 android:textSize="12sp"
                 android:text="Export" />
         </LinearLayout>
+
+        <!--
+          CONNECTION CONTROLS — moved here from the main screen's settings cog.
+
+          On their own row rather than squeezed into the two above: they act on the
+          connection itself, so grouping them with the log tools would invite a
+          mis-tap, and the 4-across rows are already at their label limit.
+        -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="4dp">
+
+            <Button
+                android:id="@+id/btnReconnect"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="4dp"
+                android:minWidth="0dp"
+                android:minHeight="42dp"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:textSize="12sp"
+                android:text="Reconnect" />
+
+            <Button
+                android:id="@+id/btnDisconnect"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="4dp"
+                android:minWidth="0dp"
+                android:minHeight="42dp"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:textSize="12sp"
+                android:text="Disconnect" />
+        </LinearLayout>
     </LinearLayout>
 
     <!--
@@ -242,7 +284,7 @@
         android:textSize="11sp"
         android:lineSpacingExtra="3dp"
         android:textColor="?attr/appColorTextSecondary"
-        android:text="Mark: timestamp an action · Screen: screenshot to text&#10;Layout: main screen geometry · Widget: widget state&#10;Logic: widget update check · Clear / Export: log file" />
+        android:text="Mark: timestamp an action · Screen: screenshot to text&#10;Layout: main screen geometry · Widget: widget state&#10;Logic: widget update check · Clear / Export: log file&#10;Reconnect / Disconnect: drop and re-establish the link" />
 
     <!--
       Live clock: current time with milliseconds, plus time since the last Mark.

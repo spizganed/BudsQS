@@ -45,10 +45,23 @@ object SettingRowFactory {
         val row = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
+            // WRAP_CONTENT + minimumHeight, NOT a fixed 56dp.
+            //
+            // A fixed height CLIPS a row whose trailing value wraps: a tap-and-hold
+            // binding can name several actions ("ANC, Adaptive, Transparency, ANC
+            // off") and one line cannot hold it, so the text was cut off rather than
+            // shown. Letting the row grow is what makes it fit any number of actions.
+            //
+            // Rows that fit on one line still measure exactly 56dp, because
+            // minimumHeight is the floor — so the main screen's rows are unchanged.
+            // The 8dp vertical padding only takes effect once a row actually wraps,
+            // so it cannot push a single-line row taller either.
             layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(56f)
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
             )
-            setPadding(dp(14f), 0, dp(14f), 0)
+            minimumHeight = dp(56f)
+            setPadding(dp(14f), dp(8f), dp(14f), dp(8f))
             // Rows are separated by a hairline drawn by the card, not by margin,
             // so the group reads as one contiguous card.
             isClickable = onClick != null
@@ -159,15 +172,37 @@ object SettingRowFactory {
         }
     }
 
-    /** A muted right-aligned value label, used by rows that only report state. */
+    /**
+     * A muted right-aligned value label, used by rows that only report state.
+     *
+     * WRAPS rather than running off the row. A value like a multi-action gesture
+     * binding is far too long for one line, and without a width cap a single-line
+     * TextView in this position does not wrap — it just extends, squeezing the
+     * weighted title to nothing and then being clipped at the row edge.
+     *
+     * The cap leaves the title enough room for a short label while letting a full
+     * binding sit on ONE line, which is what keeps the row at the same 56dp height
+     * as every other row. A tighter cap pushed a normal binding onto two lines and
+     * the row grew taller than its neighbours, which is what looked wrong.
+     *
+     * maxLines + ellipsize remain a backstop for a value that is long even when
+     * wrapped, so the row cannot grow without bound.
+     *
+     * END padding is the gap between this text and whatever sits after it (the
+     * chevron on the gesture rows). Without it the value butts against the chevron.
+     */
     fun buildValue(context: Context, text: String): TextView {
         val dp = { v: Float -> ThemeRes.dp(context, v) }
+        val screenWidth = context.resources.displayMetrics.widthPixels
         return TextView(context).apply {
             setText(text)
             setTextColor(ThemeRes.color(context, R.attr.appColorTextSecondary))
             textSize = 13f
             gravity = Gravity.END
-            setPadding(dp(8f), 0, 0, 0)
+            setPadding(dp(8f), 0, dp(12f), 0)
+            maxWidth = (screenWidth * 0.62f).toInt()
+            maxLines = 2
+            ellipsize = android.text.TextUtils.TruncateAt.END
         }
     }
 

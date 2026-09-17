@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Sheet surface for the app's own bottom dialogs.
+
+  Rounded at the TOP only, because the sheet is anchored to the bottom edge of the
+  screen: a radius on the bottom corners would float it above the edge and show a
+  gap. Fill and stroke read from the theme palette, so the sheet matches the cards
+  in all three themes rather than being a platform-grey box.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="?attr/appColorCard" />
+    <corners
+        android:topLeftRadius="20dp"
+        android:topRightRadius="20dp" />
+    <stroke
+        android:width="1dp"
+        android:color="?attr/appColorOutline" />
+</shape>

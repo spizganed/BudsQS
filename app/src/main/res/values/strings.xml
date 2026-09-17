@@ -113,11 +113,7 @@
     <string name="gesture_double">Double tap</string>
     <string name="gesture_triple">Triple tap</string>
     <string name="gesture_slide">Slide</string>
-    <string name="gesture_hold">Tap and hold</string>
-
-    <!-- Subtitle on the tap-and-hold row only, so the fact that it cycles is
-         visible before the dialog is opened. -->
-    <string name="gesture_hold_multi_sub">Cycles through the actions you pick</string>
+    <string name="gesture_hold">Hold</string>
 
     <!-- Actions. -->
     <string name="gesture_action_none">No action</string>
@@ -133,10 +129,25 @@
     <string name="gesture_action_anc_transparency">Transparency</string>
     <string name="gesture_action_anc_off">ANC off</string>
 
+    <!--
+      SHORT forms, used ONLY by the row summary (not the dialog, which shows the
+      full names above). Tap-and-hold joins up to four actions into one line, so
+      "ANC, Adapt, Trans, Off" fits where the full names wrap — and a wrapped
+      summary makes that row taller than every other row.
+    -->
+    <string name="gesture_action_anc_adaptive_short">Adapt</string>
+    <string name="gesture_action_anc_transparency_short">Trans</string>
+    <string name="gesture_action_anc_off_short">Off</string>
+
     <string name="gesture_not_set">Not set</string>
     <string name="gesture_choose_title">Assign action</string>
-    <string name="gesture_multi_hint">Tap to add or remove. More than one makes the gesture cycle through them.</string>
     <string name="gesture_done">Done</string>
+    <!--
+      Shown ONLY when the tap-and-hold selection breaks the rule (exactly one
+      action). Deliberately not a permanent hint: the sheet stays quiet until it has
+      something to say.
+    -->
+    <string name="gesture_hold_rule">Tap and hold cycles, so pick no action or at least two.</string>
 
     <!--
       The honest status line. The selections are stored on the phone only: the
