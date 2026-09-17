@@ -117,8 +117,17 @@ object AncEventParser {
     fun describe(payload: ByteArray, currentLevel: String? = null): String {
         val raw = rawValue(payload)
         if (raw < 0) return "ANC event (payload too short)"
-        val mode = modeForRaw(raw, currentLevel)
         val hex = "0x%04X".format(raw)
+
+        // Adaptive is named for the LOG, not for the UI. modeForRaw() maps it to
+        // "ANC-Light" because the app has no Adaptive circle, which is right for
+        // the circles and WRONG for a capture: the four-stop cycle he ran came back
+        // "raw=0x0040 -> ANC-Light" followed by "raw=0x0800 -> ANC-Light", i.e. two
+        // different stops printed identically. The log exists to be read back, so it
+        // says what the buds actually are and notes what the UI does with it.
+        if (raw == 0x0800) return "raw=$hex -> Adaptive (app shows ANC-Light)"
+
+        val mode = modeForRaw(raw, currentLevel)
         return if (mode == null) "raw=$hex -> unknown ANC value" else "raw=$hex -> $mode"
     }
 }

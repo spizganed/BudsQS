@@ -261,6 +261,23 @@ from Deep reported `0x0010`; cycling from Medium reported `0x0020`. So the value
 is a **bitmask of the actual mode**, not a fixed three-value enum. Code that
 treats it as an enum will be wrong half the time.
 
+`[CAPTURE]` 2026-09-21 — a four-stop gesture cycle (`low -> adaptive ->
+transparency -> off`) returned **`0x0800` for the Adaptive stop**, which had been
+`[OSS]`-only until then. Full capture: `local/logs/anc-cycle-gesture-4stop.txt`.
+Two consequences worth keeping:
+
+- `0x0020` was NOT the "ANC on" stop in general. The cycle above never produced
+  it, because Light was the level in force. Both earlier captures that read it as
+  *the* ANC-on value were simply starting from Medium. The bitmask reading is the
+  correct one and this capture is the second, independent confirmation.
+- **`0x0040` (Light) and `0x0800` (Adaptive) are byte-distinct but map to the same
+  UI state**, because the app has three ANC levels and lights Low for both. A log
+  that prints only the UI name shows two different stops as `ANC-Light`, so a
+  capture cannot be read back. `AncEventParser.describe()` therefore prints
+  `raw=0x0800 -> Adaptive (app shows ANC-Light)` while `modeForRaw()` — which the
+  circles and the widget actually use — still returns `ANC-Light` for it. **Do not
+  "unify" these two back into one name.**
+
 ### Querying
 
 ```
