@@ -199,11 +199,11 @@ object OpoProtocol {
      * configuration in our app (PROTOCOL.md §6). It may also hand us the enum straight
      * from the device, which would remove the need for a HeyMelody capture.
      *
-     * Payload is a bare query (no payload), matching the other 0x01xx reads. The reply
-     * is logged RAW by `KeyFunctionParser` until the layout is confirmed — see
-     * LogDecoder's 0x8108 branch. Payload shape is documented as
-     * `<count> <deviceType, button, buttonAction, function>...` in PROTOCOL.md §6 but
-     * that is sourced from KeyFunctionItem.cs, NOT yet observed here.
+     * Payload is a bare query (no payload), matching the other 0x01xx reads. The buds
+     * DO answer it: the reply is `<status> <count> <4-byte entries>...` and its layout
+     * is `[CAPTURE]`-confirmed — see PROTOCOL.md §6 and `KeyFunctionParser`, which
+     * logs it RAW and grouped so two readings can be diffed. The `function` VALUES in
+     * it are still unnamed, which is why the write path stays unbuilt.
      */
     fun queryKeyFunction(): ByteArray = buildPacket(CMD_QUERY_KEY_FUNCTION)
 

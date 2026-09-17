@@ -17,13 +17,19 @@ import com.spizganed.quickbuds.R
  * publishes it, and it is the one remaining blocker (PROTOCOL.md §6). So
  * [GestureAction] deliberately carries a LABEL and no protocol value.
  *
+ * THE READ HALF IS NOW DONE: the `0x8108` reply decodes ([CAPTURE]), and it
+ * reports the `function` byte per gesture. What is still missing is the NAMES —
+ * one reading cannot name its own values, because the app does not know what the
+ * current bindings mean either. Diffing two `KEYFN:` lines around one change in
+ * HeyMelody is what will supply them.
+ *
  * WHY THAT IS NOT AN OVERSIGHT: guessing an ANC bit is exactly what produced the
  * SET-vs-NOTIFY regression this project already had to revert, and a dropdown of
  * guessed values would look finished while silently sending the wrong thing. The
- * selections here are therefore stored ON THE PHONE ONLY until the enum is
- * confirmed from the 0x8108 reply (or a HeyMelody capture). The screen says so
- * rather than pretending. When the enum lands, add the byte to [GestureAction]
- * and send it from the screen — nothing else about this model needs to change.
+ * selections here are therefore stored ON THE PHONE ONLY until the enum names are
+ * confirmed. The screen says so rather than pretending. When they land, add the
+ * byte to [GestureAction] and send it from the screen — nothing else about this
+ * model needs to change.
  */
 enum class GestureSide(val labelRes: Int) {
     LEFT(R.string.gesture_bud_left),

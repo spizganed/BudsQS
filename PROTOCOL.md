@@ -100,7 +100,7 @@ garbage rather than an error.
 | `0x0100` | `0x8100` | Handshake | — | `[CAPTURE]` |
 | `0x0103` | `0x8103` | Product ID | — | `[CAPTURE]` |
 | `0x0106` | `0x8106` | Battery | — | `[CAPTURE]` |
-| `0x0108` | `0x8108` | **getKeyFunction** (gestures) | `<count> <deviceType...>` | `[OSS]` queried, reply unconfirmed |
+| `0x0108` | `0x8108` | **getKeyFunction** (gestures) | `<status> <count> <deviceType...>` | `[CAPTURE]` see §6 |
 | `0x0109` | `0x8109` | Wearing / in-case | — | `[CAPTURE]` |
 | `0x010C` | `0x810C` | ANC state | `01 01` | `[CAPTURE]` |
 | `0x010D` | `0x810D` | Feature switch status (batch) | `<count> <featureIds...>` | `[CAPTURE]` |
@@ -151,10 +151,10 @@ A working connection is exactly this, in order `[CAPTURE]`:
 
 Then a periodic status poll (the app uses ~60 s).
 
-`[GUESS]` Step 9 is additive and unproven: it is a read, so it cannot change a
-binding, but it is not yet known whether the buds answer it, stay silent, or
-object. **If the timing of the earlier steps ever looks disturbed, step 9 is the
-first suspect** — it is the only step here that is new. See §6.
+`[CAPTURE]` Step 9 is settled: the buds answer it in ~40 ms and nothing objects,
+so it stays. It is a read, so it cannot change a binding. See §6 for the reply.
+**If the timing of the earlier steps ever looks disturbed, step 9 is still the
+first suspect** — it remains the only step here that was added late.
 
 ### The broadcast codes reply (0x8200) is the map of what exists
 
@@ -331,54 +331,99 @@ fields are identical.
 
 | Direction | Cmd | Payload |
 |-----------|-----|---------|
-| Read | `0x0108` → `0x8108` | `<count> <deviceType...>` (commonly `02 03 01`) |
-| Write | `0x0402` | `<count> [deviceType, button, buttonAction, function]...` |
+| Read | `0x0108` → `0x8108` | `<status> <count> <4-byte entries>...` `[CAPTURE]` |
+| Write | `0x0402` | `<count> [deviceType, button, buttonAction, function]...` `[OSS]` |
 
 Each entry is 4 bytes `[deviceType, button, buttonAction, function]`
-(`[OSS]` `Models/KeyFunctionItem.cs`).
+(`[OSS]` `Models/KeyFunctionItem.cs`, confirmed on the read side by our capture).
+The read reply's 2-byte header is our own finding — see just below.
 
-**The `function` enum values are UNKNOWN.** That is the one blocking gap. Do not
-guess them. Two ways to get them, cheapest first:
+**The `function` VALUES are UNKNOWN.** That is the one blocking gap, and it is
+narrower than it looks: the read half is DONE, only the enum is missing. Two ways to
+get it, cheapest first:
 
-1. **Ask the buds.** Send `0x0108` and read the `0x8108` reply — it should describe
-   the *current* assignment, which may hand us the enum directly.
+1. **Ask the buds, then DIFF.** Send `0x0108` and read the `0x8108` reply; it
+   describes the *current* assignment. One reading alone cannot name anything (see
+   below), but two readings around ONE change in HeyMelody name that value outright.
 2. **Capture HeyMelody.** Change one gesture assignment in the official app and
-   log the `TX` frame; that is the write we need to imitate, plus its ack.
+   log the `TX` frame; that is the write we need to imitate, plus its ack. Only
+   needed if the diff in (1) proves unreadable.
 
 Note the source conflict: an `ai-generated/` doc says `0x0401`; `OppoPodsManager`'s
 command table says **`0x0402`**. Prefer `0x0402`, and confirm from a capture.
 
-#### Status of route 1 — SHIPPED 2026-09-19, RESULT PENDING
+#### Route 1 — ANSWERED. The reply is readable, and the layout guess was WRONG.
 
-Route 1 is implemented: `OpoProtocol.queryKeyFunction()` (`0x0108`) is sent last in
-the init sequence (read-only, so it cannot change a binding), and `KeyFunctionParser`
-decodes the `0x8108` reply. **The reply has not been seen yet, so the layout below is
-still `[OSS]`, not `[CAPTURE]`.**
+`[CAPTURE]` The buds answer `0x0108`, and the reply decodes completely. The capture
+is in `local/logs/keyfn-reply-capture.txt`.
 
 ```
-TX  AA 07 00 00 08 01 <seq> 00 00      query key function (payload empty)
+TX  AA 07 00 00 08 01 30 00 00        query key function (payload empty)
+RX  AA 51 00 00 08 81 30 4A 00 | 00 12 ...    payLen = 0x4A = 74
 ```
 
 `TotalLen` is `07` here, matching the handshake, because `TotalLen = 7 + payLen`
 and this payload is empty — do not copy `08` from the command number. The seq byte
-is whatever the counter was at; it is not fixed.
+is whatever the counter was at; it is not fixed (the reply echoes it, `0x30` above).
+
+**THE PAYLOAD HAS A LEADING STATUS BYTE THAT `KeyFunctionItem.cs` DOES NOT MODEL.**
+
+```
+<status> <count> <deviceType, button, buttonAction, function>...
+  0x00    0x12      4 bytes each
+```
+
+`KeyFunctionItem.cs` describes ONE entry's bytes, not the payload wrapped around it.
+Taking `payload[0]` as the count is therefore wrong: it is `0x00`, so the parser read
+0 entries, shifted every entry one byte left, and printed `dev=0x12` — which is really
+the count. The `!LAYOUT` guard caught it (`expected 1+0*4 bytes, got 74`) rather than
+decoding garbage silently, which is why the guard exists. **Arithmetic settles the
+header size:** 74 bytes with 18 entries is `2 + 18*4`, exactly; no other header size
+fits. `KeyFunctionParser.HEADER_SIZE = 2`.
+
+`[CAPTURE]` The 18 entries on Buds 4, grouped by the app (`act:fn`), entries in the
+buds' own order:
+
+```
+dev=0x01/btn=0x01[01:00 02:11 03:00 04:08 06:00 05:07]
+dev=0x01/btn=0x06[02:00 03:00 06:00]
+dev=0x02/btn=0x01[01:00 02:00 03:00 04:08 06:00 05:07]
+dev=0x02/btn=0x06[02:00 03:00 06:00]
+```
+
+`deviceType` matches the `0xF1` frame's side byte (`0x01` left, `0x02` right), and
+`button` is `0x01` / `0x06` — `0x01` also being this project's button id from the
+`0xF1` captures. So the two frames agree on their two shared fields.
 
 Three places print the reply, so a capture can always be read even if the parse is
 wrong: the raw `RX:` line, `BudsConnectionManager`'s `KEYFN:` line, and
 `LogDecoder`'s description — **all of which end with `RAW=[...]`**.
 
-The parser is deliberately guarded, and these guards are what to look for:
+#### STILL UNKNOWN, AND STILL NOT TO BE NAMED
 
-- `parsed=N` vs `count=M` — a disagreement means the entry size is not 4, or the
-  payload begins with something other than a count byte.
-- `!LAYOUT` — printed when `count` and the bytes present do not reconcile. A
-  `0x8108` reply that trips this is the evidence needed to fix the layout.
-- `fn=0xNN` is printed as a **number and never named.** Naming it before a capture
-  confirms it is exactly the mistake that cost us the SET-ANC regression (§5). No
-  UI may offer a function list until this is resolved.
+The `function` VALUES are unread: `0x00`, `0x07`, `0x08`, `0x11`. Reading them off
+this one reply is not possible — the app has no idea what its own bindings currently
+are, so there is nothing to compare against. `fn` is printed as a **number and never
+named**, and no UI may offer a function list yet: a dropdown of guessed values looks
+finished while sending the wrong thing, which is the SET-ANC mistake again (§5).
 
-If `0x8108` turns out to be opaque or the guards trip on every reading, fall back to
-route 2 (capture HeyMelody changing one assignment).
+`[GUESS]` Two weak hints, recorded so the next capture can confirm or kill them:
+`0x00` on 13 of 18 entries (so, something like "unbound/default"); long press
+(`act 0x04`) is `0x08` on BOTH buds, and the slide-ish `act 0x05` is `0x07` on both
+— consistent with `fn` being an action-level value.
+
+The `buttonAction` NUMBERS are also unmapped, and they are **NOT** the `0xF1` action
+numbers: `F1` calls single tap `0x00` and long press `0x04`, while this reply binds
+`0x01` as well as `0x04`. `[GUESS]` `1..6` could be single, double, triple, long
+press, slide up, slide down — but that is a guess and stays one.
+
+#### THE ONE CAPTURE THAT FINISHES IT — no HCI snoop needed
+
+`0x8108` describes the CURRENT binding, so **DIFF TWO READINGS**: change ONE gesture
+in HeyMelody from a KNOWN value, reconnect our app, and compare the `KEYFN:` lines.
+Whichever `fn` byte moves for that button is that function's value, and each further
+action can be learned the same way. This is why the reply is now printed GROUPED per
+`dev/btn` — the single entry that changed is meant to be visible at a glance.
 
 **Note the write path is not built.** `0x0402` is deliberately not defined as a
 constant yet, and `buildPacket()` still lacks LEB128 `TotalLen` (§2), which a
