@@ -8,6 +8,7 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import com.spizganed.quickbuds.protocol.AncEventParser
 import com.spizganed.quickbuds.protocol.BatteryParser
 import com.spizganed.quickbuds.protocol.GameModeParser
 import com.spizganed.quickbuds.protocol.OpoProtocol
@@ -51,10 +52,23 @@ class BudsConnectionManager(private val context: Context) {
          * authoritative source. Implementers should persist it to WidgetStateStore
          * so the widget and app buttons reflect reality rather than our last command.
          *
-         * NOTE: the buds raise NO equivalent event for ANC changes, so ANC cannot be
-         * synced this way.
+         * NOTE: ANC has its own event, subType 0x03 — see onAncModeState.
          */
         fun onGameModeState(on: Boolean) {}
+
+        /**
+         * ANC mode changed on the BUDS themselves (0x0204 subType 0x03).
+         *
+         * Mirrors onGameModeState: raised for a buds gesture AND for our own command
+         * (the buds push real state either way), so implementers should persist it to
+         * WidgetStateStore and let the store listener repaint both surfaces. An
+         * implementation that ignores an equal value is what keeps an echo a no-op.
+         *
+         * `mode` is a store ANC name ("Off", "Transparency", "ANC-Light",
+         * "ANC-Medium", "ANC-Deep"). An unnameable raw value is never reported, so an
+         * implementer can never be handed a mode the buds did not actually report.
+         */
+        fun onAncModeState(mode: String) {}
     }
 
     private val listeners = CopyOnWriteArrayList<Listener>()
@@ -238,13 +252,13 @@ class BudsConnectionManager(private val context: Context) {
         log("Disconnected")
     }
 
-    fun sendAncOff() { sendRaw(OpoProtocol.ancOff(), "ANC Off") }
+    fun sendAncOff() { lastAncLevelSent = null; sendRaw(OpoProtocol.ancOff(), "ANC Off") }
     fun sendAncOn() { sendRaw(OpoProtocol.ancOn(), "ANC On") }
     fun sendAncTransparency() { sendRaw(OpoProtocol.ancTransparency(), "ANC Trans") }
     fun sendAncSmart() { sendRaw(OpoProtocol.ancSmart(), "ANC Smart") }
-    fun sendAncDeep() { sendRaw(OpoProtocol.ancDeep(), "ANC Deep") }
-    fun sendAncMedium() { sendRaw(OpoProtocol.ancMedium(), "ANC Medium") }
-    fun sendAncLight() { sendRaw(OpoProtocol.ancLight(), "ANC Light") }
+    fun sendAncDeep() { lastAncLevelSent = "ANC-Deep"; sendRaw(OpoProtocol.ancDeep(), "ANC Deep") }
+    fun sendAncMedium() { lastAncLevelSent = "ANC-Medium"; sendRaw(OpoProtocol.ancMedium(), "ANC Medium") }
+    fun sendAncLight() { lastAncLevelSent = "ANC-Light"; sendRaw(OpoProtocol.ancLight(), "ANC Light") }
 
     fun setGameMode(on: Boolean) =
         sendRaw(if (on) OpoProtocol.gameModeOn() else OpoProtocol.gameModeOff(), "GameMode")
@@ -273,6 +287,19 @@ class BudsConnectionManager(private val context: Context) {
      * called alongside it or the attribution probe silently stops working.
      */
     private fun markAncFlush() { lastAncFlushAt = System.currentTimeMillis() }
+
+    /**
+     * The ANC LEVEL the app last sent ("ANC-Light"/"ANC-Medium"/"ANC-Deep", or null).
+     *
+     * Used only to interpret the buds' subType 0x03 push when its value is the
+     * ambiguous "ANC on" stop: that stop echoes whichever level was last active, so
+     * the level the app just set is the best available hint. It never overrides a
+     * value we can name outright — see AncEventParser.modeForRaw().
+     *
+     * Deliberately a plain field rather than a WidgetStateStore read: the manager
+     * has no Context, and the store is owned by the service.
+     */
+    private var lastAncLevelSent: String? = null
 
     private fun sendRaw(data: ByteArray, label: String = "") {
         Thread {
@@ -451,6 +478,30 @@ class BudsConnectionManager(private val context: Context) {
         if (cmd == OpoProtocol.CMD_ACTIVE_REPORT &&
             UserInteractionParser.isUserInteractionEvent(payload)) {
             log("BTN EVT: ${UserInteractionParser.describe(payload)}")
+            return
+        }
+
+        // --- ANC changed on the buds: 0x0204 spontaneous event, subType 0x03 ---
+        // Raised by an ANC gesture on either bud. Mapped and confirmed — see
+        // AncEventParser for the frame shape and the four known values.
+        //
+        // Handled BEFORE the length-based checks below because the payload is only
+        // 5 bytes.
+        //
+        // The event reflects the buds' real state whether the change came from a
+        // gesture or from our own command, so there is deliberately NO suppression
+        // of "our own" echoes: BudsService drops a mode equal to the stored one, so
+        // an echo is a no-op and a genuine external change always lands.
+        //
+        // A mode that cannot be named (unrecognised value) is logged but NOT pushed,
+        // so we never invent a mode the buds did not report.
+        if (cmd == OpoProtocol.CMD_ACTIVE_REPORT &&
+            AncEventParser.isAncEvent(payload)) {
+            val mode = AncEventParser.parseActive(payload, lastAncLevelSent)
+            log("ANC EVT: ${AncEventParser.describe(payload, lastAncLevelSent)}")
+            if (mode != null) {
+                handler.post { listeners.forEach { it.onAncModeState(mode) } }
+            }
             return
         }
 

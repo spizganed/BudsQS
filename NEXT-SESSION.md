@@ -1,84 +1,126 @@
 NEXT SESSION — START HERE
 =====================================================================
 
-Written 2026-09-18. Read your memory first (it is long and current), then
-HANDOFF.md.
+Written 2026-09-18 (night), updated 2026-09-19.
+**NEXT FEATURE: gesture configuration.** See the section below.
 
-COMMIT FIRST
+## STEP 0 — CHECK THE MDs ARE UP TO DATE (he asked for this explicitly)
+
+Do this before writing any code:
+
+1. `git log --oneline -5` and `git status` — is the tree clean? Are the
+   2026-09-18 commits actually in, or still uncommitted? Check whether
+   `commit-title-short.txt` / `commit-title-anc.txt` were used.
+2. Read, in this order: **`PROTOCOL.md`**, **`CREDITS.md`**, this file, and the
+   memory note.
+3. **Cross-check the docs against the CODE.** A doc that disagrees with the code
+   is worse than no doc, because it will be trusted. Specifically:
+   - `PROTOCOL.md` §3 command numbers vs `OpoProtocol.kt`
+   - **§5's two ANC tables** vs `ancPayload()` and `AncEventParser.modeForRaw()`
+     — these MUST still differ from each other. If someone "unified" them, that
+     is a regression.
+   - §4's init sequence vs `BudsConnectionManager`
+   - anything marked `[GUESS]` that a later session resolved
+4. Fix any drift, and say what you checked. Correcting a stale doc IS a
+   deliverable — the whole point of writing it down was so it could be trusted.
+
+## STATUS: EVERYTHING SHIPPED SO FAR IS VERIFIED ON DEVICE (2026-09-19)
+
+He confirmed all of this himself, after the last rebuild:
+
+- ANC Off / Light / Medium / High / Transparency all apply, and the right circle
+  lights. **The SET-table regression is gone.**
+- Trans works, audibly.
+- A bud gesture updates the app circles AND the widget.
+- **He REBOUND a gesture on the right bud to a different mode cycle and the app
+  followed it.** Strongest possible confirmation the push path is sound: the app
+  tracks real bud state, not just echoes of its own commands.
+- Tapping in the APP updates the WIDGET (the one-way sync bug is fixed).
+
+Do not re-open any of that unless something regresses. There is nothing to
+verify right now — go straight to the feature.
+
+
+## THE FEATURE: GESTURE CONFIGURATION IN OUR APP
+
+**His goal, in his words:** manage the gesture bindings from our app, so he does
+not have to rebind them in HeyMelody.
+
+Commands are known. ONE gap blocks it.
+
+    Read   getKeyFunction  0x0108  -> 0x8108   payload <count> <deviceType...>
+    Write  setKeyFunction  0x0402             payload <count> [deviceType,
+                                              button, buttonAction, function]...
+
+**THE BLOCKING GAP IS THE `function` ENUM** — which value means "ANC cycle",
+which means "game mode", which means "voice assistant". Nobody publishes it.
+**DO NOT GUESS IT.** Guessing ANC bits already cost us a regression.
+
+Cheapest path first:
+
+    a. Send 0x0108 and read the 0x8108 reply. It describes the CURRENT
+       assignment, so it may hand us the enum directly, from the device.
+       TRY THIS FIRST — one query, no HeyMelody capture needed.
+    b. Only if (a) is opaque: capture HeyMelody changing ONE gesture
+       assignment, and read the TX frame plus its ack.
+
+Note the source conflict: the `ai-generated/` doc says 0x0401;
+OppoPodsManager's command table says **0x0402**. Prefer 0x0402.
+
+Caution: **TotalLen is LEB128** (PROTOCOL.md §2). A gesture config with
+several entries can exceed 127 bytes, so `buildPacket()` will need real
+LEB128 encoding before a multi-entry write. Do not ship a long write without it.
+
+Suggested shape for the session (keep it small):
+
+1. Add `queryKeyFunction()` (`0x0108`) and log the `0x8108` reply RAW.
+   Ship that alone if budget is tight — cheapest way to learn the layout, and
+   it is read-only so it cannot break anything.
+2. Read the reply with him, then decide.
+3. Only then build UI, and only for gestures/actions we can actually NAME. A
+   dropdown offering functions we guessed is worse than no UI.
+
+
+THE REST OF THE QUEUE
 ---------------------------------------------------------------------
-The 2026-09-18 work is BUILT, SIGNED AND INSTALLED and sits in the working tree
-uncommitted. The message is written to a file:
+- LAUNCHER / PACKAGE ICON from his three SVGs. `ic_launcher_foreground.xml`
+  still traces the OLD bud artwork. Needs a layer-list + safe-zone scale —
+  the same ratio math that ate a whole night on the widget buds.
+  **ITS OWN SESSION.**
+- LIGHT THEME REMOVAL — decided, not started. Mostly deletion.
+- targetSdk 35 edge-to-edge warning. Bundle with light-theme removal.
+- Case LID is NOT readable. The case ICON must stay visible regardless.
+- Undecoded families: `0x0501`/`0x0500` (seen after ANC writes, may be this
+  firmware's alternate ANC notification), broadcast codes `0x04`/`0x08`/`0x0B`,
+  and the `0x810D` batch-status reply layout. PROTOCOL.md §12 lists them.
 
-    cd /storage/emulated/0/Android/data/com.tyron.code/files/codeassist/projects/BudsQS
-    git add -A && git commit -F commit-title-short.txt && git push
 
-`-F` avoids CodeAssist's commit box, which is too small for a full message.
-
-
-WHAT WAS DONE 2026-09-18
+DOCS — KEEP THEM CURRENT
 ---------------------------------------------------------------------
-1. THE ICONS ARE THE USER'S OWN SVGs, COPIED VERBATIM. `svgs/case.svg`,
-   `svgs/bud_left.svg`, `svgs/bud_right.svg` -> the three drawables, path data
-   character for character, source viewBox kept. Do NOT rescale or re-transcribe
-   them; that mistake was made three times and produced wrong artwork.
-2. SIZING RULES, each learned from a real failure: layout size (not viewBox) in
-   android:width/height, or the widget builds 400MB of bitmaps and the app crashes
-   on connect; explicit widths from the true ratio, because wrap_content +
-   adjustViewBounds clips the art (intrinsic size rounds to whole PIXELS).
-3. BATTERY CARD IS NOW TWO CARDS stacked (icons above, bars below), so resizing
-   one does not move the other. Both fade+collapse when disconnected.
-4. HEADER CONNECTION PILL: dot + word beside the device name, cross-fading.
-5. ANIMATIONS: icons fade+scale on show/hide, the case also lifts, the buds slide
-   together when the case is hidden, cards collapse, bars fade, widget pill fades.
-6. TOASTS OFF for connect/disconnect, at his request.
-7. BAR CELLS have rounded edges (rounded divider slots).
-8. WIDGET: "Can't load widget" WAS THE VECTOR previewImage. Removed. The widget
-   now shows a connection pill instead of a blank card when disconnected.
-
-
-1. VERIFY THE WIDGET, FIRST THING
----------------------------------------------------------------------
-The previewImage fix is the identified cause of "Can't load widget" but is NOT
-yet confirmed on device.
-
-    - long-press the home screen -> Widgets, and check the picker no longer
-      shows "Can't load widget"
-    - place one, then Dev Tools -> Widg, and send
-      Downloads/QuickBudsShot/layout_widget_<ts>.txt
-
-If the picker is fixed, the fallback (a real BITMAP preview) can be added later.
-Never a vector.
-
-
-2. THE REMAINING TASKS
----------------------------------------------------------------------
-a. ANC GESTURE PUSH-BACK — the ANC buttons should track a mode changed by the
-   buds' own gesture, exactly as game mode already does. HE MUST SEND A LOG after
-   cycling through each ANC setting by gesture; the push format is not captured
-   yet. Do not guess at it.
-
-b. LAUNCHER / PACKAGE ICON from the same three SVGs. `ic_launcher_foreground.xml`
-   still traces the OLD bud artwork.
-
-c. LIGHT THEME REMOVAL — decided, not started.
-
-d. targetSdk 35 edge-to-edge warning appeared in the last build (content draws
-   behind the status/nav bars). Unexamined.
-
-e. Case LID state is NOT readable: the firmware never reports it, BudsService only
-   infers it. Reading it properly needs a hardware request that has not been
-   captured. **The case ICON must stay visible regardless** — he restated that.
+- **PROTOCOL.md** — the wire format. Tag every claim `[VENDOR]` / `[OSS]` /
+  `[CAPTURE]` / `[GUESS]`. **Update it in the same commit as a protocol change.**
+  Its §5 "History of Getting This Wrong" and §11 "Method" exist on purpose.
+- **CREDITS.md** — whose work we rely on, area by area. **Add a row when you add
+  a constant.** Also lists what is original to this project.
+- `NEXT-SESSION.md` (this file) — the plan.
 
 
 PROCESS NOTES THAT SAVED REAL TIME
 ---------------------------------------------------------------------
+- **A `when` on UI string keys with NO `else` is a silent-failure generator.**
+  The Transparency bug was `"Trans"` vs `"Transparency"` and hid for weeks.
+  Also check for a state write with no matching refresh call — that was the
+  widget one-way sync.
+- **REVERT FIRST, REASON AFTER.** He reported the game-mode flap and asked for a
+  revert; arguing cost a session. His later log cleared our code, but the revert
+  was still right. Do the revert, then investigate.
+- **His screenshots are PNGs — the agent CANNOT read them.** One sentence from
+  him replaced an entire diagnostic loop. Ask for the sentence.
+- **`search_text` returns false negatives.** It reported "No matches" for
+  `onAncCircleTapped`, which exists. Read the file.
+- **`get_diagnostics` can say "No diagnostics" on a file that fails to compile**
+  (missing import across packages). After a cross-package call, run the BUILD.
+- `noteUnattributed` blanket-excludes cmd 0x0204, so an undecoded 0x0204 subType
+  prints NOTHING. That hid the ANC frame for three captures.
 - READ `testlogs/layout_*.txt` OR THE WIDGET REPORT BEFORE CHANGING ANY LAYOUT.
-  It caught the clipping bug, the icon overlap, and the blank-widget cause.
-- The widget report's SIZES are exact but its POSITIONS are meaningless (detached
-  view tree). Do not re-add a position walk.
-- The diagnostic itself crashed the app twice (null LayoutParams;
-  getResourceEntryName on View.NO_ID). It is now fully wrapped in try/catch and
-  writes any trace into the report. Keep it that way.
-- Sketch a layout as ASCII and get an explicit yes/no BEFORE coding. That is what
-  stopped this project burning build cycles on guessed layouts.
-- XML comments: no `--`, and they MUST end with `-->`.
+- WRITE THE COMMIT MESSAGE TO A FILE. His CodeAssist commit box is too small.

@@ -31,9 +31,8 @@ package com.spizganed.quickbuds.protocol
  * this is a genuine push from the buds and not an echo of our own command. State
  * correlates 5/5 with the game-mode value, so the encoding is safe to rely on.
  *
- * IMPORTANT SCOPE LIMIT: this event is GAME MODE ONLY. It is NOT raised for ANC
- * changes — ANC Off at 14:41:46 and ANC Light at 14:43:57 produced no 0x05 frame.
- * Do not try to read ANC out of this packet.
+ * IMPORTANT SCOPE LIMIT: this event is GAME MODE ONLY. ANC changes arrive in a
+ * DIFFERENT subType, 0x03 — see AncEventParser. Do not read ANC out of this packet.
  */
 object GameModeParser {
 

@@ -166,6 +166,10 @@ object LogDecoder {
                                 sb.append(if (on) " ON" else " OFF")
                             }
                         }
+                        AncEventParser.EVT_ANC -> {
+                            sb.append("Active report: ANC ")
+                            sb.append(AncEventParser.describe(payload))
+                        }
                         UserInteractionParser.EVT_USER_INTERACTION -> {
                             sb.append("Button/gesture: ")
                             sb.append(UserInteractionParser.describe(payload))
@@ -240,20 +244,30 @@ object LogDecoder {
         else -> "?"
     }
 
+    /**
+     * Names an ANC payload using the SET_ANC table (OpoPodsManager Anc*.cs).
+     *
+     * This is the SET encoding, which is NOT the same as the query/notify
+     * encoding used by 0x810C replies and 0x0204 subType 0x03 (see
+     * AncEventParser). Reading only byte 2 would miss Adaptive, whose bit is in
+     * the next byte, so the field is read as a little-endian int across bytes.
+     */
     private fun ancPayloadToString(payload: ByteArray): String {
         if (payload.isEmpty()) return "?"
-        // The ANC payload encodes which ANC mode via a bitfield in byte 2+.
-        // Bit positions: 0=Off, 1=On, 2=Trans, 4=Deep, 5=Med, 6=Light, 7=Smart
-        val bitByte = payload.getOrElse(2) { 0 }.toInt() and 0xFF
+        var bits = 0
+        for (i in 2 until payload.size) {
+            bits = bits or ((payload[i].toInt() and 0xFF) shl ((i - 2) * 8))
+        }
         return when {
-            (bitByte and 1) != 0 -> "Off"
-            (bitByte and 0x02) != 0 -> "On"
-            (bitByte and 0x04) != 0 -> "Trans"
-            (bitByte and 0x10) != 0 -> "Deep"
-            (bitByte and 0x20) != 0 -> "Med"
-            (bitByte and 0x40) != 0 -> "Light"
-            (bitByte and 0x80) != 0 -> "Smart"
-            else -> "Unknown"
+            (bits and 0x0001) != 0 -> "Off"
+            (bits and 0x0004) != 0 -> "Trans"
+            (bits and 0x0010) != 0 -> "Deep"
+            (bits and 0x0020) != 0 -> "Med"
+            (bits and 0x0040) != 0 -> "Light"
+            (bits and 0x0080) != 0 -> "Smart"
+            (bits and 0x0100) != 0 -> "Adaptive"
+            (bits and 0x0002) != 0 -> "On"
+            else -> "Unknown (0x%04X)".format(bits)
         }
     }
 

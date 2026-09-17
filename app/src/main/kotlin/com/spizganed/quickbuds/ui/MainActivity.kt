@@ -33,6 +33,7 @@ import com.spizganed.quickbuds.bluetooth.BudsConnectionManager
 import com.spizganed.quickbuds.bluetooth.BudsService
 import com.spizganed.quickbuds.bluetooth.PacketLogger
 import com.spizganed.quickbuds.devtool.LayoutReport
+import com.spizganed.quickbuds.widget.AncWidgetProvider
 import com.spizganed.quickbuds.widget.WidgetStateStore
 
 /**
@@ -1269,7 +1270,14 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
             // second tap on an already-lit circle was an unnecessary step.
             "ANC" -> showAncChooser()
             "Off" -> selectAnc("Off")
-            "Trans" -> selectAnc("Transparency")
+            // The BUTTON passes "Transparency"; the display label and circleFor()
+            // use "Trans". Accepting only "Trans" here meant every Transparency tap
+            // fell through the when with NO else, so no command was sent and nothing
+            // was rendered — which is exactly the "Trans does nothing" report, and
+            // the log line reads circle=Transparency. Accept both spellings; do not
+            // "tidy" this back to one of them.
+            "Trans", "Transparency" -> selectAnc("Transparency")
+            else -> PacketLogger.log("ANC TAP: unhandled circle='$circle' (no command sent)")
         }
     }
 
@@ -1330,12 +1338,26 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
         SettingRowFactory.refreshSwitch(this, gameSwitch!!, next)
     }
 
-    /** Pushes our optimistic state into the store so the widget repaints too. */
+    /**
+     * Pushes our optimistic state into the store and REPAINTS THE WIDGET.
+     *
+     * The refreshAll() call is the whole reason this method exists. Writing the
+     * store is not enough on its own: the widget renders from it only when
+     * something asks it to, and MainActivity's own storeListener posts a callback
+     * rather than raising one. Without the explicit refresh, a tap in the APP
+     * updated the store but left the widget showing stale icons until some other
+     * event happened to refresh it — which is exactly the one-way sync that was
+     * reported (widget -> app worked, app -> widget did not).
+     *
+     * BudsService does the same thing after a buds-side event; both directions
+     * must refresh, so keep these two calls in step.
+     */
     private fun syncWidgetState() {
         val state = WidgetStateStore.read(this)
         state.ancMode = activeAncMode
         state.gameMode = gameModeOn
         WidgetStateStore.write(this, state)
+        AncWidgetProvider.refreshAll(this)
     }
 
     // ==================== Settings rows ====================
@@ -1649,6 +1671,10 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
 
     override fun onGameModeState(on: Boolean) {
         // Routed through the store, not painted here, for the same reason ANC is.
+    }
+
+    override fun onAncModeState(mode: String) {
+        // Routed through the store, not painted here, for the same reason game mode is.
     }
 
     companion object {

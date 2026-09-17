@@ -104,12 +104,24 @@ WidgetActionReceiver  ->  BudsService  ->  BudsConnectionManager (RFCOMM)
 Key protocol facts (observed on Buds 4):
 - Battery query `0x01F0` -> components `(01,L) (02,R) (03,C)`
 - Wearing query `0x01F2` -> status codes: `4` = in case, `1/5` = out idle, `3/7` = wearing
-- `0x0205` registration makes the buds push `0x0204` events. The payload is
-  `02 01 02` — a **count** byte followed by event ids (count=2: battery `01` + wearing `02`).
-  Registering both makes wear changes arrive instantly, no polling.
+- `0x0205` registration makes the buds push `0x0204` events. The payload is a **count** byte
+  followed by event ids. Registering battery (`01`), wearing (`02`) **and ANC (`03`)** makes
+  wear changes and ANC changes arrive instantly, no polling.
+  Do not write `01 01 02 02`: under the count-first shape that means "count=1, battery only",
+  which the firmware accepts while silently never sending the rest.
 - Game Mode is also pushed, as `0x0204` subType `0x05`, **including from bud-side gestures**
-- **ANC raises no event at all** (verified three times). ANC sync needs a one-shot query — see
-  [ROADMAP.md](./ROADMAP.md)
+- **ANC is pushed too**, as `0x0204` subType `0x03`, and **including from bud-side gestures** —
+  so the app's ANC circles and the widget follow a gesture made on the buds. See
+  `AncEventParser`. (An earlier revision of this file claimed ANC raised no event at all; that
+  was wrong, and it is why ANC sync took so long to land.)
+  - To receive it you must subscribe to broadcast code `0x03` in the `0x0205` registration.
+    We had only registered `01` (battery) and `02` (wearing), which is why ANC gestures
+    appeared silent.
+  - The buds' advertised broadcast codes come back in the `0x8200` reply — read it before
+    assuming an event is unsupported.
+- **The SET and NOTIFY encodings for ANC are different tables.** Setting uses bit 0 = Off,
+  bit 2 = Transparency, bits 4-7 = Deep/Medium/Light/Smart. The buds *report* Off as bit 3
+  and Transparency as bit 8. Do not unify them; see `OpoProtocol.ancPayload()`.
 - Closing the lid with buds docked kills the RFCOMM socket — used as one of the lid-state signals
 
 ### Push vs poll (the latency story)
@@ -128,11 +140,27 @@ remaining 60-second poll is now a pure keep-alive.
 | File | What it is |
 | --- | --- |
 | [ROADMAP.md](./ROADMAP.md) | The priority list. Read this first if you want to help. |
+| [**PROTOCOL.md**](./PROTOCOL.md) | **The wire format, end to end** — frame layout, every command, ANC, gestures, and the mistakes already made. Read before touching anything protocol-related. |
 | [HANDOFF.md](./HANDOFF.md) | Current state, key files, storage/log paths, known issues. |
+| [CREDITS.md](./CREDITS.md) | **Whose reverse-engineering this stands on, and which parts are ours.** Read before adding protocol constants. |
 | [GRADLE-EXPORT.md](./GRADLE-EXPORT.md) | How to take this project to a desktop Gradle setup. |
 | `testlogs/` | Not committed (git-ignored): log captures and layout reports handed over for analysis. |
 | `screenshots/` | Predate the current redesign, and **the AI agent cannot read them.** For anything about geometry or spacing, capture a layout report instead — see *Reading the layout*. |
 
+## Credits
+
+The OPPO/OnePlus/realme earbud protocol was never publicly documented. Everything this project
+knows about it came from people who reverse-engineered it first and published their work —
+most of all [Zhaoyi-ya/OppoPodsManager](https://github.com/Zhaoyi-ya/OppoPodsManager), plus
+[Leaf-lsgtky/OppoPods](https://github.com/Leaf-lsgtky/OppoPods),
+[Star-ZER0/Pods-Protocol-Reverse-Engineering](https://github.com/Star-ZER0/Pods-Protocol-Reverse-Engineering),
+[Zhaoyi-ya/OPPO-Pods-Win](https://github.com/Zhaoyi-ya/OPPO-Pods-Win) and
+[ORION2809/DevPods](https://github.com/ORION2809/DevPods).
+
+See **[CREDITS.md](./CREDITS.md)** for exactly what came from where, what is original to this
+project, and a list of previously-wrong assumptions kept on purpose.
+
 ## License
 
-GPL-3.0. See [LICENSE](./LICENSE).
+GPL-3.0. See [LICENSE](./LICENSE). Protocol references are used as documentation; check
+[CREDITS.md](./CREDITS.md) for the license of each source before copying text from it.

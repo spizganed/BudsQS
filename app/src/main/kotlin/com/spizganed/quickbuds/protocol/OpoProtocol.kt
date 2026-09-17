@@ -1,5 +1,21 @@
 package com.spizganed.quickbuds.protocol
 
+/**
+ * OPPO / OnePlus / realme earbud RFCOMM protocol constants.
+ *
+ * PROVENANCE — almost nothing here was documented by the vendor. The command
+ * numbers and payload shapes are reverse-engineered, and the main source is
+ * Zhaoyi-ya/OppoPodsManager (https://github.com/Zhaoyi-ya/OppoPodsManager),
+ * with additional framing details from
+ * Star-ZER0/Pods-Protocol-Reverse-Engineering.
+ *
+ * READ PROTOCOL.md AT THE REPO ROOT BEFORE EDITING THIS FILE. It documents the
+ * frame layout, every known command, the ANC set-vs-notify trap, and the
+ * assumptions that were already proven wrong once. CREDITS.md records which
+ * source each area came from; add to it when you add a constant here.
+ *
+ * Do not copy code from those projects without checking their licenses first.
+ */
 object OpoProtocol {
 
     const val SPP_UUID_PRIMARY = "00001107-D102-11E1-9B23-00025B00A5A5"
@@ -71,23 +87,58 @@ object OpoProtocol {
     fun queryWearingStatus(): ByteArray = buildPacket(CMD_QUERY_WEARING, seq = 0xF2)
 
     /**
-     * Subscribe to spontaneous 0x0204 notifications (battery + wearing).
+     * Subscribe to spontaneous 0x0204 notifications (battery + wearing + ANC).
      *
-     * Payload is canonical: a count byte followed by event ids. count=2 with
-     * events battery (0x01) + wearing (0x02), i.e. 02 01 02.
+     * Payload is canonical: a count byte followed by event ids.
      *
-     * CONFIRMED on device: the ACK comes back listing BOTH events, and the buds
-     * then emit 0x0204 subtype 02 on every wear change. Wear updates are
-     * effectively instant — no polling needed.
+     * CONFIRMED on device: with count=2 and events battery (0x01) + wearing (0x02),
+     * the ACK lists BOTH and the buds then emit 0x0204 subtype 02 on every wear
+     * change. Wear updates are effectively instant — no polling needed.
      *
      * The old legacy literal 01 01 02 02 was a misread: under the count-first
      * shape it means count=1 (register battery only) with 02 02 left over. The
      * firmware ACKed that happily and silently never sent wear events, which is
-     * why wear appeared to be poll-only. Do NOT revert.
+     * why wear appeared to be poll-only. Do NOT revert to that.
+     *
+     * 0x03 (ANC) WAS ADDED on 2026-09-18. The buds advertise their event ids in
+     * the 0x8200 broadcast-codes reply, which lists `01 02 03 04 08 0B F1 F2 F3` —
+     * 03 is offered, and the ANC subType 0x03 push arrived only unreliably while we
+     * had not subscribed to it. Subscribing is the documented way to make a 0x0204
+     * subType arrive, and it is how wear was fixed, so the same reasoning applies.
+     *
+     * NOT YET CONFIRMED ON DEVICE. If the ANC buttons still do not follow a gesture,
+     * check the 0x8205 ACK actually lists `01 02 03`; a firmware that rejects the
+     * longer list would ACK a shorter one, and this is the first thing to suspect.
      */
     fun registerNotifications(): ByteArray =
-        buildPacket(CMD_REGISTER_NOTIFY, payload = byteArrayOf(0x02, 0x01, 0x02))
+        buildPacket(CMD_REGISTER_NOTIFY, payload = byteArrayOf(0x03, 0x01, 0x02, 0x03))
 
+    /**
+     * SET_ANC (0x0404) payload: `01 01` then a bit field, bit `index` set.
+     *
+     * THE SET AND QUERY/NOTIFY ENCODINGS ARE DIFFERENT TABLES. Do not "unify" them.
+     *
+     * SET (this function) — bit indices below, sourced from OppoPodsManager
+     * `Protocol/OppoProtocol.Anc.cs` (AncOff/AncLight/AncMedium/AncDeep/
+     * AncTransparency, and PktAncByIndex which is this exact algorithm):
+     *
+     *     Off          01 01 01      (bit 0)
+     *     Transparency 01 01 04      (bit 2)
+     *     Deep         01 01 10      (bit 4)
+     *     Medium       01 01 20      (bit 5)
+     *     Light        01 01 40      (bit 6)
+     *     Smart        01 01 80      (bit 7)
+     *     Adaptive     01 01 00 08   (bit 8, 4-byte payload)
+     *
+     * QUERY reply / 0x0204 subType 0x03 NOTIFY use bits 3 and 8 instead:
+     * 0x0008 Off, 0x0100 Transparency(+voice enhance off), 0x0010 Deep,
+     * 0x0020 Medium, 0x0040 Light, 0x0080 Smart, 0x0000 0x0002/0x0008 Adaptive.
+     * Those live in AncEventParser and are deliberately NOT reused here.
+     *
+     * WARNING / DO NOT REPEAT: this table was briefly "corrected" to the notify
+     * bits (Off->3, Transparency->8) on the theory that set and query must agree.
+     * They do not. That change sent the wrong bits. It is reverted.
+     */
     private fun ancPayload(index: Int): ByteArray {
         val byteCount = index / 8 + 1
         val arr = ByteArray(2 + byteCount)
@@ -104,6 +155,7 @@ object OpoProtocol {
     fun ancMedium(): ByteArray = buildPacket(CMD_SET_ANC, payload = ancPayload(5))
     fun ancLight(): ByteArray = buildPacket(CMD_SET_ANC, payload = ancPayload(6))
     fun ancSmart(): ByteArray = buildPacket(CMD_SET_ANC, payload = ancPayload(7))
+    fun ancAdaptive(): ByteArray = buildPacket(CMD_SET_ANC, payload = ancPayload(8))
 
     private fun featurePayload(featureId: Int, on: Boolean): ByteArray =
         byteArrayOf(featureId.toByte(), if (on) 0x01 else 0x00)

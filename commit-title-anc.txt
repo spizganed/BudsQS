@@ -1,0 +1,12 @@
+Credit sources; fix ANC set; add PROTOCOL.md
+
+- Add PROTOCOL.md, the wire format end to end, every claim tagged
+  VENDOR/OSS/CAPTURE/GUESS.
+- Add CREDITS.md: whose reverse-engineering this stands on, what is
+  ours, and the assumptions already proven wrong.
+- Fix the ANC SET bits for Off and Transparency. SET and NOTIFY use
+  different tables; I had wrongly unified them.
+- Accept "Transparency" and "Trans" in the ANC tap handler; add the
+  missing widget refresh on app-side changes.
+- Note gesture-config commands for the next feature (blocked on the
+  function enum, not guessed).

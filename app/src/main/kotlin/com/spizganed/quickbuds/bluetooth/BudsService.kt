@@ -292,6 +292,24 @@ class BudsService : Service(), BudsConnectionManager.Listener {
         AncWidgetProvider.refreshAll(this)
     }
 
+    /**
+     * ANC mode changed ON THE BUDS (0x0204 subType 0x03).
+     *
+     * Same contract as onGameModeState above: persist, then let the store listener
+     * repaint both surfaces. Nothing here touches views directly.
+     *
+     * The equality check is what makes OUR OWN command's echo a no-op, so a gesture
+     * and a tap cannot fight each other over the last write.
+     */
+    override fun onAncModeState(mode: String) {
+        val st = WidgetStateStore.read(this)
+        if (st.ancMode == mode) return
+        st.ancMode = mode
+        statusLog("[SVC] ANC mode (from buds): $mode")
+        WidgetStateStore.write(this, st)
+        AncWidgetProvider.refreshAll(this)
+    }
+
     companion object {
         const val ACTION_FORCE_CONNECT = "com.spizganed.quickbuds.FORCE_CONNECT"
         const val ACTION_FORCE_DISCONNECT = "com.spizganed.quickbuds.FORCE_DISCONNECT"
