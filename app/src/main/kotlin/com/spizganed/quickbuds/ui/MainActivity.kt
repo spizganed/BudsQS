@@ -1466,11 +1466,12 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
         )
 
         // --- 6. Earbud controls (gesture config) ---
-        // Placed above App update, as requested. The screen it opens is complete
-        // and stores its selections, but does NOT write them to the buds yet: the
-        // `function` enum's NAMES for setKeyFunction (0x0402) are still unknown,
-        // and a guessed value is the mistake that already cost this project a
-        // regression. See GestureConfigStore and PROTOCOL.md §6.
+        // Placed above App update, as requested. The screen it opens writes the
+        // selections to the buds and reads the table back to confirm. The `function`
+        // bytes were MEASURED rather than guessed (see GestureAction), and the write
+        // command is the WRITE_TABLE constant in OpoProtocol — do not describe its
+        // number here, because it has already been wrong once and a comment in a
+        // second file is one more place to go stale.
         addRow(
             SettingRowFactory.build(
                 this, R.drawable.ic_gesture, R.string.row_gesture_title, R.string.row_gesture_sub,

@@ -54,6 +54,21 @@ object KeyFunctionParser {
      */
     const val HEADER_SIZE = 2
 
+    /**
+     * The `button` id this app writes bindings to: the physical-button group.
+     *
+     * 0x01 is the ONLY group we touch. Every F1 frame this project has captured carries
+     * `btn=0x01` on both buds, so that is the group the user actually presses.
+     *
+     * The reply also carries a `btn 0x06` group (`act 02/03/06`) whose meaning is unknown
+     * — no capture has ever reported it. It is left strictly alone: a write sends the
+     * whole table rebuilt from the last reading, so that group goes back byte-for-byte
+     * untouched. `writeGestureBinding()` matches on button as well as side for the same
+     * reason — `act 0x02` exists in BOTH groups, so matching on side+action would change
+     * a second binding with nothing in our UI to show for it.
+     */
+    const val BUTTON_PRIMARY = 0x01
+
     data class Entry(
         val deviceType: Int,
         val button: Int,
@@ -156,5 +171,92 @@ object KeyFunctionParser {
         }
         sb.append(" RAW=[").append(raw).append(']')
         return sb.toString()
+    }
+
+    /**
+     * Canonical, order-independent signature of a reading: one
+     * `dev=0x01/btn=0x01 act=0x02 -> 0x11` token per entry, sorted.
+     *
+     * A PLAIN STRING on purpose, so it can be STORED between connections. The
+     * experiment this exists for requires disconnecting our app — the vendor app needs
+     * the RFCOMM socket — and reconnecting it, which may restart the process. An
+     * in-memory baseline would be lost exactly in the gap it exists to span, and a lost
+     * baseline is indistinguishable from "nothing changed".
+     */
+    fun signature(table: Table): String =
+        table.entries
+            .map { slotOf(it) + " -> " + "0x%02X".format(it.function) }
+            .sorted()
+            .joinToString("; ")
+
+    /** `dev=0x01/btn=0x01 act=0x02` — the part of an entry a function is bound TO. */
+    private fun slotOf(e: Entry): String =
+        "dev=0x%02X/btn=0x%02X act=0x%02X".format(e.deviceType, e.button, e.action)
+
+    /**
+     * Describes ONLY what moved between two readings, which is the whole reason the
+     * reply is read: change ONE gesture in the vendor app and the single `fn` that
+     * moved names that function's value. The line is built for exactly that reading:
+     *
+     *     dev=0x01/btn=0x01 act=0x02: 0x00 -> 0x12
+     *
+     * A slot present in only ONE of the two is reported as added/removed, because a
+     * missing entry is a different fact from a changed one — and on this firmware a
+     * slot does appear and disappear as a binding is cleared.
+     *
+     * NO CHANGE is stated explicitly rather than returning an empty string, because it
+     * is a REAL RESULT here: rebinding the HOLD cannot move `fn` at all (the vendor app
+     * offers the hold only the ANC cycle), so "nothing moved" is the expected outcome
+     * of that particular experiment and must not be readable as a failure to run.
+     */
+    fun diff(previous: String, current: String): String {
+        val before = parseSignature(previous)
+        val after = parseSignature(current)
+        if (before.isEmpty() && after.isEmpty()) return "unreadable baseline and reading"
+
+        val changed = ArrayList<String>()
+        for (slot in (before.keys + after.keys).sorted()) {
+            val a = before[slot]
+            val b = after[slot]
+            when {
+                a == null -> changed.add("$slot added: 0x%02X".format(b!!))
+                b == null -> changed.add("$slot removed (was 0x%02X)".format(a))
+                a != b -> changed.add("$slot: 0x%02X -> 0x%02X".format(a, b))
+            }
+        }
+        return if (changed.isEmpty()) {
+            "NO CHANGE (${after.size} slots identical)"
+        } else {
+            changed.joinToString(" | ")
+        }
+    }
+
+    /** `dev=0x01/btn=0x01 act=0x02 -> 0x11` tokens -> slot to function. */
+    private fun parseSignature(sig: String): Map<String, Int> {
+        val out = HashMap<String, Int>()
+        for (token in sig.split(';')) {
+            if (token.isBlank()) continue
+            val at = token.lastIndexOf(" -> ")
+            if (at <= 0) continue
+            val fn = parseHex(token.substring(at + 4)) ?: continue
+            out[token.substring(0, at).trim()] = fn
+        }
+        return out
+    }
+
+    /**
+     * Reads a `0x`-prefixed hex byte out of a signature, or null if it is not one.
+     *
+     * WHY NOT `toIntOrNull(16)`: that delegates to `Integer.parseInt`, which REJECTS a
+     * `0x` prefix. Since [signature] writes exactly that prefix, the naive call returns
+     * null for EVERY field, so [parseSignature] yields an empty map for both readings and
+     * every diff silently reports "unreadable baseline and reading" — a failure that
+     * looks like an inconclusive experiment rather than a bug. Strip the prefix first.
+     */
+    private fun parseHex(s: String): Int? {
+        val t = s.trim()
+        val body = if (t.startsWith("0x", ignoreCase = true)) t.substring(2) else t
+        if (body.isEmpty()) return null
+        return body.toIntOrNull(16)
     }
 }

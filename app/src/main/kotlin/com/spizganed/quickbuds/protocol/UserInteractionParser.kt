@@ -28,16 +28,68 @@ package com.spizganed.quickbuds.protocol
  *     byte1 = button id   model dependent (0x06 on Enco Air5 Pro)
  *     byte2 = action      0x00 single, 0x02 double, 0x03 triple,
  *                         0x04 long press, 0x07 slide up, 0x08 slide down
- *     byte3 = modifier    non-zero on some long presses
+ *                         for the taps this is ALSO the key-function `act` — see below
+ *     byte3 = the bound FUNCTION, as the buds report it — matching the 0x8108 reply's
+ *                         `function` byte. See the correspondence below.
  *     byte4 = context
  *     then  = int16 options, little endian
  *
- * WHY THIS MATTERS (do not delete): ANC changes made on the BUDS raise no 0x0204
- * subtype event — verified three times. The open question after every ANC gesture
- * capture has been "did the buds say nothing at all, or did they speak in a frame we
- * simply don't name?" This is the candidate for the second case. Until a capture shows
- * an F1 frame landing ~a second after a gesture, the link is UNPROVEN — treat the F1
- * log line as diagnostic evidence, not as a control signal.
+ * THE OLD CLAIM HERE WAS WRONG — do not restore it. This comment used to say "ANC
+ * changes made on the BUDS raise no 0x0204 subtype event — verified three times".
+ * They DO: subType 0x03, mapped in AncEventParser, and the belief survived three
+ * captures only because `noteUnattributed` blanket-excludes cmd 0x0204, so an
+ * undecoded subType printed nothing at all (PROTOCOL.md §5).
+ *
+ * WHAT THE F1 FRAME IS FOR: it says WHEN, and which side and action. On a real ANC
+ * hold, F1 lands FIRST and the 0x0204 subType 0x03 frame follows 1.3-2.0 s later
+ * (capture: local/logs/anc-cycle-gesture-4stop.txt). So a capture window that stops
+ * at the F1 line misses the answer, and the F1 log line stays diagnostic evidence,
+ * never a control signal.
+ *
+ * THE CONCLUSION THAT USED TO SIT HERE WAS TOO STRONG, and it is kept only so it is not
+ * restored. It read "byte3 is identical for every gesture of the same action+side,
+ * therefore it cannot say what the gesture did", with two long presses — one cycling ANC,
+ * one firing voice assistant — offered as the proof. That example cannot exist: the hold
+ * is offered only the ANC modes, so a hold cannot be bound to voice assistant, and a
+ * binding is one function per (device, button, action) anyway. The observation never
+ * supported the conclusion.
+ *
+ * BYTE2 AND BYTE3 ARE THE KEY-FUNCTION MAPPING. PROTOCOL.md §6.1 asked whether byte3
+ * carries the bound function. It does — and byte2 carries the key-function *action*
+ * number, so the F1 frame is the key-function entry for the gesture that fired:
+ *
+ *     F1 payload      byte2  byte3   key-function entry      its fn
+ *     01 01 01 01 0x    01     01     dev=01/btn=01 act 01     0x01
+ *     01 01 02 06 0x    02     06     dev=01/btn=01 act 02     0x06
+ *     01 01 03 05 0x    03     05     dev=01/btn=01 act 03     0x05
+ *     01 01 04 08 0x    04     08     dev=01/btn=01 act 04     0x08
+ *
+ * Four independent slots, four DIFFERENT function values, all matching — that is not a
+ * coincidence, and byte2 == the key-function `act` in every one of them. The F1 numbering
+ * is therefore NOT the key-function numbering (as §6.1 already warned); byte2 here is
+ * already a key-function `act`, not an F1 action id.
+ *
+ * AN EARLIER REVISION OF THIS COMMENT CLAIMED THE OPPOSITE, using this frame as its
+ * counter-example:
+ *
+ *     payload F1 01 01 00 00 03   byte2 = 0x00, byte3 = 0x00 (parsed as "single tap")
+ *     key-function table:         act 01 -> fn 0x01
+ *
+ * byte3 (0x00) is not fn (0x01), so the theory was declared dead. That was too hasty:
+ * byte2 = 0x00 is not a key-function `act` at all (the table has none — its acts are
+ * 1..6), so this frame is not the single-tap BINDING entry and is not comparable to one.
+ * It is very likely a different event (a touch/tap report rather than a binding firing),
+ * which also means the [OSS] reading of 0x00 as "single tap" is suspect.
+ *
+ * STILL UNEXPLAINED, and the reason this is not written as settled:
+ *   - slides. byte2 0x07 / 0x08 give byte3 0x05 / 0x06, while the slide slot's fn is
+ *     0x0A. Possibly "switch track" (0x0A) is a COMPOSITE that the firmware reports
+ *     per-direction as prev (0x05) and next (0x06) — coherent, but unproven.
+ *   - whether byte2 is ever an F1 action number, or always a key-function `act`.
+ *
+ * So: this frame MAY carry the function, and the evidence for that is now strong rather
+ * than absent. It is still not a control signal — nothing may switch on byte3 until the
+ * two outliers above are explained.
  */
 object UserInteractionParser {
 

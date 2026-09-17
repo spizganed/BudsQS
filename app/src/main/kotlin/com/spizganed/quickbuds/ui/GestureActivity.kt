@@ -1,6 +1,7 @@
 package com.spizganed.quickbuds.ui
 
 import android.app.Activity
+import android.content.Intent
 import android.graphics.Typeface
 import android.os.Bundle
 import android.view.Gravity
@@ -11,6 +12,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import com.spizganed.quickbuds.R
+import com.spizganed.quickbuds.bluetooth.BudsService
 
 /**
  * Earbud controls — bind a gesture to an action, per bud.
@@ -129,11 +131,13 @@ class GestureActivity : Activity() {
         }
         column.addView(gestureList)
 
-        // The honest note. Deliberately below the list and in secondary colour: it
+        // The status note. Deliberately below the list and in secondary colour: it
         // is information, not an error state, and it must not look like a warning
-        // that something failed.
+        // that something failed. It states what actually happens now — a write to the
+        // buds, read back to confirm — rather than the old "phone only", which the
+        // measured enum made untrue.
         column.addView(TextView(this).apply {
-            setText(R.string.gesture_not_written)
+            setText(R.string.gesture_write_note)
             setTextColor(ThemeRes.color(this@GestureActivity, R.attr.appColorTextSecondary))
             textSize = 12f
             setPadding(dp(4f), dp(16f), dp(4f), dp(8f))
@@ -165,6 +169,50 @@ class GestureActivity : Activity() {
     private fun selectSide(newSide: GestureSide) {
         side = newSide
         render()
+    }
+
+    /**
+     * Sends ONE gesture's new binding to the buds.
+     *
+     * Goes through BudsService rather than binding it here, which is the same pattern
+     * Dev Tools uses for Reconnect/Disconnect: the service already owns the connection
+     * and the manager, and an Activity that bound the service itself would need its own
+     * lifecycle handling for no gain.
+     *
+     * This is fire-and-forget on purpose. The write is confirmed by the SERVICE re-reading
+     * the table and logging the resulting diff (`KEYFN DIFF:`), not by a callback into
+     * this screen — the write crosses a socket to a device that may be asleep, and a UI
+     * that waited for it would either lie about success or stall. If no table has been read
+     * yet the manager REFUSES the write and says so in the log, rather than inventing the
+     * other entries; that refusal is deliberate, not a silent no-op.
+     *
+     * WHICH BUTTON GROUPS ARE WRITTEN comes from [Gesture.keyFnButtons], not from a
+     * constant here. That is not tidiness — hardcoding `btn 0x01` is exactly what broke
+     * slide, because slide's slots moved out of `0x01` and the writes kept going to the
+     * old address and silently doing nothing.
+     *
+     * THE HOLD'S EMPTY CASE SENDS NOTHING, and that is deliberate too. Measured on the
+     * device: clearing the hold's function byte to `0x00` does NOT stop the ANC cycle —
+     * the very next long press still changed the noise mode. So writing `0x00` cannot turn
+     * the gesture off; all it does is make the buds' stored table disagree with what the
+     * gesture actually does. Sending nothing keeps the table honest. Turning the cycle off
+     * for real needs the separate `setSupportNoiseReduction` (`0x0404`) command — see
+     * [GestureConfigStore] and PROTOCOL.md §5.
+     */
+    private fun writeToBuds(gesture: Gesture, actions: List<GestureAction>) {
+        if (gesture == Gesture.TAP_HOLD && actions.isEmpty()) {
+            // Nothing to send: `0x00` does not disable the cycle, so writing it would only
+            // corrupt the table's description of a gesture that still works.
+            return
+        }
+        val intent = Intent(this, BudsService::class.java).apply {
+            action = BudsService.ACTION_SET_GESTURE
+            putExtra(BudsService.EXTRA_GESTURE_DEVICE, side.deviceType)
+            putExtra(BudsService.EXTRA_GESTURE_ACTION, gesture.keyFnAction)
+            putExtra(BudsService.EXTRA_GESTURE_BUTTONS, gesture.keyFnButtons)
+            putExtra(BudsService.EXTRA_GESTURE_FUNCTION, GestureAction.functionByteFor(actions))
+        }
+        startService(intent)
     }
 
     /**
@@ -295,6 +343,7 @@ class GestureActivity : Activity() {
                         selected = selected.contains(action),
                         onClick = {
                             GestureConfigStore.save(this, side, gesture, listOf(action))
+                            writeToBuds(gesture, listOf(action))
                             render()
                         }
                     )
@@ -319,6 +368,10 @@ class GestureActivity : Activity() {
                     // deterministic and matches the list the user just saw.
                     val ordered = options.filter { working.contains(it) }
                     GestureConfigStore.save(this, side, gesture, ordered)
+                    // Only reached with a VALID selection (none, or two or more), so this
+                    // is the point the hold is actually committed — the exactly-one case
+                    // above returns early without saving.
+                    writeToBuds(gesture, ordered)
                     sheet.close()
                     render()
                 }

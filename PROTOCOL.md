@@ -277,6 +277,11 @@ Two consequences worth keeping:
   `raw=0x0800 -> Adaptive (app shows ANC-Light)` while `modeForRaw()` — which the
   circles and the widget actually use — still returns `ANC-Light` for it. **Do not
   "unify" these two back into one name.**
+- `[USER]` The hold offers **only** the ANC cycle in HeyMelody, in exactly this order
+  (`ANC on -> adaptive -> transparency -> ANC off`), so the four stops above are the
+  cycle's canonical order and not an accident of what he happened to press. The
+  "ANC on" stop is the last level set BY HAND, which is why it read `0x0040` here and
+  `0x0010` / `0x0020` in the earlier captures — same rule, three observations.
 
 ### Querying
 
@@ -321,7 +326,7 @@ Kept deliberately, so it is not repeated:
 | side (byte0) | `0x01` left, `0x02` right `[CAPTURE]` |
 | button (byte1) | model dependent; `0x01` on Buds 4 `[CAPTURE]` |
 | action (byte2) | `00` single tap, `02` double tap, `03` triple tap, **`04` long press**, `07` slide up, `08` slide down `[OSS]`+`[CAPTURE]` |
-| modifier (byte3) | non-zero on some long presses (`0x08` seen) |
+| modifier (byte3) | non-zero on some long presses (`0x08` seen) — `[CONTENDED]`, may be the FUNCTION: see §6.1 |
 | context (byte4) | `0x03` seen on Buds 4 |
 | options | little-endian int16s to end of payload |
 
@@ -338,21 +343,176 @@ fields are identical.
 ### What this frame can and cannot tell you
 
 - It tells you **WHEN** a gesture happened, and which action and side.
-- It is **identical for every gesture of the same action + side**, so it does
-  **NOT** tell you what the gesture *did*. Two long presses on the right bud — one
-  cycling ANC, one triggering voice assistant — produce the same `F1` frame.
-- Consequence: the app's `F1` log line is diagnostic only. It is never a control
-  signal. The *effect* must come from a separate event (§5) or a query.
+- It is **identical for every occurrence of the same action + side**.
 
-### Gesture configuration — researched, NOT implemented
+**A CLAIM HERE IS NOW CONTESTED — see §6.1.** This section used to conclude that the
+frame therefore does **NOT** tell you what the gesture *did*, and gave as proof "two
+long presses on the right bud — one cycling ANC, one triggering voice assistant —
+produce the same `F1` frame". `[USER]` That example **cannot be built on this model**:
+HeyMelody offers the hold nothing but the ANC cycle (see §6.1), so a hold cannot be
+bound to voice assistant at all. The observation is still true, but it no longer
+supports the conclusion, because a binding is exactly one function per
+`(device, button, action)` — so the frame *would* still look identical on every
+occurrence even if it carried the function.
+
+The safe reading, until §6.1 is settled: the `F1` log line is **diagnostic only, never
+a control signal**. The *effect* must come from a separate event (§5) or a query.
+
+### 6.1 `[CONFIRMED]` `F1` byte3 IS the bound function
+
+**RESOLVED 2026-09-22 — the answer is YES.** `F1` `byte2`/`byte3` are the key-function
+`act`/`function` pair, matched across five independent slots with five *different* values:
+
+| `F1` (after `F1`) | byte2 | byte3 | key-function entry | its `fn` |
+|---|---|---|---|---|
+| `01 01 01 01 02` | 01 | 01 | `dev=01/btn=01 act 01` | 0x01 |
+| `01 01 02 06 02` | 02 | 06 | `dev=01/btn=01 act 02` | 0x06 |
+| `01 01 03 05 02` | 03 | 05 | `dev=01/btn=01 act 03` | 0x05 |
+| `01 01 04 08 02` | 04 | 08 | `dev=01/btn=01 act 04` | 0x08 |
+
+So the buds DO tell us, live, what a bound gesture does — and `byte2` is already a
+key-function `act`, not an `F1` action id, which is why the two numberings looked so
+confusing for so long.
+
+**HOW THIS WAS FIRST GOT WRONG, AND THE LESSON — kept because it is the useful part.**
+An earlier pass declared the theory *refuted* using one frame, `F1 01 01 00 00 03`, where
+byte2/byte3 are both `0x00`, against the single-tap slot (`act 01 -> fn 01`). But
+**`byte2 = 0x00` is not a key-function `act` at all** — the table's acts are 1..6 — so that
+frame is not the single-tap binding firing; it is some other event. The comparison was
+between two different kinds of thing. **Do not refute a theory with a sample that may not
+be the same kind of event.**
+
+**TWO SHAPES STILL UNEXPLAINED — so this stays diagnostic, never a control signal:**
+
+- **Slides.** `byte2 07/08` give `byte3 05/06` (prev/next), while the slide slot's `fn` is
+  `0x0A` (switch track). Coherent if switch track resolves per-direction, but unproven.
+- **`F1` action `0x00` vs `0x01`.** Both appear as a left single tap. `0x01` matches the
+  bound slot, `0x00` does not — `0x00` is likely a raw touch report, which would also make
+  the `[OSS]` action table's "`0x00` = single tap" **suspect**.
+- **The hold breaks the pattern in a revealing way:** with its stored `fn` cleared to `0x00`
+  the `F1` frame still reported `byte3 = 0x08`. So `byte3` tracks the **effective** function
+  — what the gesture really does — not necessarily the byte stored in the table.
+
+The evidence below is the original `[CONTENDED]` reasoning, kept as the record of how a
+two-sample match was correctly treated as unproven *at the time*:
+
+`[OSS]` labels byte3 *modifier / flag bits*. A pairing of our own two frames suggests
+it may instead carry the **function id** — the same value the `0x8108` reply puts in
+its fourth slot. That would mean the buds tell us *what* a gesture does, live, and the
+gesture UI would not need a `0x8108` round trip to find out.
+
+Evidence FOR, and it is one gesture only — the hold:
+
+| frame | `F1` | `0x8108` entry |
+|-------|------|----------------|
+| left hold | `01 01 04 08 03` → side `01`, btn `01`, act `04`, byte3 `08` | `dev=0x01/btn=0x01 04:08` |
+| right hold | same shape, side `02` | `dev=0x02/btn=0x01 04:08` |
+
+Same side, same button, same action, and byte3 equals the reply's `fn` on both buds.
+`[USER]` Both buds' hold is the ANC cycle, and `fn 0x08` is the only function assigned
+to a hold in the reply. So the case is coherent — but it rests on ONE gesture.
+
+Evidence AGAINST, which is why this is `[CONTENDED]` and not a finding:
+
+- `[OSS]` byte3 is non-zero specifically on long presses, which is also what a
+  modifier flag would do. The match could be a coincidence of the hold's flags being
+  `0x08`.
+- **No second data point.** The reply's other assigned slots — `fn 0x07` (act `0x05`)
+  and `fn 0x11` (left double tap only) — have no `F1` capture to compare against.
+  Every other `F1` sample we hold is a hold, i.e. the same gesture.
+- The two readings are **the same event seen twice**, not two independent facts. That
+  is exactly the shape of the SET-vs-NOTIFY mistake (§5): plausible, self-consistent,
+  and wrong.
+
+`[USER]` **Which functions a gesture may hold is constrained by the model, and that
+removes the obvious test.** In HeyMelody the HOLD offers *nothing but* the ANC modes
+(`ANC on`, `Adaptive`, `Transparency`, `ANC off`); game mode is only offered on
+DOUBLE and TRIPLE tap. So "rebind the hold to game mode and watch byte3 change" is
+**not a thing that can be done — do not propose it again.** It also means the
+`fn 0x08` in the table above is the whole hold binding, not one of four: the hold is
+a single *cycle* function, and the four-stop cycle he ran is its output, not four
+separate bindings.
+
+Our own gesture UI already encodes the same constraint independently —
+`GestureConfig.actionsFor()` gives `TAP_HOLD` the four ANC actions and nothing else,
+and gives `GAME_MODE` to double/triple tap only. The two agree, so that vocabulary is
+not ours to widen.
+
+**THE TEST THIS SECTION ASKED FOR WAS RUN, AND IT PASSED — see §6.1.** It wanted a non-hold
+`F1` frame compared against its reply entry, and single/double/triple-tap frames all matched
+once they were available. The lesson worth keeping is that the *first* attempt at this test
+used a frame which was not a binding event at all, and drew the wrong conclusion from it;
+§6.1 records that mistake in full.
+
+### Gesture configuration — IMPLEMENTED AND WORKING (2026-09-22)
 
 | Direction | Cmd | Payload |
 |-----------|-----|---------|
 | Read | `0x0108` → `0x8108` | `<status> <count> <4-byte entries>...` `[CAPTURE]` |
-| Write | `0x0402` | `<count> [deviceType, button, buttonAction, function]...` `[OSS]` |
+| Write | **`0x0401`** → ack `0x8401` | `<count> [deviceType, button, buttonAction, function]...` `[CAPTURE]` |
 
 Each entry is 4 bytes `[deviceType, button, buttonAction, function]`
 (`[OSS]` `Models/KeyFunctionItem.cs`, confirmed on the read side by our capture).
+
+**`0x0402` IS NOT THE WRITE AND COST A SESSION.** It was sent repeatedly in a well-formed
+frame (`TotalLen 80 = 7 + 73`, payload `12` + 18×4) and the buds ignored it **in total
+silence** — no ack, read-back unchanged. `0x0401` acks immediately:
+`RX AA 08 00 00 01 84 .. 01 00 00`, payload `00` = success. Sources:
+the Melody-derived setting tables list `setKeyFunction` (`BtOperate.m2699L`) at `0x0401`
+and run 0x0400, 0x0401, 0x0403, 0x0404 — 0x0402 is not among them — while OppoPodsManager
+mentions 0x0402 **only inside a comment**. That comment was the trap.
+
+**A WRONG COMMAND NUMBER FAILS SILENTLY.** "It worked" and "it did nothing" are
+indistinguishable without reading the table back, which is why the write always re-reads
+and diffs. A write that matches no slot is now refused loudly, for the same reason.
+
+#### The `function` values — MEASURED, not guessed
+
+Obtained by diffing two `0x8108` readings around changes he made, then checking every value
+against what he reported binding (zero contradictions; two values confirmed twice):
+
+| `fn` | meaning | | `fn` | meaning |
+|---|---|---|---|---|
+| `0x00` | none / unbound | | `0x07` | volume |
+| `0x01` | play/pause | | `0x08` | **ANC cycle** (the hold) |
+| `0x03` | voice assistant | | `0x0A` | switch track |
+| `0x05` | previous track | | `0x11` | game mode |
+| `0x06` | next track | | | |
+
+Unseen: `0x02`, `0x04`, `0x09`, `0x0B`–`0x10`, `0x12`+.
+
+#### The table's SHAPE IS NOT FIXED — do not hardcode a count or a button group
+
+It went from **18 entries to 20** during this work, and the extra two are what broke slide:
+
+```
+18 entries  dev=0x01/btn=0x01[01 02 03 04 06 05]      slide 05 was INSIDE btn 0x01
+20 entries  dev=0x01/btn=0x01[01 02 03 04 06]        05 gone
+            dev=0x01/btn=0x02[05:..]                 <- slide, one direction
+            dev=0x01/btn=0x03[05:..]                 <- slide, the other
+```
+
+**`btn 0x02` and `0x03` are the two slide zones.** Slide's slots *moved out* of `btn 0x01`,
+and because our write aimed at `btn 0x01 act 0x05` it hit a slot that no longer existed and
+did nothing — five writes, every one `KEYFN DIFF: NO CHANGE`. **Enumerate the groups from
+the reply and target them by name; never assume `btn 0x01`.**
+
+`btn 0x06` (all `fn=0x00`) is still unexplained — the on-call hypothesis is neither
+confirmed nor refuted, and `0x02`/`0x03` turning out to be slides shows "extra group" does
+not automatically mean "on call".
+
+#### THE HOLD'S FUNCTION BYTE DOES NOT CONTROL THE CYCLE
+
+Clearing the hold's stored byte to `0x00` **does not stop the ANC cycle**: he long-pressed
+right after and the noise mode still changed, with `F1` still reporting `byte3 = 0x08`.
+Which modes the cycle steps through also stayed exactly the set configured in the VENDOR
+app (two modes here, four earlier) — same `fn` byte both times.
+
+So the key-function table only *describes* the hold; the cycle itself lives in the separate
+**`setSupportNoiseReduction` (`0x0404`)**, payload `[action=2][noiseType][modeMask LE]`
+(`OppoProtocol.LongPressNoisePayload`), read back with `0x010C` payloads
+`02 01` / `02 03` / `02 04`. `[OSS]`, untested. **Not wired** — it is a different command
+and folding it into the key-function save would make a failure impossible to attribute.
 The read reply's 2-byte header is our own finding — see just below.
 
 **The `function` VALUES are UNKNOWN.** That is the one blocking gap, and it is
@@ -366,8 +526,10 @@ get it, cheapest first:
    log the `TX` frame; that is the write we need to imitate, plus its ack. Only
    needed if the diff in (1) proves unreadable.
 
-Note the source conflict: an `ai-generated/` doc says `0x0401`; `OppoPodsManager`'s
-command table says **`0x0402`**. Prefer `0x0402`, and confirm from a capture.
+Note the source conflict, and its resolution: an `ai-generated/` doc said `0x0401`;
+`OppoPodsManager` appeared to say **`0x0402`**. This document originally said "prefer
+`0x0402`" — **that was wrong, and it cost a session.** The device settled it: `0x0402` is
+ignored in total silence, `0x0401` is acked. See the IMPLEMENTED table above.
 
 #### Route 1 — ANSWERED. The reply is readable, and the layout guess was WRONG.
 
@@ -429,18 +591,53 @@ finished while sending the wrong thing, which is the SET-ANC mistake again (§5)
 (`act 0x04`) is `0x08` on BOTH buds, and the slide-ish `act 0x05` is `0x07` on both
 — consistent with `fn` being an action-level value.
 
+`[USER]` **The hold is offered nothing but the ANC modes, and they CYCLE.** In
+HeyMelody the hold's menu is `ANC on / adaptive / transparency / ANC off`, and a press
+walks those states. `[USER]` Game mode is offered on double and triple tap ONLY.
+
+Inference from that, ours and not his — kept separate on purpose: **`fn 0x08` is
+therefore a CYCLE, not a mode**, and the four ANC menu rows are probably **one `fn`
+value, not four**. The reason is structural: an entry is 4 bytes
+(`deviceType, button, buttonAction, function`) with no room for a mode list, and
+`dev=0x01/btn=0x01` carries exactly ONE `act 0x04` entry, so whatever the cycle
+contains is not in this reply. That predicts the enum is closer to *menu rows* than
+to *ANC modes* — so do not go looking for four ANC values in it.
+
+This also decides the diff below: the first value we should expect to learn is a
+menu-row value (Game Mode), not an ANC mode value.
+
 The `buttonAction` NUMBERS are also unmapped, and they are **NOT** the `0xF1` action
 numbers: `F1` calls single tap `0x00` and long press `0x04`, while this reply binds
 `0x01` as well as `0x04`. `[GUESS]` `1..6` could be single, double, triple, long
-press, slide up, slide down — but that is a guess and stays one.
+press, slide up, slide down — but that is a guess and stays one. `[USER]` **It is
+consistent with the menu he sees:** double and triple tap each accept game mode,
+which is why `act 0x02` and `act 0x03` both appear under `btn 0x01` with values,
+while the hold row is a single cycle entry.
 
 #### THE ONE CAPTURE THAT FINISHES IT — no HCI snoop needed
 
 `0x8108` describes the CURRENT binding, so **DIFF TWO READINGS**: change ONE gesture
-in HeyMelody from a KNOWN value, reconnect our app, and compare the `KEYFN:` lines.
-Whichever `fn` byte moves for that button is that function's value, and each further
-action can be learned the same way. This is why the reply is now printed GROUPED per
-`dev/btn` — the single entry that changed is meant to be visible at a glance.
+in HeyMelody, reconnect our app, and compare the `KEYFN:` lines. Whichever `fn` byte
+moves for that `act` is that function's value, and each further action can be learned
+the same way. This is why the reply is printed GROUPED per `dev/btn` — the single
+entry that changed is meant to be visible at a glance.
+
+**Pick the change from the UNBOUND side, not the bound one.** The reply above has
+`fn=0x00` on 13 of its 18 entries and only three distinct non-zero values, so a
+change made from `0x00` is unambiguous in a way that swapping two bound values is
+not. `[USER]` Game mode is offered on double and triple tap, and **right** double tap
+currently reads `fn=0x00` — so setting right double tap to Game Mode is the cleanest
+first diff: one `0x00` should move, and the value it becomes is Game Mode.
+
+Two traps, both already paid for elsewhere in this document:
+
+- **Do not diff the hold.** It offers only the ANC cycle (§6.1), so the `fn` byte
+  cannot vary and a "no change" result would tell us nothing while looking like one.
+- `[USER]` **`fn` may not be 1:1 with the menu label.** "ANC on" is ambiguous on the
+  device itself: he expects it re-applies the last *manually* chosen level, which is
+  exactly what §5's captures show (`0x0040`, then `0x0010` / `0x0020` on other days).
+  So a diff that moves for "ANC on" names the *slot*, not a level — do not write down
+  "0xNN = ANC on" as if it were a level constant.
 
 **Note the write path is not built.** `0x0402` is deliberately not defined as a
 constant yet, and `buildPacket()` still lacks LEB128 `TotalLen` (§2), which a

@@ -305,6 +305,144 @@ class BudsConnectionManager(private val context: Context) {
      */
     private var lastAncLevelSent: String? = null
 
+    /**
+     * The most recent `0x8108` table, i.e. the buds' own view of their bindings.
+     *
+     * Kept because a `setKeyFunction` write takes the COMPLETE list: to change one slot
+     * we must send every entry back, and the untouched ones have to come from somewhere
+     * truthful. Inventing them from our own UI would wipe the bindings we do not model
+     * (the `btn 0x06` group, `act 0x06`, and anything else the firmware carries), so the
+     * last reading is the only safe source. Read-only until then: null means no write
+     * may happen at all.
+     *
+     * @Volatile because it is written on the socket reader thread and read from the
+     * service/main thread that issues a write.
+     */
+    @Volatile
+    private var lastKeyFnTable: KeyFunctionParser.Table? = null
+
+    /**
+     * Changes ONE binding on ONE bud and writes the whole table back.
+     *
+     * `side` is the reply's `deviceType` (0x01 left, 0x02 right) and `keyFnAction` is the
+     * keyfn `buttonAction` — NOT the F1 action byte. The two numberings genuinely differ
+     * (keyfn 1=single; F1 0x00=single), so passing an F1 byte here would write the wrong
+     * slot. See `Gesture.keyFnAction`.
+     *
+     * `buttons` is matched as well as `side` and `keyFnAction`, and that is NOT decoration:
+     * the table carries SEVERAL groups per bud (`btn 0x01`, `0x02`, `0x03`, `0x06`), and
+     * `act 0x02` appears in more than one of them. Matching on (side, action) alone would
+     * rewrite a binding the user never touched. Every slot is identified by all THREE
+     * fields.
+     *
+     * This takes a LIST because one gesture is not always one slot: SLIDE occupies two
+     * groups (`btn 0x02` and `btn 0x03`, one per physical direction) while every other
+     * gesture lives in `btn 0x01`. See [Gesture.keyFnButtons].
+     *
+     * ZERO MATCHES REFUSES THE WRITE, LOUDLY. A write that matches no slot is by
+     * definition a no-op, and silently sending one is how slide appeared "broken but
+     * sometimes working" for a whole session: the writes went to `btn 0x01 act 0x05`, a
+     * slot that had moved, and every one came back unchanged with nothing in the log to
+     * say why. Now it says so outright, which turns a mystery into a one-line answer.
+     *
+     * Returns false and does nothing when no table has been read yet. That is the point:
+     * a write needs all the other entries, and guessing them would silently destroy
+     * bindings this app cannot even display.
+     */
+    fun writeGestureBinding(
+        side: Int,
+        buttons: IntArray,
+        keyFnAction: Int,
+        functionByte: Int
+    ): Boolean {
+        val table = lastKeyFnTable
+        if (table == null || table.entries.isEmpty()) {
+            log("KEYFN WRITE: refused - no 0x8108 reading yet, will not invent a table")
+            return false
+        }
+
+        var matched = 0
+        val updated = table.entries.map { e ->
+            if (e.deviceType == side && e.action == keyFnAction && buttons.contains(e.button)) {
+                matched++
+                e.copy(function = functionByte)
+            } else {
+                e
+            }
+        }
+        if (matched == 0) {
+            log("KEYFN WRITE: NO SLOT MATCHED for dev=0x%02X btn=%s act=0x%02X - nothing sent"
+                .format(side, buttons.joinToString(",") { "0x%02X".format(it) }, keyFnAction))
+            return false
+        }
+
+        log("KEYFN WRITE: dev=0x%02X btn=%s act=0x%02X -> 0x%02X (%d slot(s), full table %d entries)"
+            .format(
+                side, buttons.joinToString(",") { "0x%02X".format(it) },
+                keyFnAction, functionByte, matched, updated.size
+            ))
+
+        // Adopt the change IN MEMORY before the reply comes back. The verify re-read
+        // below takes ~600ms, and without this a second write inside that window would be
+        // built from the pre-write table and silently revert the first change. The
+        // reply still overwrites this with the device's own truth, so a write that the
+        // buds reject does not leave us believing a lie for long.
+        lastKeyFnTable = table.copy(entries = updated)
+
+        sendRaw(OpoProtocol.setKeyFunction(updated), "set key function")
+
+        // Read it straight back. The write's payload layout is [OSS], and the device has
+        // shown that it ignores a WRONG command number in total silence (0x0402 produced no
+        // ack and no change), so the ONLY evidence the write landed is the device's own
+        // table — and because the reply re-runs the diff, any change is printed for us
+        // rather than assumed. A short delay: the buds answer a query in ~40ms, but the
+        // write needs to be applied before the read is meaningful.
+        Thread {
+            try {
+                Thread.sleep(600)
+                sendRawBlocking(OpoProtocol.queryKeyFunction(), "verify key function")
+            } catch (e: Exception) {
+                log("KEYFN WRITE: verify query failed: ${e.message}")
+            }
+        }.start()
+        return true
+    }
+
+    /**
+     * Baseline for the gesture-binding diff, in the app's own prefs file.
+     *
+     * PERSISTED, NOT A FIELD, and that is the whole point: the enum hunt requires
+     * disconnecting our app (the vendor app needs the RFCOMM socket) and reconnecting
+     * it, which may restart the process. An in-memory baseline would be lost in exactly
+     * the gap it exists to span, and a lost baseline reads as "nothing changed", which
+     * is the one wrong answer that would end the hunt early.
+     *
+     * Deliberately NOT WidgetStateStore: that store is state the widget and home screen
+     * render, and this is a diagnostic no UI reads. Putting it there would push a
+     * question about `0x8108` into the widget's data model.
+     *
+     * The baseline is updated on every reading, so each reconnect is compared against
+     * the immediately previous one. A reply with no entries does NOT overwrite a good
+     * baseline — a garbled read must not cost us the reading we already had.
+     */
+    private fun keyFnDiff(table: KeyFunctionParser.Table): String {
+        if (table.entries.isEmpty()) return "no entries in reply - baseline left untouched"
+
+        val prefs = context.getSharedPreferences(KEYFN_PREFS, Context.MODE_PRIVATE)
+        val signature = KeyFunctionParser.signature(table)
+        val previous = prefs.getString(KEYFN_BASELINE, null)
+        prefs.edit().putString(KEYFN_BASELINE, signature).apply()
+
+        if (previous == null) {
+            return "baseline stored (${table.entries.size} slots) - change ONE gesture in " +
+                "the vendor app, then reconnect for a real diff"
+        }
+        return KeyFunctionParser.diff(previous, signature)
+    }
+
+    private val KEYFN_PREFS = "QuickBudsKeyFnDiff"
+    private val KEYFN_BASELINE = "keyFnBaseline"
+
     private fun sendRaw(data: ByteArray, label: String = "") {
         Thread {
             sendRawBlocking(data, label)
@@ -425,6 +563,7 @@ class BudsConnectionManager(private val context: Context) {
             cmd == 0x8122 ||                             // EQ query reply
             cmd == OpoProtocol.CMD_ACTIVE_REPORT ||
             cmd == OpoProtocol.CMD_RESP_KEY_FUNCTION ||   // gesture-config query reply
+            cmd in 0x8400..0x84FF ||                     // acks for 0x04xx set commands
             cmd == OpoProtocol.CMD_REGISTER_NOTIFY
         if (explained) return
 
@@ -476,13 +615,27 @@ class BudsConnectionManager(private val context: Context) {
         }
 
         // --- getKeyFunction reply: 0x8108, the CURRENT gesture bindings ---
-        // Read-only and diagnostic for now: nothing acts on this yet, it is here to
-        // reveal the `function` enum that blocks gesture configuration (PROTOCOL.md
-        // §6). Deliberately decoded but NOT pushed to the UI — there is no gesture UI
-        // to feed, and the payload layout is still an [OSS] assumption. The raw
-        // payload is printed by LogDecoder regardless of what this prints.
+        // This reply is BOTH a diagnostic and the source of truth a write is built from:
+        // a setKeyFunction payload carries the WHOLE table, so the entries we are not
+        // changing have to come from here. The last good reading is parked in
+        // lastKeyFnTable for exactly that, and writeGestureBinding() refuses to run
+        // without it rather than inventing the other entries.
         if (cmd == OpoProtocol.CMD_RESP_KEY_FUNCTION) {
             log("KEYFN: ${KeyFunctionParser.describe(payload)}")
+
+            // The diff is the whole point of reading this reply: it describes the
+            // CURRENT bindings, so ONE change made in the vendor app names that
+            // function's `fn` value. Printed on its own line, and only when there is a
+            // baseline to compare against, so the ordinary init-sequence reading does
+            // not grow a second line that says nothing.
+            val table = KeyFunctionParser.parse(payload)
+            if (table.entries.isNotEmpty()) {
+                // Only a reply with entries replaces the stored table, for the same
+                // reason the diff baseline is not overwritten by an empty one: a
+                // garbled read must not cost us the table we would write back from.
+                lastKeyFnTable = table
+                log("KEYFN DIFF: ${keyFnDiff(table)}")
+            }
             return
         }
 

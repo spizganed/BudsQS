@@ -214,6 +214,19 @@ object LogDecoder {
                     "Bud state: ${stateToString(state)}"
                 } ?: "Bud state (unparsed)"
             }
+            // Acks for the 0x04xx SET commands come back as 0x84xx (cmd | 0x8000). NAMED
+            // rather than left to the catch-all, because an unnamed ack is a large part of
+            // what made a broken write so hard to read: our successful gesture writes
+            // printed as "0x8401 - 00" with nothing saying that was the confirmation being
+            // waited for, and the FAILING variant produced no ack line at all. Stating both
+            // clearly is what makes "ignored" vs "accepted" visible at a glance.
+            in 0x8400..0x84FF -> {
+                val setCmd = cmd and 0x7FFF
+                val ok = payload.isNotEmpty() && (payload[0].toInt() and 0xFF) == 0
+                val status = if (payload.isEmpty()) "no payload"
+                else "status=0x%02X".format(payload[0].toInt() and 0xFF)
+                "Ack for set 0x%04X (%s%s)".format(setCmd, status, if (ok) " = ok" else "")
+            }
             else -> "$cmdHex - ${data.joinToString(" ") { "%02X".format(it) }}"
         }
     }

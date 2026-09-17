@@ -150,12 +150,14 @@
     <string name="gesture_hold_rule">Tap and hold cycles, so pick no action or at least two.</string>
 
     <!--
-      The honest status line. The selections are stored on the phone only: the
-      write command (0x0402) needs the `function` enum, which is not yet known,
-      and sending a guessed value is the mistake that already cost this project
-      one regression. Shown on the screen rather than hidden in a comment.
+      The status line, and it must stay TRUE. It used to say the selections were
+      stored on the phone only, because the `function` enum was unknown; that is no
+      longer the case, so leaving it would be a plain lie on screen. The `function`
+      bytes are now measured (see GestureAction) and a change IS written to the buds.
+      The second sentence stays because the hold really is a special case: all four
+      ANC modes share ONE byte, so the buds decide what the cycle contains.
     -->
-    <string name="gesture_not_written">Saved on this phone only. Sending these to the earbuds needs the action values, which are not confirmed yet — so the buds keep their current bindings.</string>
+    <string name="gesture_write_note">Changes are sent to the earbuds, then read back to confirm. Tap and hold is sent as the earbuds\' own ANC cycle, so which modes it steps through is decided by the earbuds, not here.</string>
 
     <!-- Misc -->
     <string name="dialog_close">Close</string>

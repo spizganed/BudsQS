@@ -1,7 +1,14 @@
 ## QuickBuds (BudsQS) - Development Roadmap & Priority List
 
 > Living document. Updated as items complete or priorities shift.
-> Last updated: 2026-09-19 (THIRD pass — `NEXT-SESSION.md` moved into `local/` and is now
+> Last updated: 2026-09-22 (FIFTH pass — **gesture configuration is DONE and verified on the
+> device.** The `function` enum was MEASURED rather than guessed, the write is `0x0401` (not
+> `0x0402`, which the buds ignore in silence), and two real bugs he found are fixed: slide wrote to
+> a button group its slots had moved out of, and the hold's function byte does not control the ANC
+> cycle. **This file said the `0x8108` reply "has not been read yet" in two places long after it had
+> been** — that staleness is a large part of why the enum hunt took as long as it did, and it is
+> recorded rather than quietly deleted.)
+> THIRD pass 2026-09-19 — `NEXT-SESSION.md` moved into `local/` and is now
 > git-ignored too, along with everything else in that folder; all doc references to the old
 > `testlogs/`, `svgs/`, `HANDOFF.md`, `GRADLE-EXPORT.md` and `screenshots/` paths corrected.
 > SECOND pass same day: gesture UI built, app-owned bottom sheets, connect controls moved to
@@ -63,7 +70,7 @@
 | ---| ---| ---| ---| ---| ---| ---| ---| ---| ---|
 | 9| **Easy parity batch**: spatial sound switch (commands exist), find my earbuds (loud beep), alert-sound volume slider (More settings shows it as a slider), game mode done| Quick wins, commands mostly exist — the switch, beep screen and game mode are already in (2026-09-16); the volume slider is not| 2-3 h| Medium|
 | 10| **Medium parity batch + spikes**: dual device ("connect 2 devices and switch"), ANC-Smart behavior (spike: app adapts or buds themselves?), Hi-Res mode (switch BT codec - LHDC; the original app shows a simple toggle), earbud fit test (unknown)| Listed for parity| spikes 30 min each| Spike -> Medium|
-| 11| **Hard parity batch - EQ + Golden Sound + controls**: EQ = 6 bands (62/250/1k/4k/8k/16k Hz), +/-6 dB, presets (Balanced/Clear Vocals/Bass), custom presets with rename, BassWave dynamic-bass toggle + intensity slider. Golden Sound = one-time hearing test, likely produces an EQ profile. Earbud controls = per-bud single/double/triple tap + slide + touch&hold — **the UI for this is DONE (see #26); only the write is blocked on the `function` enum**. The on-call section is deliberately NOT implemented and never will be, by his decision| Complex, long-term; needs packet research vs reference projects| many hours| Big|
+| 11| **Hard parity batch - EQ + Golden Sound + controls**: EQ = 6 bands (62/250/1k/4k/8k/16k Hz), +/-6 dB, presets (Balanced/Clear Vocals/Bass), custom presets with rename, BassWave dynamic-bass toggle + intensity slider. Golden Sound = one-time hearing test, likely produces an EQ profile. Earbud controls = per-bud single/double/triple tap + slide + touch&hold — **DONE and writing to the buds (see #26)**; what remains from this row is EQ / Golden Sound. The on-call section is deliberately NOT implemented and never will be, by his decision| Complex, long-term; needs packet research vs reference projects| many hours| Big|
 | 12| **Case lid state research**: read Leaf-lsgtky/OppoPods + Zhaoyi-ya/OppoPodsManager - do buds/case report lid open/closed (0x8105 ear-status bit 0x04?)? KEEP current case code + ic_case.xml until resolved. Note: verified HeyMelody also cannot read case battery when buds are out + lid closed| Case icon comeback depends on this; parked by user decision 2026-09-15| 1-2 h research| Spike|
 | 13| **Lock screen widget** feasibility research (Android 15 / Nothing OS)| Worth a peek, low importance| 30 min| Spike|
 
@@ -74,7 +81,7 @@
 | 14| Credits section - in-app + README: Leaf-lsgtky/OppoPods, Zhaoyi-ya/OppoPodsManager, tools, thanks. GPL-3.0 obligation| Ships with 1.1| 1 h| Quick|
 | 15| Source cleanup pass - unused files/dead code (ic_case.xml stays - parked per #12), verify .gitignore. **Partly done 2026-09-19 via #25** — the root is cleaned up and `.gitignore` now covers `local/` whole; dead-code removal still outstanding| Before redesign| 1-2 h| Medium|
 | 25| **`local/` folder + .gitignore** - DONE 2026-09-19. All working material moved under one ignored folder: `local/NEXT-SESSION.md` (the plan — moved at his request, so it no longer travels with a clone), `local/commits/`, `local/crashlogs/`, `local/logs/` (was `testlogs/`), `local/notes/` (HANDOFF, GRADLE-EXPORT, the gesture-capture brief, QUESTIONS), `local/svgs/` (was `svgs/`). `local/` is ignored WHOLE, so a new file dropped in needs no `.gitignore` edit. `screenshots/`, `testlogs/`, `svgs/` and `crashlog/` are DELETED. Only README / PROTOCOL / CREDITS / ROADMAP / LICENSE remain tracked at the root| The root had grown a file-per-purpose; one ignore rule beats a list of one-off patterns| 30 min| Quick|
-| 26| **Gesture configuration UI** ("Earbud controls") — DONE 2026-09-19, WRITES NOTHING BY DESIGN. New screen `ui/GestureActivity.kt` + model `ui/GestureConfig.kt`, opened from a home-screen row above App update. Bud icon, Left/Right per-bud selector, "When not on call", and one row per gesture. `actionsFor()` holds exactly the permitted actions per gesture. **Tap-and-hold is multi-select and must have none or at least two** — the rule is explained only when Done is pressed with exactly one. Selections persist per side AND gesture in the shared prefs. `GestureAction` carries a LABEL and **no protocol byte**, because the `function` enum is unknown; the screen states this on screen rather than looking finished. Blocked on the same enum as #19's follow-up. See `local/NEXT-SESSION.md` for what to do when the `0x8108` reply is read| He wants to manage gesture bindings without HeyMelody| built across 2 sessions| Medium|
+| 26| **Gesture configuration** ("Earbud controls") — **DONE + VERIFIED ON DEVICE 2026-09-22. IT WRITES.** `ui/GestureActivity.kt` + `ui/GestureConfig.kt`, opened from a home-screen row above App update: bud icon, Left/Right per-bud selector, "When not on call", one row per gesture. `actionsFor()` holds exactly the permitted actions. **Tap-and-hold is multi-select and must have none or at least two** — explained only when Done is pressed with exactly one. Selections persist per side AND gesture. **The `function` values are MEASURED, not guessed** (`GestureAction.functionByte`), obtained by diffing two `0x8108` readings around changes he made — the app prints `KEYFN DIFF:` for exactly that. The write is **`0x0401`** (NOT `0x0402`, which the buds ignore in total silence), and every write re-reads the table and diffs it because a wrong command number fails silently. It listed "not yet read" here long after it HAD been read; that staleness is why the enum hunt took as long as it did. **Two known bugs, both fixed 2026-09-22** — slide wrote to a button group its slots had moved out of, and the hold's function byte does not actually control the ANC cycle (that needs the separate `0x0404` command). See PROTOCOL.md §6| He wants to manage gesture bindings without HeyMelody| built across 3 sessions| Medium — DONE|
 | 16| ~~Package rename~~ - CLOSED: package is already `com.spizganed.quickbuds`; app name QuickBuds pending final decision with #6| -| -| -|
 
 ## Priority 5 - The final step
@@ -86,23 +93,25 @@
 ## Execution order
 
 ```
-4b -> 7 -> ANC gesture sync (#19, DONE + verified) -> gesture configuration (blocked on the
-`function` enum; route 1 shipped) -> icon rework (his brief)
+4b -> 7 -> ANC gesture sync (#19, DONE + verified) -> gesture configuration (#26, DONE +
+verified 2026-09-22) -> icon rework (his brief)
 -> #24 remove Light theme -> dual device / codec feature ids (capture first)
 -> 5 -> 8a -> 9 (easy batch: alert-sound volume slider)
 -> widget colour states (Q4 rule) -> 8b (needs #4) -> 10/12/13/6? spikes anytime
 -> 14 -> 15 -> 17 (with 10/11 slotted in as the UI grows)
 ```
 
-Next up: **the `function` enum**, which is the one thing blocking gesture writes (PROTOCOL.md §6).
-Route 1 is shipped — `0x0108` is sent during init and the `0x8108` reply is decoded by
-`KeyFunctionParser` — but **the reply has not been read yet**, so no result is claimed. Route 2 if
-it proves opaque: capture HeyMelody changing ONE assignment.
+Next up: **finish the gesture feature's leftovers, then replace the remaining placeholder rows.**
+The `function` enum is no longer a blocker — it was MEASURED (see #26 and PROTOCOL.md §6), and the
+write is confirmed working on the device. What is left:
 
-**The gesture UI is now BUILT (#26) and deliberately sends nothing.** It stores its choices on the
-phone and says so on screen. That is not the "guessed dropdown" this row used to warn against: the
-UI offers LABELS with no protocol values behind them, so it cannot send a wrong byte. When the enum
-lands, add the byte to `GestureAction` and wire the write — nothing else needs rebuilding.
+1. **The hold is not a normal binding.** Its function byte does not control the ANC cycle: clearing
+   it to `0x00` did not stop the cycle, and its mode list lives in the separate
+   `setSupportNoiseReduction` (`0x0404`) command, which is still unwired. Needs a decision on the UI
+   (an on/off, or the mode picker wired properly).
+2. **Slide's two directions** (`btn 0x02` / `btn 0x03`) are written with the same action because
+   which is up and which is down is not yet known. Harmless, and worth establishing.
+3. **The remaining placeholder rows** — Hi-Res codec, spatial audio, EQ, find-my-earbuds (#9/#10).
 
 **Icon rework (his brief) is still pending** and is its own session.
 

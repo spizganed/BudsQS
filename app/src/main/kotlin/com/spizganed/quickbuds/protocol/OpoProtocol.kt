@@ -33,12 +33,34 @@ object OpoProtocol {
     const val CMD_QUERY_EQ = 0x010F
     const val CMD_QUERY_EQ_ALL = 0x0122
 
-    // --- gesture / key-function bindings (READ-ONLY so far) ---
+    // --- gesture / key-function bindings ---
     const val CMD_QUERY_KEY_FUNCTION = 0x0108  // getKeyFunction — current bindings
     const val CMD_RESP_KEY_FUNCTION = 0x8108
-    // setKeyFunction is 0x0402 (OppoPodsManager command table; the ai-generated/ notes
-    // say 0x0401 — prefer 0x0402). DELIBERATELY NOT DEFINED YET: writing a binding needs
-    // the `function` enum, which is still unknown. See PROTOCOL.md §6.
+    /**
+     * setKeyFunction — write the gesture bindings back.
+     *
+     * THE DEVICE PROVED 0x0402 WRONG; 0x0401 IS THE CANDIDATE THAT REPLACES IT. Both are
+     * `[OSS]`, so this is the better-supported of two unverified numbers — NOT a
+     * confirmed one:
+     *   - 0x0402 was sent repeatedly in a WELL-FORMED frame (`TotalLen 80 = 7 + 73`,
+     *     payload `12` + 18x4) and the buds ignored it in total silence: no ack, and the
+     *     0x8108 read-back still showed the old table. That much IS settled — 0x0402 is
+     *     not the write.
+     *   - **0x0401** is what the Melody-derived setting tables list for `setKeyFunction`
+     *     (`BtOperate.m2699L`), and those tables run 0x0400, 0x0401, 0x0403, 0x0404 —
+     *     0x0402 does not appear among them at all.
+     *   - OppoPodsManager mentions 0x0402 only inside a COMMENT on its 0x0108 query line,
+     *     and defines no constant for it. The old note here took that comment as a table
+     *     entry, which is how the wrong number got in.
+     *
+     * STILL UNVERIFIED: only the device can confirm 0x0401, and if it is also wrong the
+     * failure is equally silent, so the read-back is the only evidence either way.
+     *
+     * Payload SHAPE is corroborated rather than assumed: `<count> [deviceType, button,
+     * buttonAction, function]...` is what the 0x8108 read reply returns (minus the read's
+     * leading status byte), and the Melody tables list the write payload in that form.
+     */
+    const val CMD_SET_KEY_FUNCTION = 0x0401
 
     // --- wearing / in-case status (reverse-engineered from OppoPodsManager) ---
     const val CMD_QUERY_WEARING = 0x0109      // getEarBudsStatus — THE in-case query
@@ -202,10 +224,48 @@ object OpoProtocol {
      * Payload is a bare query (no payload), matching the other 0x01xx reads. The buds
      * DO answer it: the reply is `<status> <count> <4-byte entries>...` and its layout
      * is `[CAPTURE]`-confirmed — see PROTOCOL.md §6 and `KeyFunctionParser`, which
-     * logs it RAW and grouped so two readings can be diffed. The `function` VALUES in
-     * it are still unnamed, which is why the write path stays unbuilt.
+     * logs it RAW and grouped so two readings can be diffed.
+     *
+     * The `function` VALUES are no longer a mystery either: they were MEASURED by
+     * diffing two of these replies around a change made in the vendor app. See
+     * `GestureAction.functionByte`.
      */
     fun queryKeyFunction(): ByteArray = buildPacket(CMD_QUERY_KEY_FUNCTION)
+
+    /**
+     * setKeyFunction (0x0401) — write gesture bindings back.
+     *
+     * Payload is `<count>` then 4 bytes per entry, and the entries are the SAME
+     * [KeyFunctionParser.Entry] type the read reply decodes into, deliberately: using
+     * one type for both directions is what stops the two from drifting, and it means a
+     * table read back from the buds can be written out again unmodified.
+     *
+     * NO LEADING STATUS BYTE, unlike the reply. The reply is `<status> <count> ...`
+     * (`[CAPTURE]`), but a status byte is something the device REPORTS; a write supplies
+     * only the count and its entries.
+     *
+     * WHY THE CALLER STILL RE-READS: the payload layout above is `[OSS]`, and the ONE
+     * thing the device has taught us about this command is that it ignores a wrong
+     * command number in total silence (see CMD_SET_KEY_FUNCTION). A silent ignore looks
+     * exactly like success unless the table is read back, so the read-back is not
+     * belt-and-braces — it is the only evidence there is.
+     *
+     * LEB128 is safe here: the largest realistic payload is an 18-entry table,
+     * `1 + 18*4 = 73` bytes, so `TotalLen = 80` fits in one LEB128 byte. `buildPacket()`
+     * would only need real LEB128 above ~30 entries, which this device does not have.
+     */
+    fun setKeyFunction(entries: List<KeyFunctionParser.Entry>): ByteArray {
+        val payload = ByteArray(1 + entries.size * KeyFunctionParser.ENTRY_SIZE)
+        payload[0] = entries.size.toByte()
+        for ((i, e) in entries.withIndex()) {
+            val o = 1 + i * KeyFunctionParser.ENTRY_SIZE
+            payload[o] = e.deviceType.toByte()
+            payload[o + 1] = e.button.toByte()
+            payload[o + 2] = e.action.toByte()
+            payload[o + 3] = e.function.toByte()
+        }
+        return buildPacket(CMD_SET_KEY_FUNCTION, payload = payload)
+    }
 
     fun queryStatus(): ByteArray = buildPacket(
         CMD_QUERY_STATUS,

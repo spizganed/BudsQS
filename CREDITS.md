@@ -33,7 +33,7 @@ What we use from it:
 | ANC (set) | `Protocol/OppoProtocol.Anc.cs` — the `AncOff/AncLight/AncMedium/AncDeep/AncTransparency` payloads and `PktAncByIndex()`, which is the exact bitmask algorithm in our `OpoProtocol.ancPayload()` |
 | ANC (notify) | `AncValues` — the `(Val1, Val2) -> name` dictionary for the 0x0204 subType 0x03 push, which matches our own captures exactly and is the basis of `AncEventParser.modeForRaw()` |
 | Button/gesture | `Models/UserInteractionEventInfo.cs` — the 0x0204 subType 0xF1 payload body (side, button, action, modifier, context, int16 options) and the action names (0x00 single, 0x02 double, 0x03 triple, 0x04 long press, 0x07 slide up, 0x08 slide down) |
-| Key function | `Models/KeyFunctionItem.cs` — the **4-byte entry** `[deviceType, button, buttonAction, function]` shared by `getKeyFunction` (0x0108) and `setKeyFunction` (0x0402). That field order is confirmed by our own `0x8108` capture (PROTOCOL.md §6), so `ENTRY_SIZE = 4` is `[OSS]`+`[CAPTURE]`. **The file does NOT model the payload around an entry, and we initially over-trusted it:** the real reply begins `<status> <count>`, and reading `payload[0]` as the count cost us an off-by-one that printed `!LAYOUT`. The 2-byte header is OUR finding (`[CAPTURE]`), not theirs — credit for the entry, not the envelope. The `function` byte's *values* are not in that file either, so they stay unknown and deliberately unnamed |
+| Key function | `Models/KeyFunctionItem.cs` — the **4-byte entry** `[deviceType, button, buttonAction, function]` shared by `getKeyFunction` (0x0108) and `setKeyFunction`. That field order is confirmed by our own `0x8108` capture (PROTOCOL.md §6), so `ENTRY_SIZE = 4` is `[OSS]`+`[CAPTURE]`. **The file does NOT model the payload around an entry, and we initially over-trusted it TWICE:** the real reply begins `<status> <count>`, and reading `payload[0]` as the count cost us an off-by-one that printed `!LAYOUT`; and the write command it implies — `CmdSetKeyFunction = 0x0402` — is **wrong**, which cost a second session. Both corrections are OUR findings (`[CAPTURE]`). Credit for the entry, not the envelope or the command number. The `function` byte's *values* are not in that file either — we measured them ourselves |
 | Feature IDs | `Protocol/OppoProtocol.Features.cs` — the `FeatureXxx` constants for the generic 0x0403 feature switch, including `FeatureSpatial=0x1B`, `FeatureDualDevice=0x11`, `FeatureGameLL=0x06`, `FeatureGameMain=0x28` |
 | Wearing / in-case | The 0x0109 wearing query and its `[count][component,status]` pairs |
 
@@ -97,8 +97,26 @@ from anyone else:
   genuine trap and is documented in `OpoProtocol.ancPayload()`.
 - The working `0x0205` registration payload shape for this device, and the fact
   that `0x03` must be included to receive ANC pushes at all.
+- **The gesture write command is `0x0401`, not `0x0402`.** Both public sources were
+  `[OSS]` and disagreed; `0x0402` was tried and the buds **ignored it in total
+  silence** (no ack, table unchanged), while `0x0401` is acked immediately
+  (`RX AA 08 00 00 01 84 .. 01 00 00`, payload `00` = success). Settled on the
+  device — see PROTOCOL.md §6.
+- **The `function` enum's values**, measured by diffing two `0x8108` readings
+  around changes made in the vendor app and checking every value against what was
+  actually bound: `0x00` none, `0x01` play/pause, `0x03` voice assistant,
+  `0x05` prev, `0x06` next, `0x07` volume, `0x08` ANC cycle, `0x0A` switch track,
+  `0x11` game mode.
+- **The `0x8108` reply's table shape is not fixed** (18 entries then 20), and
+  **slide occupies its own `button` groups `0x02`/`0x03`** — when its slots moved
+  out of `0x01`, writes aimed at `0x01` silently did nothing.
+- **F1 `byte2`/`byte3` are the key-function `act`/`function` pair** (PROTOCOL.md
+  §6.1), matched across five slots.
+- **The hold's function byte does not control the ANC cycle** — clearing it to
+  `0x00` did not stop the gesture. Its mode list belongs to the separate
+  `setSupportNoiseReduction` (`0x0404`).
 - Everything in the Android UI layer: the widget, the layout, the theme system,
-  the LayoutReport dev tool.
+  the LayoutReport dev tool, and the `KEYFN DIFF:` binding-diff tool.
 
 ---
 
