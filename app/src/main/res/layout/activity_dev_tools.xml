@@ -1,132 +1,233 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Dev Tools screen, restyled to match the main screen.
+
+  WHAT WAS WRONG (it is structural, not cosmetic): the whole toolbar was ONE
+  horizontal row holding a 24sp title plus SEVEN buttons — Mark / Shot / Layout /
+  Widg / Wlog / Clear / Export. That is a bit over 480dp of buttons in roughly
+  330dp of usable width, and a LinearLayout does not wrap, so the right-hand
+  buttons were simply pushed past the edge. It "almost" fit because only the last
+  one or two were clipped.
+
+  THE FIX is two weighted rows (4 + 3) inside a card, not a smaller font. With
+  layout_width=0dp and layout_weight=1 each button gets an equal share of the
+  row, so no label length and no screen width can push a sibling off the edge.
+  This is the same mechanism the main screen's battery card uses for its halves.
+
+  STYLE: matches activity_main.xml — same 44dp top padding, same card
+  (@drawable/app_card_bg) and chip (@drawable/dev_button_bg) drawables, and every
+  colour read from a theme attribute (?attr/appColor*) rather than a literal. That
+  is what makes the OLED / Dark / Light swap work here for free.
+
+  All seven button ids are preserved, plus clockText / sinceMarkText / scroll /
+  logText, because DevToolsActivity binds them with findViewById in onCreate and a
+  missing id would be a null assignment into a lateinit field.
+
+  XML comments may not contain a double hyphen, and every block must be closed.
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/devToolsRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
+    android:background="?attr/appColorBg"
     android:paddingStart="16dp"
     android:paddingEnd="16dp"
-    android:paddingBottom="16dp"
-    android:paddingTop="48dp">
+    android:paddingTop="44dp"
+    android:paddingBottom="12dp">
 
-    <!-- Toolbar: title + clear + export -->
+    <!--
+      Header. Title only, matching the main screen's header row, which is a
+      weighted bold title with the controls pushed to the right. The title has an
+      id now: applyTheme() used to find it positionally (child 0 of child 0),
+      which only worked while this screen happened to keep that exact shape.
+    -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingBottom="8dp">
+        android:paddingBottom="10dp">
 
         <TextView
+            android:id="@+id/devToolsTitle"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="Dev Tools"
-            android:textSize="24sp"
-            android:textStyle="bold" />
-
-        <Button
-            android:id="@+id/btnMark"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:minWidth="0dp"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
-            android:text="Mark" />
-
-        <!--
-          Screenshot -> text. Diagnostic only: decodes an image on device and writes
-          the pixels out as text so the coding agent can read a layout it cannot see.
-          See ScreenshotToText.
-        -->
-        <Button
-            android:id="@+id/btnScreenshot"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:minWidth="0dp"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
-            android:text="Shot" />
-
-        <!--
-          Layout report. Writes the measured geometry of THIS screen out as text:
-          every view's id, bounds, margins, padding, weights and text metrics.
-          This is the readable form of a screenshot for a layout question — a
-          text description of a picture is guesswork, but the numbers the
-          framework already computed are exact. See LayoutReport.
-        -->
-        <Button
-            android:id="@+id/btnLayout"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:minWidth="0dp"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
-            android:text="Layout" />
-
-        <!--
-          Widget report. The Layout button walks an ACTIVITY's view tree, and a
-          home-screen widget is not an Activity — it is drawn by the launcher from a
-          RemoteViews parcel in another process, so it was invisible to the layout
-          log until this button existed. This inflates widget_anc in-process at the
-          launcher's reported size, and also prints the live widget state, which is
-          what distinguishes "measures wrong" from "state empty so everything is
-          gated INVISIBLE". See LayoutReport.buildWidget.
-        -->
-        <Button
-            android:id="@+id/btnWidgetLayout"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:minWidth="0dp"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
-            android:text="Widg" />
-
-        <!--
-          Widget REMOTEVIEWS check. The "Widg" button above measures the widget's
-          layout, which is a different question and was misleading: the layout was
-          already correct while the widget still failed, so the button kept saying
-          "fine". This one runs the widget's REAL builder for the current state and
-          round-trips the result through a Parcel — the same thing the
-          AppWidgetService does before the launcher ever sees the update — and reports
-          any throw, plus how many times the live update path has already failed.
-        -->
-        <Button
-            android:id="@+id/btnWidgetLogic"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:minWidth="0dp"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
-            android:text="Wlog" />
-
-        <Button
-            android:id="@+id/btnClear"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:minWidth="0dp"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
-            android:text="Clear" />
-
-        <Button
-            android:id="@+id/btnExport"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:minWidth="0dp"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
-            android:text="Export" />
+            android:textSize="@dimen/header_title_size"
+            android:textStyle="bold"
+            android:textColor="?attr/appColorTextPrimary" />
     </LinearLayout>
 
-    <!-- Live clock: current time with milliseconds + time since last Mark.
-         Used as a testing instrument to time physical actions (bud in/out)
-         against the packet timeline. -->
+    <!--
+      ACTION CARD — the seven buttons, in two weighted rows.
+
+      Grouped by what they do, which also decides the split:
+        row A  Mark / Shot / Layout / Widg   the ones used while capturing
+        row B  Wlog / Clear / Export         the report and log-management ones
+
+      Labels are kept SHORT (Widg, Wlog) on purpose: these are the abbreviations
+      already in use in the logs and in the capture notes, so they stay recognisable.
+    -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/app_card_bg"
+        android:padding="6dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <!-- Numbered marker in the packet timeline, used to timestamp a physical action. -->
+            <Button
+                android:id="@+id/btnMark"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="4dp"
+                android:minWidth="0dp"
+                android:minHeight="42dp"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:textSize="12sp"
+                android:text="Mark" />
+
+            <!--
+              Screenshot -> text. Diagnostic only: decodes an image on device and
+              writes the pixels out as text so the coding agent can read a layout it
+              cannot see. See ScreenshotToText.
+            -->
+            <Button
+                android:id="@+id/btnScreenshot"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="4dp"
+                android:minWidth="0dp"
+                android:minHeight="42dp"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:textSize="12sp"
+                android:text="Shot" />
+
+            <!--
+              Layout report. Writes the measured geometry of the main screen out as
+              text: every view's id, bounds, margins, padding, weights and text
+              metrics. This is the readable form of a screenshot for a layout
+              question. See LayoutReport.
+            -->
+            <Button
+                android:id="@+id/btnLayout"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="4dp"
+                android:minWidth="0dp"
+                android:minHeight="42dp"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:textSize="12sp"
+                android:text="Layout" />
+
+            <!--
+              Widget report. A home-screen widget is not an Activity, so it is not in
+              any Activity's view tree: it is drawn by the launcher from a RemoteViews
+              parcel in another process. This inflates widget_anc in-process at the
+              launcher's reported size and also prints the live widget state, which is
+              what distinguishes "measures wrong" from "state empty". See
+              LayoutReport.buildWidget.
+            -->
+            <Button
+                android:id="@+id/btnWidgetLayout"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="4dp"
+                android:minWidth="0dp"
+                android:minHeight="42dp"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:textSize="12sp"
+                android:text="Widg" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="4dp">
+
+            <!--
+              Widget REMOTEVIEWS check. The "Widg" button measures the widget's
+              layout, which is a different question and was misleading: the layout was
+              already correct while the widget still failed, so that button kept saying
+              "fine". This one runs the widget's REAL builder for the current state and
+              round-trips the result through a Parcel, the same thing the
+              AppWidgetService does before the launcher ever sees the update.
+            -->
+            <Button
+                android:id="@+id/btnWidgetLogic"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="4dp"
+                android:minWidth="0dp"
+                android:minHeight="42dp"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:textSize="12sp"
+                android:text="Wlog" />
+
+            <Button
+                android:id="@+id/btnClear"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="4dp"
+                android:minWidth="0dp"
+                android:minHeight="42dp"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:textSize="12sp"
+                android:text="Clear" />
+
+            <Button
+                android:id="@+id/btnExport"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="4dp"
+                android:minWidth="0dp"
+                android:minHeight="42dp"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:textSize="12sp"
+                android:text="Export" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!--
+      Live clock: current time with milliseconds, plus time since the last Mark.
+      A testing instrument for timing a physical action (bud in or out) against the
+      packet timeline.
+    -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
+        android:paddingTop="10dp"
         android:paddingBottom="6dp">
 
         <TextView
@@ -137,7 +238,8 @@
             android:text="--:--:--.---"
             android:textSize="16sp"
             android:textStyle="bold"
-            android:typeface="monospace" />
+            android:typeface="monospace"
+            android:textColor="?attr/appColorTextSecondary" />
 
         <TextView
             android:id="@+id/sinceMarkText"
@@ -145,38 +247,59 @@
             android:layout_height="wrap_content"
             android:text=""
             android:textSize="13sp"
-            android:typeface="monospace" />
+            android:typeface="monospace"
+            android:textColor="?attr/appColorTextSecondary" />
     </LinearLayout>
 
-    <!-- Tab switcher -->
+    <!--
+      Tab switcher. Two equal chips rather than a control with a fixed width, so
+      neither label ("Human-Readable" is the long one) can clip the other.
+      updateTabButtons() repaints these to show which is selected.
+    -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:paddingBottom="4dp">
+        android:paddingBottom="8dp">
 
         <Button
             android:id="@+id/btnTabHuman"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Human-Readable"
-            android:textStyle="bold" />
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="4dp"
+            android:minWidth="0dp"
+            android:minHeight="42dp"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:background="@drawable/dev_button_bg"
+            android:text="Human-Readable" />
 
         <Button
             android:id="@+id/btnTabRaw"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Raw Hex"
-            android:textStyle="bold" />
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="4dp"
+            android:minWidth="0dp"
+            android:minHeight="42dp"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:background="@drawable/dev_button_bg"
+            android:text="Raw Hex" />
     </LinearLayout>
 
     <!--
       Log content.
 
-      The ScrollView itself now carries the card background (log_card_bg) so the
-      log sits inside a bordered panel, matching the main screen's cards. The
+      The ScrollView itself carries the card background (log_card_bg) so the log
+      sits inside a bordered panel, matching the main screen's cards. The
       background is on the ScrollView rather than the inner TextView so the border
       stays put when the content is shorter than the view, and so the padding is
       inside the border rather than pushing it around.

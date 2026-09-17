@@ -131,6 +131,8 @@ object LogDecoder {
             OpoProtocol.CMD_QUERY_STATUS -> "Status query"
             OpoProtocol.CMD_QUERY_ANC -> "ANC query"
             OpoProtocol.CMD_QUERY_WEARING -> "Wearing query (0x0109)"
+            OpoProtocol.CMD_QUERY_KEY_FUNCTION -> "Key function query (0x0108)"
+            OpoProtocol.CMD_RESP_KEY_FUNCTION -> KeyFunctionParser.describe(payload)
             OpoProtocol.CMD_REGISTER_NOTIFY -> "Register notifications (0x0205)"
             OpoProtocol.CMD_SET_ANC -> {
                 val ancStr = ancPayloadToString(payload)

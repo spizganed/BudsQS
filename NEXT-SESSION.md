@@ -1,8 +1,29 @@
 NEXT SESSION — START HERE
 =====================================================================
 
-Written 2026-09-18 (night), updated 2026-09-19.
+Written 2026-09-18 (night), updated 2026-09-19 (late).
 **NEXT FEATURE: gesture configuration.** See the section below.
+
+## STEP 0 DONE — 2026-09-19. What was checked, and what was wrong.
+
+Run again anyway if time has passed, but this is the state as of the above date:
+
+- Checked `PROTOCOL.md` §3 command numbers against `OpoProtocol.kt` — **agreed.**
+- Checked §5's **two ANC tables** vs `ancPayload()` and `AncEventParser.modeForRaw()`
+  — **still deliberately different** (SET bit 0 Off / bit 2 Trans; NOTIFY bits 3 and
+  8). No unification, no regression.
+- Checked §4's init sequence vs `BudsConnectionManager.runInitSequence()` — agreed.
+  `0x0108` was then APPENDED to the sequence (see below), and §4 was updated in the
+  same edit to list 9 steps, so doc and code still match. Step 9 is tagged `[GUESS]`
+  there because whether the buds answer it is unknown.
+- **Drift found and fixed, two places:**
+  1. `OpoProtocol.registerNotifications()`'s comment still ended "NOT YET CONFIRMED
+     ON DEVICE" long after he confirmed it. Now records the 2026-09-19 confirmation.
+  2. **`ROADMAP.md` was badly stale on ANC** — row 4b, row #19, the execution-order
+     block, "Next up", and the UI-debt table all still asserted *"ANC raises no push
+     event (verified 3x)"* and listed ANC gesture sync as unfinished. All superseded
+     by his verified result. Corrected, with the wrong claim kept visible rather
+     than deleted, because the way it was wrong is the lesson (PROTOCOL.md §5).
 
 ## STEP 0 — CHECK THE MDs ARE UP TO DATE (he asked for this explicitly)
 
@@ -70,6 +91,24 @@ OppoPodsManager's command table says **0x0402**. Prefer 0x0402.
 Caution: **TotalLen is LEB128** (PROTOCOL.md §2). A gesture config with
 several entries can exceed 127 bytes, so `buildPacket()` will need real
 LEB128 encoding before a multi-entry write. Do not ship a long write without it.
+
+### WHERE THE SESSION GOT TO (2026-09-19 late) — step 1 is SHIPPED, UNREAD
+
+Route (a) is coded and in the init sequence. **Nothing is claimed about the reply,
+because it has not been seen.** What to do next, in order:
+
+1. **Build and connect, then find the `0x8108` reply.** It is sent last in the init
+   sequence, so it is near the top of a fresh Dev Tools log. Three lines print it —
+   the raw `RX:`, a `KEYFN:` line, and `LogDecoder`'s description — and **all three
+   end with `RAW=[...]`** so the bytes survive even if the parse is wrong.
+2. **Read the reply together.** The guards to look for: `!LAYOUT` (the 4-byte entry
+   assumption is wrong, i.e. the payload does not begin with a count byte), and
+   `parsed=N` disagreeing with `count=M`.
+3. **ONLY THEN build gesture UI**, and only for actions that can actually be NAMED.
+   A dropdown offering guessed functions is worse than no UI.
+
+**DO NOT** name the `fn=` byte, define `0x0402`, or add LEB128 to `buildPacket()`
+until the enum is confirmed. The write path is deliberately unbuilt.
 
 Suggested shape for the session (keep it small):
 

@@ -11,6 +11,7 @@ import android.util.Log
 import com.spizganed.quickbuds.protocol.AncEventParser
 import com.spizganed.quickbuds.protocol.BatteryParser
 import com.spizganed.quickbuds.protocol.GameModeParser
+import com.spizganed.quickbuds.protocol.KeyFunctionParser
 import com.spizganed.quickbuds.protocol.OpoProtocol
 import com.spizganed.quickbuds.protocol.OppoPacketFramer
 import com.spizganed.quickbuds.protocol.UserInteractionParser
@@ -212,6 +213,9 @@ class BudsConnectionManager(private val context: Context) {
                 delay(200); sendRawBlocking(OpoProtocol.queryAncMode(), "query anc")
                 delay(200); sendRawBlocking(OpoProtocol.queryBattery(), "query battery")
                 delay(200); sendRawBlocking(OpoProtocol.queryWearingStatus(), "query wearing")
+                // Read-only: reports the CURRENT gesture bindings so a capture can
+                // reveal the `function` enum. See OpoProtocol.queryKeyFunction().
+                delay(200); sendRawBlocking(OpoProtocol.queryKeyFunction(), "query key function")
             } catch (e: Exception) {
                 log("Init sequence error: ${e.message}")
             }
@@ -420,6 +424,7 @@ class BudsConnectionManager(private val context: Context) {
             cmd == 0x810D ||                             // status query reply
             cmd == 0x8122 ||                             // EQ query reply
             cmd == OpoProtocol.CMD_ACTIVE_REPORT ||
+            cmd == OpoProtocol.CMD_RESP_KEY_FUNCTION ||   // gesture-config query reply
             cmd == OpoProtocol.CMD_REGISTER_NOTIFY
         if (explained) return
 
@@ -467,6 +472,17 @@ class BudsConnectionManager(private val context: Context) {
                     it.onWearState(lastLeftStatus, lastRightStatus, lastCaseStatus)
                 }
             }
+            return
+        }
+
+        // --- getKeyFunction reply: 0x8108, the CURRENT gesture bindings ---
+        // Read-only and diagnostic for now: nothing acts on this yet, it is here to
+        // reveal the `function` enum that blocks gesture configuration (PROTOCOL.md
+        // §6). Deliberately decoded but NOT pushed to the UI — there is no gesture UI
+        // to feed, and the payload layout is still an [OSS] assumption. The raw
+        // payload is printed by LogDecoder regardless of what this prints.
+        if (cmd == OpoProtocol.CMD_RESP_KEY_FUNCTION) {
+            log("KEYFN: ${KeyFunctionParser.describe(payload)}")
             return
         }
 

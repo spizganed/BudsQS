@@ -33,6 +33,13 @@ object OpoProtocol {
     const val CMD_QUERY_EQ = 0x010F
     const val CMD_QUERY_EQ_ALL = 0x0122
 
+    // --- gesture / key-function bindings (READ-ONLY so far) ---
+    const val CMD_QUERY_KEY_FUNCTION = 0x0108  // getKeyFunction — current bindings
+    const val CMD_RESP_KEY_FUNCTION = 0x8108
+    // setKeyFunction is 0x0402 (OppoPodsManager command table; the ai-generated/ notes
+    // say 0x0401 — prefer 0x0402). DELIBERATELY NOT DEFINED YET: writing a binding needs
+    // the `function` enum, which is still unknown. See PROTOCOL.md §6.
+
     // --- wearing / in-case status (reverse-engineered from OppoPodsManager) ---
     const val CMD_QUERY_WEARING = 0x0109      // getEarBudsStatus — THE in-case query
     const val CMD_RESP_WEARING = 0x8109
@@ -106,9 +113,11 @@ object OpoProtocol {
      * had not subscribed to it. Subscribing is the documented way to make a 0x0204
      * subType arrive, and it is how wear was fixed, so the same reasoning applies.
      *
-     * NOT YET CONFIRMED ON DEVICE. If the ANC buttons still do not follow a gesture,
-     * check the 0x8205 ACK actually lists `01 02 03`; a firmware that rejects the
-     * longer list would ACK a shorter one, and this is the first thing to suspect.
+     * CONFIRMED ON DEVICE 2026-09-19. The 0x8205 ACK lists `01 02 03`, and a bud-side
+     * gesture now updates the app circles AND the widget, including a gesture REBOUND
+     * to a different mode cycle. If ANC ever stops following gestures, check the ACK
+     * still lists `01 02 03` first — a firmware that rejects the longer list would ACK
+     * a shorter one.
      */
     fun registerNotifications(): ByteArray =
         buildPacket(CMD_REGISTER_NOTIFY, payload = byteArrayOf(0x03, 0x01, 0x02, 0x03))
@@ -180,6 +189,23 @@ object OpoProtocol {
     fun queryAncMode(): ByteArray = buildPacket(CMD_QUERY_ANC, payload = byteArrayOf(0x01, 0x01))
     fun queryEq(): ByteArray = buildPacket(CMD_QUERY_EQ)
     fun queryEqAll(): ByteArray = buildPacket(CMD_QUERY_EQ_ALL, payload = byteArrayOf(0x01, 0x05))
+
+    /**
+     * getKeyFunction (0x0108) — read the CURRENT gesture bindings.
+     *
+     * READ-ONLY, and deliberately so: it reports what the buds are already doing,
+     * so it cannot change state or break a binding. The 0x8108 reply is the cheapest
+     * shot at learning the `function` enum, which is the one thing blocking gesture
+     * configuration in our app (PROTOCOL.md §6). It may also hand us the enum straight
+     * from the device, which would remove the need for a HeyMelody capture.
+     *
+     * Payload is a bare query (no payload), matching the other 0x01xx reads. The reply
+     * is logged RAW by `KeyFunctionParser` until the layout is confirmed — see
+     * LogDecoder's 0x8108 branch. Payload shape is documented as
+     * `<count> <deviceType, button, buttonAction, function>...` in PROTOCOL.md §6 but
+     * that is sourced from KeyFunctionItem.cs, NOT yet observed here.
+     */
+    fun queryKeyFunction(): ByteArray = buildPacket(CMD_QUERY_KEY_FUNCTION)
 
     fun queryStatus(): ByteArray = buildPacket(
         CMD_QUERY_STATUS,

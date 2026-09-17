@@ -1,0 +1,12 @@
+Restyle Dev Tools toolbar
+
+- Seven buttons plus a title were in one row: ~480dp of buttons in
+  ~330dp, and a LinearLayout does not wrap, so the last ones were
+  clipped off the edge.
+- Split into two weighted rows (4 + 3) inside a card. Each button is
+  0dp + weight=1, so no label or screen width can push one off-edge.
+- Match the main screen: same padding, card and chip drawables, and
+  theme attributes instead of literals.
+- Bind btnWidgetLayout/btnWidgetLogic before applyTheme() paints
+  them, or opening the screen throws.
+- Give the title an id; applyTheme found it by position before.

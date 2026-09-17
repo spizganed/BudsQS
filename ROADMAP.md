@@ -1,8 +1,11 @@
 ## QuickBuds (BudsQS) - Development Roadmap & Priority List
 
 > Living document. Updated as items complete or priorities shift.
-> Last updated: 2026-09-17 (battery icon alignment fixed + verified; 50:50 battery card, icons 52dp;
-> layout-report dev tool; Q2/Q3/Q4 answered; Light theme slated for removal)
+> Last updated: 2026-09-19 (ANC gesture sync VERIFIED — the "ANC has no push event" claim was
+> wrong, see #19; gesture-config route 1 shipped (0x0108 query + KeyFunctionParser); docs
+> cross-checked against code per NEXT-SESSION STEP 0. Previous: 2026-09-17 battery icon
+> alignment fixed + verified; 50:50 battery card, icons 52dp; layout-report dev tool;
+> Q2/Q3/Q4 answered; Light theme slated for removal)
 
 ## Working principles
 
@@ -27,7 +30,7 @@
 | #| Item| Why / when| Est. time| Type|
 | ---| ---| ---| ---| ---| ---| ---|
 | 4| **Widget wear-change latency** — DONE. Root cause was `0x0205`'s payload: it is count-then-event-ids, and the old literal `01 01 02 02` registered battery only, so wear was never pushed and lagged a 5s poll. Sending `02 01 02` registers battery + wear. Icons now react in milliseconds; residual ~2s is the bud's hardware debounce| Icons felt poll-bound and inconsistent (0-4s). Push makes it feel instant| Done| Quick|
-| 4b| **Battery + Game Mode push, and poll trim** — DONE 2026-09. Long captures proved (a) battery pushes on change and no `poll status` reply EVER contained a battery byte, so the 60s poll is now a pure keep-alive; (b) Game Mode is pushed as `0x0204` subType `0x05` and fires on BUD-SIDE gestures too, so the widget/app buttons now track the earbuds. Battery resolution is tens (100/90/80) — a firmware trait, confirmed against the reference implementation which reads the bytes raw. **ANC has no push event at all** (verified 3x), so ANC cannot sync this way; a one-shot `0x810C` query is the only route. See also the main-screen redesign: compact capped panel with a reserved `featureList` area below it for the upcoming controls (dual device, spatial audio, codec, EQ, find my earbuds)| Completes the push story and frees the poll; unblocks the feature rows| Done| Medium|
+| 4b| **Battery + Game Mode push, and poll trim** — DONE 2026-09. Long captures proved (a) battery pushes on change and no `poll status` reply EVER contained a battery byte, so the 60s poll is now a pure keep-alive; (b) Game Mode is pushed as `0x0204` subType `0x05` and fires on BUD-SIDE gestures too, so the widget/app buttons now track the earbuds. Battery resolution is tens (100/90/80) — a firmware trait, confirmed against the reference implementation which reads the bytes raw. ~~**ANC has no push event at all** (verified 3x)~~ **SUPERSEDED 2026-09-19 — that was WRONG.** ANC *does* push, as `0x0204` subType `0x03`; the belief survived three captures because the frames were arriving undecoded and `noteUnattributed` printed nothing for them (PROTOCOL.md §5, "History of Getting This Wrong"). See #19. Earlier note kept for the record: the main-screen redesign made a compact capped panel with a reserved `featureList` area below it for the upcoming controls (dual device, spatial audio, codec, EQ, find my earbuds)| Completes the push story and frees the poll; unblocks the feature rows| Done| Medium|
 | 5| **FGS notification**: AUDITED 2026 — already optimal. Channel is `IMPORTANCE_MIN`, no badge/lights/vibration/sound, `PRIORITY_MIN`, `ongoing(false)` so it is swipeable. Android 15 requires it for a `connectedDevice` FGS; no setting removes it. The only true fix (dropping the persistent connection) would cost the instant push updates. **Leave as is.** | Serves no user purpose; annoying. Not officially supported on Android 15 - spike| 30 min| Spike|
 | 6| **Adaptive app icon** — DONE (redone 2026-09). Traced `ic_bud_left`/`ic_bud_right` paths reused verbatim via group transforms, monochrome white on black, buds side by side. Geometry is **solved, not eyeballed**: the adaptive safe zone is a circle of radius 33 centred on (54,54), so the binding constraint is each ink corner's distance from the centre. Final scale S=0.756 puts the worst corner at 94.1% of the safe radius (S=0.62 filled only 77.5% and looked undersized). Added an explicit `monochrome` layer for themed icons to stop the launcher synthesising one. Deleted the legacy `mipmap/ic_launcher.xml` layer-lists and the shadowed `ic_launcher_foreground.png`. Widget preview decoupled from the launcher icon via new `drawable/widget_preview_buds.xml` — **note it is a separate copy and must be updated alongside `ic_launcher_foreground.xml`.** Also added `ic_stat_buds` for the FGS notification (was the generic `stat_sys_headset`)| Replaces placeholder; Nothing OS was wrapping the icon in a white circle| Done| Medium|
 | 7| **Dev Tools screen** - DONE. Separate in-app screen with (a) a human-readable log ("L bud: in ear", "ANC -> Deep", "Battery L=70"), (b) a raw-hex log, plus hold-to-copy on the current tab and export-to-file via MediaStore Downloads. Mark / Clear / Export all live here, so the main screen carries no log at all — status events there are silent by design. **An earlier revision toasted them, which stormed the UI because several call sites fire once per packet; do not put user-visible output on a packet listener.**| Raw log is hard to read; also the diagnostic tool for #4| Done| Medium|
@@ -38,7 +41,7 @@
 | #| Item| Why / when| Est. time| Type|
 | ---| ---| ---| ---| ---|
 | 18| **Settings-card rows + secondary screens** — DONE 2026-09-16. The reserved `featureList` area is now a real card: Game Mode (live, driven by the pushed `0x0204` subType `0x05`), Hi-Res codec (preference toggle only — the feature id is not captured, see below), spatial audio (legacy feature `0x1B`), Equalizer, Find my earbuds, App update. Rows are built in code by `ui/SettingRowFactory.kt` (one place for row shape + themed icon tint) instead of six near-identical XML blocks. New screens: `ui/EqActivity.kt`, `ui/FindBudsActivity.kt`, `ui/UpdateActivity.kt` (never auto-updates), `ui/ChimePlayer.kt`, `ui/SegmentedBarDrawable.kt` (number drawn inside the bar), `bluetooth/KeepAliveReceiver.kt`| Parity with the original app's settings list; the main screen needed real content below the battery block| Done| Medium|
-| 19| **ANC gesture sync** — IN PROGRESS. ANC raises **no** push event (verified 3x), so a bud-side ANC gesture is invisible to us. The planned route is a one-shot `0x810C` (query ANC) after the gesture is inferred; if the gesture produces nothing at all, the fallback is polling `0x810C` on a short timer while connected. **Not yet confirmed from a capture** — the gesture log has not been analysed| ANC set from the buds must be reflected in the widget/app circles| 1-2 h| Medium|
+| 19| **ANC gesture sync** — DONE + VERIFIED ON DEVICE 2026-09-19. The premise ("ANC raises no push event, verified 3x") was **WRONG**: ANC pushes as `0x0204` subType `0x03`, payload `03 01 01 LO HI`. The frames had been arriving all along; `noteUnattributed` blanket-excluded cmd `0x0204`, so an undecoded subType logged nothing and it read as silence. The subscribe also had to include event `0x03`. No poll and no `0x810C`-after-gesture was needed. Value is the buds' own ANC bitmask (bit `index` set), NOT a three-value enum — see PROTOCOL.md §5, and "History of Getting This Wrong" there| ANC set from the buds must be reflected in the widget/app circles| 1-2 h| Medium — DONE|
 | 20| **Hi-Res codec honesty** — the row currently toggles only its own subtitle; no codec set/get command has been captured on this firmware. Needs a capture of the reference implementation to find the feature id (LHDC). Until then the row is deliberately a preference stub, not a lie| A switch that silently does nothing is worse than one that is honest| 1-2 h + capture| Spike|
 | 21| **Layout-report dev tool** — DONE 2026-09-17. `devtool/LayoutReport.kt` writes the measured view tree as TEXT (bounds, weights, margins, padding, gravity, text size/style/colour, drawable intrinsic vs actual) plus a `SIBLING GAPS` section, because the AI agent **cannot read images** and `screenshots/*.png` are opaque to it. MainActivity parks a report in `onResume`; Dev Tools reads it (cached or live) and it lands in `testlogs/`. This is now the primary way layout bugs are diagnosed, and it is what made the icon fix verifiable rather than a guess. `collectGaps` must report DIRECT children only, each container against its own origin and on its own axis — two earlier versions broke this (see HANDOFF)| Descriptions of a layout ("the card looks too close to the header") failed because the agent had to guess which of ~30 view ids was meant, and a wrong guess cost a build cycle| Done| Medium|
 | 22| **Battery icon alignment** — DONE + VERIFIED 2026-09-17. He reported "the icons are misaligned different sizes". Every measured *box* was correct and every aspect ratio matched, so all the obvious suspects were innocent. The cause was **fill fraction**: the case was a 48x40 viewport on a 1:1 slot (ellipse edge to edge, 100% fill) while the buds were inset to ~79% of their viewport, so a case unit was 48/48dp against a bud's 40/48dp — it drew ~20% larger per unit and sat on a different optical line. Fixed by rescaling `ic_case.xml` to the buds' ~79% fill on a shared 48x48 viewport. Confirmed by measurement: equal gaps either side of the case (`0.0dp`/`0.0dp`; previously 114px vs 135px). **If one icon's frame or insets change, the others must be rescaled to match or this returns**| Visible on every screen, every session| Done| Medium|
@@ -72,19 +75,21 @@
 ## Execution order
 
 ```
-4b -> 7 -> ANC gesture sync (IN PROGRESS, capture not handed over) -> icon rework (his brief)
+4b -> 7 -> ANC gesture sync (#19, DONE + verified) -> gesture configuration (blocked on the
+`function` enum; route 1 shipped) -> icon rework (his brief)
 -> #24 remove Light theme -> dual device / codec feature ids (capture first)
 -> 5 -> 8a -> 9 (easy batch: alert-sound volume slider)
 -> widget colour states (Q4 rule) -> 8b (needs #4) -> 10/12/13/6? spikes anytime
 -> 14 -> 15 -> 17 (with 10/11 slotted in as the UI grows)
 ```
 
-Next up: **the icon rework (his brief, not written yet)** and **ANC gesture sync (#19)**. ANC
-cannot be pushed (the buds emit no event for it — verified three times), so the route is a
-one-shot `0x810C` query after a bud-side gesture, or a short `0x810C` poll if the gesture emits
-nothing the app can see. **The gesture capture has not been handed over yet** — the brief exists
-at `testlogs/ANC-GESTURE-CAPTURE.md`, and the build logs `MARK`, `BTN EVT:` and `UNATTR RX:`,
-but no log has been analysed. That decides which of the two routes it is.
+Next up: **gesture configuration**, specifically the `function` enum that blocks it (PROTOCOL.md
+§6). Route 1 is shipped — `0x0108` is sent during init and the `0x8108` reply is decoded by
+`KeyFunctionParser` — but **the reply has not been read yet**, so no result is claimed. Route 2 if
+it proves opaque: capture HeyMelody changing ONE assignment. **Do not guess the enum and do not
+build gesture UI until it is confirmed** — a dropdown of guessed functions is worse than none.
+
+**Icon rework (his brief) is still pending** and is its own session.
 
 ## Known UI debt (honest list, 2026-09-17)
 
@@ -98,7 +103,7 @@ visible to a new user.
 | Spatial audio row | Wired to the legacy feature `0x1B`; the newer three-mode `0x0422` may be what this firmware honours. Unverified |
 | Equalizer screen | Placeholder destination: presets are not yet sent to the buds |
 | Find my earbuds | Opens the buds' locate flow; volume/duration are not tunable |
-| ANC sync | The circles do not follow bud-side gestures until #19 lands |
+| ~~ANC sync~~ | **RESOLVED (#19, verified 2026-09-19)** — the circles follow bud-side gestures |
 | Widget colour states | The Q4 rule (in-ear full strength, out-of-ear grey, in-case full strength, all theme-aware) is decided but **not implemented in the widget** — the app-side icon fix did not touch it |
 | Light theme | Still present and still a source of invisible-on-light bugs; slated for removal (#24) |
 | Localisation | All user-facing text is in `strings.xml` but only `values/` (English) exists. Hardcoded strings remain in `MainActivity` dialogs (crash report, Bluetooth permission dialog) |

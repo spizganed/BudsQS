@@ -1,0 +1,9 @@
+Query gesture bindings; fix stale docs
+
+- Send getKeyFunction (0x0108) last in init; decode the 0x8108
+  reply via KeyFunctionParser. Read-only, cannot rebind.
+- Print the reply three ways, all ending RAW=[...] so the bytes
+  survive a wrong parse.
+- fn= prints as a number, never named; no gesture UI on a guess.
+- ROADMAP's "ANC has no push event (verified 3x)" was wrong; fixed.
+- PROTOCOL.md sections 4/6 updated in the same commit.

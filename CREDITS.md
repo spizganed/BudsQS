@@ -33,7 +33,7 @@ What we use from it:
 | ANC (set) | `Protocol/OppoProtocol.Anc.cs` — the `AncOff/AncLight/AncMedium/AncDeep/AncTransparency` payloads and `PktAncByIndex()`, which is the exact bitmask algorithm in our `OpoProtocol.ancPayload()` |
 | ANC (notify) | `AncValues` — the `(Val1, Val2) -> name` dictionary for the 0x0204 subType 0x03 push, which matches our own captures exactly and is the basis of `AncEventParser.modeForRaw()` |
 | Button/gesture | `Models/UserInteractionEventInfo.cs` — the 0x0204 subType 0xF1 payload body (side, button, action, modifier, context, int16 options) and the action names (0x00 single, 0x02 double, 0x03 triple, 0x04 long press, 0x07 slide up, 0x08 slide down) |
-| Key function | `Models/KeyFunctionItem.cs` — `[deviceType, button, buttonAction, function]`, the payload unit of `setKeyFunction` |
+| Key function | `Models/KeyFunctionItem.cs` — `[deviceType, button, buttonAction, function]`, the payload unit of `setKeyFunction`. **This is the ONLY source for the `0x8108` reply layout we parse in `protocol/KeyFunctionParser.kt`** — the payload `<count> <4-byte entries>` and `ENTRY_SIZE = 4` come from it and are `[OSS]`, **not yet confirmed by a capture on our device**. The `function` byte's *values* are NOT in that file, so they remain unknown and are deliberately never named (PROTOCOL.md §6) |
 | Feature IDs | `Protocol/OppoProtocol.Features.cs` — the `FeatureXxx` constants for the generic 0x0403 feature switch, including `FeatureSpatial=0x1B`, `FeatureDualDevice=0x11`, `FeatureGameLL=0x06`, `FeatureGameMain=0x28` |
 | Wearing / in-case | The 0x0109 wearing query and its `[count][component,status]` pairs |
 

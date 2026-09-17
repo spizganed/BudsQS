@@ -153,6 +153,22 @@ class DevToolsActivity : Activity() {
         clockText = findViewById<TextView>(R.id.clockText)
         sinceMarkText = findViewById<TextView>(R.id.sinceMarkText)
         devToolsRoot = findViewById<LinearLayout>(R.id.devToolsRoot)
+        // WIDGET -> text, added 2026-09-18 because the widget had NO diagnostic.
+        //
+        // LayoutReport walks an Activity's view tree, and a widget is not an
+        // Activity: it is drawn by the launcher from a RemoteViews parcel, in
+        // another process. So the Layout button could never describe it, which is
+        // why "the widget won't load" had to be debugged blind. This inflates the
+        // widget layout in-process at the size the launcher currently reports and
+        // writes it out the same way.
+        //
+        // THESE TWO MUST BE BOUND BEFORE applyTheme(). They used to be assigned at
+        // the very bottom of onCreate, which was harmless while only their click
+        // listeners read them — but applyTheme() now paints every action button,
+        // including these two, so leaving them unbound here would throw
+        // UninitializedPropertyAccessException the moment this screen opens.
+        btnWidgetLayout = findViewById<Button>(R.id.btnWidgetLayout)
+        btnWidgetLogic = findViewById<Button>(R.id.btnWidgetLogic)
         val prefs = getSharedPreferences("BudsQSPrefs", Context.MODE_PRIVATE)
         val theme = prefs.getInt("theme", THEME_OLED)
         applyTheme(theme)
@@ -225,21 +241,13 @@ class DevToolsActivity : Activity() {
         // not interesting.
         btnLayout.setOnClickListener { writeLayoutReport() }
 
-        // WIDGET -> text, added 2026-09-18 because the widget had NO diagnostic.
-        //
-        // LayoutReport walks an Activity's view tree, and a widget is not an
-        // Activity: it is drawn by the launcher from a RemoteViews parcel, in
-        // another process. So the Layout button could never describe it, which is
-        // why "the widget won't load" had to be debugged blind. This inflates the
-        // widget layout in-process at the size the launcher currently reports and
-        // writes it out the same way.
-        btnWidgetLayout = findViewById<Button>(R.id.btnWidgetLayout)
+        // Widget report listeners. The views themselves are bound at the TOP of
+        // onCreate, before applyTheme(), because applyTheme() paints them.
         btnWidgetLayout.setOnClickListener { writeWidgetReport() }
 
         // The RemoteViews / logic check. See writeWidgetLogicReport: the layout button
         // reports geometry, which was already correct; this one reports whether the
         // widget's real update path produces something the launcher can accept.
-        btnWidgetLogic = findViewById<Button>(R.id.btnWidgetLogic)
         btnWidgetLogic.setOnClickListener { writeWidgetLogicReport() }
     }
 
@@ -798,21 +806,26 @@ class DevToolsActivity : Activity() {
         logText.setBackgroundColor(cardColor)
         logText.setTextColor(txtColor)
         logScroll.setBackground(getDrawable(R.drawable.log_card_bg))
-        // The title is a plain TextView with no id, so it is found by position
-        // (first TextView of the first child row). Colouring only the log and the
-        // buttons left the title rendering in the platform default, which was the
-        // other half of the "text on white background" problem.
-        findViewById<android.view.ViewGroup>(R.id.devToolsRoot)
-            .getChildAt(0)
-            ?.let { (it as? android.view.ViewGroup)?.getChildAt(0) as? TextView }
-            ?.setTextColor(txtColor)
+
+        // The title is now found by ID. It used to be found BY POSITION (child 0 of
+        // child 0 of the root), which only worked while this screen happened to keep
+        // that exact shape — the restyle moved the buttons into their own card, so a
+        // positional walk would have been one edit away from silently colouring the
+        // wrong view. The id makes the binding explicit.
+        findViewById<TextView>(R.id.devToolsTitle)?.setTextColor(txtColor)
+
         clockText.setTextColor(secondary)
         sinceMarkText.setTextColor(secondary)
 
-        // Buttons get the shared chip drawable. Mark/Clear/Export are all the
-        // "inactive" chip; the tab buttons are repainted by updateTabButtons(),
-        // which knows which one is selected.
-        for (b in listOf(btnClear, btnMark, btnExport)) {
+        // Buttons get the shared chip drawable. ALL SEVEN action buttons are in this
+        // list now: previously only Mark/Clear/Export were, so Shot, Layout, Widg and
+        // Wlog kept the platform's default button background and sat in the same row
+        // looking like a different family. The tab buttons are NOT here — they are
+        // repainted by updateTabButtons(), which knows which one is selected.
+        for (b in listOf(
+            btnClear, btnMark, btnExport,
+            btnScreenshot, btnLayout, btnWidgetLayout, btnWidgetLogic
+        )) {
             b.background = getDrawable(R.drawable.dev_button_bg)
             b.setTextColor(txtColor)
         }

@@ -100,7 +100,7 @@ garbage rather than an error.
 | `0x0100` | `0x8100` | Handshake | — | `[CAPTURE]` |
 | `0x0103` | `0x8103` | Product ID | — | `[CAPTURE]` |
 | `0x0106` | `0x8106` | Battery | — | `[CAPTURE]` |
-| `0x0108` | `0x8108` | **getKeyFunction** (gestures) | `<count> <deviceType...>` | `[OSS]` **not yet used** |
+| `0x0108` | `0x8108` | **getKeyFunction** (gestures) | `<count> <deviceType...>` | `[OSS]` queried, reply unconfirmed |
 | `0x0109` | `0x8109` | Wearing / in-case | — | `[CAPTURE]` |
 | `0x010C` | `0x810C` | ANC state | `01 01` | `[CAPTURE]` |
 | `0x010D` | `0x810D` | Feature switch status (batch) | `<count> <featureIds...>` | `[CAPTURE]` |
@@ -146,9 +146,15 @@ A working connection is exactly this, in order `[CAPTURE]`:
 6. TX 0x010C query ANC                -> 0x810C
 7. TX 0x0106 query battery            -> 0x8106
 8. TX 0x0109 query wearing            -> 0x8109
+9. TX 0x0108 query key function       -> 0x8108   (added 2026-09-19, READ-ONLY)
 ```
 
 Then a periodic status poll (the app uses ~60 s).
+
+`[GUESS]` Step 9 is additive and unproven: it is a read, so it cannot change a
+binding, but it is not yet known whether the buds answer it, stay silent, or
+object. **If the timing of the earlier steps ever looks disturbed, step 9 is the
+first suspect** — it is the only step here that is new. See §6.
 
 ### The broadcast codes reply (0x8200) is the map of what exists
 
@@ -341,6 +347,42 @@ guess them. Two ways to get them, cheapest first:
 
 Note the source conflict: an `ai-generated/` doc says `0x0401`; `OppoPodsManager`'s
 command table says **`0x0402`**. Prefer `0x0402`, and confirm from a capture.
+
+#### Status of route 1 — SHIPPED 2026-09-19, RESULT PENDING
+
+Route 1 is implemented: `OpoProtocol.queryKeyFunction()` (`0x0108`) is sent last in
+the init sequence (read-only, so it cannot change a binding), and `KeyFunctionParser`
+decodes the `0x8108` reply. **The reply has not been seen yet, so the layout below is
+still `[OSS]`, not `[CAPTURE]`.**
+
+```
+TX  AA 07 00 00 08 01 <seq> 00 00      query key function (payload empty)
+```
+
+`TotalLen` is `07` here, matching the handshake, because `TotalLen = 7 + payLen`
+and this payload is empty — do not copy `08` from the command number. The seq byte
+is whatever the counter was at; it is not fixed.
+
+Three places print the reply, so a capture can always be read even if the parse is
+wrong: the raw `RX:` line, `BudsConnectionManager`'s `KEYFN:` line, and
+`LogDecoder`'s description — **all of which end with `RAW=[...]`**.
+
+The parser is deliberately guarded, and these guards are what to look for:
+
+- `parsed=N` vs `count=M` — a disagreement means the entry size is not 4, or the
+  payload begins with something other than a count byte.
+- `!LAYOUT` — printed when `count` and the bytes present do not reconcile. A
+  `0x8108` reply that trips this is the evidence needed to fix the layout.
+- `fn=0xNN` is printed as a **number and never named.** Naming it before a capture
+  confirms it is exactly the mistake that cost us the SET-ANC regression (§5). No
+  UI may offer a function list until this is resolved.
+
+If `0x8108` turns out to be opaque or the guards trip on every reading, fall back to
+route 2 (capture HeyMelody changing one assignment).
+
+**Note the write path is not built.** `0x0402` is deliberately not defined as a
+constant yet, and `buildPacket()` still lacks LEB128 `TotalLen` (§2), which a
+multi-entry write needs. Neither should be added until the enum is known.
 
 ---
 
