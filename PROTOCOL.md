@@ -382,10 +382,22 @@ frame is not the single-tap binding firing; it is some other event. The comparis
 between two different kinds of thing. **Do not refute a theory with a sample that may not
 be the same kind of event.**
 
-**TWO SHAPES STILL UNEXPLAINED — so this stays diagnostic, never a control signal:**
+**THE SLIDE "OUTLIER" IS NOW EXPLAINED (2026-09-22): `byte3` IS THE RESOLVED FUNCTION.**
+This was listed here as an unexplained counter-example. It is not one — it is the rule
+working. The same gesture, with two different slot values, gave two self-consistent pairs:
 
-- **Slides.** `byte2 07/08` give `byte3 05/06` (prev/next), while the slide slot's `fn` is
-  `0x0A` (switch track). Coherent if switch track resolves per-direction, but unproven.
+| slide slot `fn` | `byte3` up | `byte3` down | reading |
+|---|---|---|---|
+| `0x0A` switch track | `0x05` | `0x06` | resolves to prev / next |
+| `0x07` volume | `0x0B` | `0x0C` | resolves to volume up / volume down |
+
+So `0x0A` and `0x07` are **composites** that resolve per direction, and **`0x0B` = volume up,
+`0x0C` = volume down** (the pairings are measured; the two NAMES are inferred, and marked so).
+This is also the cleanest demonstration of why `byte3` cannot be read as just "the stored
+byte" — it reports what the gesture EFFECTIVELY does.
+
+**STILL UNEXPLAINED — so this stays diagnostic, never a control signal:**
+
 - **`F1` action `0x00` vs `0x01`.** Both appear as a left single tap. `0x01` matches the
   bound slot, `0x00` does not — `0x00` is likely a raw touch report, which would also make
   the `[OSS]` action table's "`0x00` = single tap" **suspect**.
@@ -473,29 +485,47 @@ against what he reported binding (zero contradictions; two values confirmed twic
 
 | `fn` | meaning | | `fn` | meaning |
 |---|---|---|---|---|
-| `0x00` | none / unbound | | `0x07` | volume |
-| `0x01` | play/pause | | `0x08` | **ANC cycle** (the hold) |
-| `0x03` | voice assistant | | `0x0A` | switch track |
-| `0x05` | previous track | | `0x11` | game mode |
-| `0x06` | next track | | | |
+| `0x00` | none / unbound | | `0x08` | **ANC cycle** (the hold) |
+| `0x01` | play/pause | | `0x0A` | switch track |
+| `0x03` | voice assistant | | `0x0B` | volume up `[INFERRED]` |
+| `0x05` | previous track | | `0x0C` | volume down `[INFERRED]` |
+| `0x06` | next track | | `0x11` | game mode |
+| `0x07` | volume | | | |
 
-Unseen: `0x02`, `0x04`, `0x09`, `0x0B`–`0x10`, `0x12`+.
+`0x0B`/`0x0C` come from **`F1` byte3 during a slide**, where the same gesture resolved
+per direction (see `byte3` in §6.1): a slot holding `0x07` (volume) reported `0x0B` going up
+and `0x0C` going down. The PAIRING is measured; the two **names are inferred**, which is why
+they are marked. `0x0A` and `0x07` are **composites** — they resolve per direction, so an
+`F1` frame never reports them directly.
 
-#### The table's SHAPE IS NOT FIXED — do not hardcode a count or a button group
+Unseen: `0x02`, `0x04`, `0x09`, `0x0D`–`0x10`, `0x12`+.
 
-It went from **18 entries to 20** during this work, and the extra two are what broke slide:
+#### The table's SHAPE IS NOT FIXED — do not hardcode a count OR a button group
+
+`[CAPTURE]` Both the entry COUNT and the button GROUPS a gesture lives in change, and they
+differ **per bud, within a single capture**. The slide gesture, one session:
 
 ```
-18 entries  dev=0x01/btn=0x01[01 02 03 04 06 05]      slide 05 was INSIDE btn 0x01
-20 entries  dev=0x01/btn=0x01[01 02 03 04 06]        05 gone
-            dev=0x01/btn=0x02[05:..]                 <- slide, one direction
-            dev=0x01/btn=0x03[05:..]                 <- slide, the other
+LEFT   19 entries  dev=0x01/btn=0x01[01 02 03 04 06 05:07]   slide bound inside btn 0x01
+RIGHT  19 entries  dev=0x02/btn=0x02[05:00]                  slide SPLIT OUT, unbound
+                   dev=0x02/btn=0x03[05:00]
+both   20 entries  (an earlier session)                      slide split out, other side
+both   18 entries  (after consolidation)                     slide back inside btn 0x01
 ```
 
-**`btn 0x02` and `0x03` are the two slide zones.** Slide's slots *moved out* of `btn 0x01`,
-and because our write aimed at `btn 0x01 act 0x05` it hit a slot that no longer existed and
-did nothing — five writes, every one `KEYFN DIFF: NO CHANGE`. **Enumerate the groups from
-the reply and target them by name; never assume `btn 0x01`.**
+**This broke slide twice, in opposite directions.** Writing to `btn 0x01` missed the split
+shape; writing to `btn 0x02`/`0x03` missed the LEFT bud and produced
+`NO SLOT MATCHED for dev=0x01`. **Any hardcoded button group is wrong about half the time,
+so a write must take the slots FROM THE TABLE** — every entry for that `(side, action)`,
+excluding only the `btn 0x06` group.
+
+**AND THE DEVICE NORMALISES THE SPLIT SHAPE — `[CAPTURE]`, by arithmetic.** Giving the right
+bud's two split halves the same function produced an ack (`0x8401`, status `00`), and the
+re-read showed `btn=0x01 act=0x05 added: 0x07` with `btn=0x02 removed` and `btn=0x03 removed`
+— 19 entries → 18 (=-2, +1 ✓). So the split is a **"two unbound halves" state** that the
+firmware folds back into one `btn 0x01` slot once both halves agree. That is exactly why
+slide appeared to work once and then never again: the first write collapsed the shape, and
+every later write aimed at groups that no longer existed.
 
 `btn 0x06` (all `fn=0x00`) is still unexplained — the on-call hypothesis is neither
 confirmed nor refuted, and `0x02`/`0x03` turning out to be slides shows "extra group" does
@@ -515,16 +545,11 @@ So the key-function table only *describes* the hold; the cycle itself lives in t
 and folding it into the key-function save would make a failure impossible to attribute.
 The read reply's 2-byte header is our own finding — see just below.
 
-**The `function` VALUES are UNKNOWN.** That is the one blocking gap, and it is
-narrower than it looks: the read half is DONE, only the enum is missing. Two ways to
-get it, cheapest first:
-
-1. **Ask the buds, then DIFF.** Send `0x0108` and read the `0x8108` reply; it
-   describes the *current* assignment. One reading alone cannot name anything (see
-   below), but two readings around ONE change in HeyMelody name that value outright.
-2. **Capture HeyMelody.** Change one gesture assignment in the official app and
-   log the `TX` frame; that is the write we need to imitate, plus its ack. Only
-   needed if the diff in (1) proves unreadable.
+**The `function` VALUES ARE NO LONGER UNKNOWN — they are in the table above, measured.**
+This paragraph used to say they were the one blocking gap and describe two routes to find
+them. Both routes were used and both are finished: route 1 (diff two readings) is what
+produced the table, and route 2 (a HeyMelody capture) was never needed. Kept as a note only
+so the history is not lost — **do not re-open it, and do not "re-derive" the enum.**
 
 Note the source conflict, and its resolution: an `ai-generated/` doc said `0x0401`;
 `OppoPodsManager` appeared to say **`0x0402`**. This document originally said "prefer

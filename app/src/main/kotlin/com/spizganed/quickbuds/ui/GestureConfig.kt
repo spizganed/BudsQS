@@ -72,53 +72,40 @@ enum class Gesture(
      * as `0x08`. Both directions are driven by that one `0x05` binding — which is why the
      * write needs one entry, not the two that `reportBytes` would suggest.
      */
-    val keyFnAction: Int = 0,
-
-    /**
-     * WHICH `button` groups this gesture's binding is written to.
-     *
-     * Defaults to the physical-button group `0x01`, which holds every tap and the hold.
-     * **SLIDE is the exception and overrides this** — see [SLIDE].
-     *
-     * This exists as a LIST rather than a single id because a gesture is not always one
-     * slot: slide became TWO. Hardcoding `0x01` here is what broke slide (see below).
-     */
-    val keyFnButtons: IntArray = intArrayOf(0x01)
+    val keyFnAction: Int = 0
 ) {
     SINGLE_TAP(R.string.gesture_single, intArrayOf(0x00), false, keyFnAction = 0x01),
     DOUBLE_TAP(R.string.gesture_double, intArrayOf(0x02), false, keyFnAction = 0x02),
     TRIPLE_TAP(R.string.gesture_triple, intArrayOf(0x03), false, keyFnAction = 0x03),
 
     /**
-     * SLIDE IS ONE ROW, TWO REPORT BYTES, AND TWO WRITE SLOTS.
+     * SLIDE IS ONE ROW, TWO REPORT BYTES, AND A MOVING TARGET.
      *
      * The buds REPORT slide up (0x07) and slide down (0x08) separately — [reportBytes]
-     * holds both — and on the device the two directions turned out to live in SEPARATE
-     * `button` groups, which is why this gesture writes to more than one:
+     * holds both — and where its BINDING lives depends on the bud and on whether it is
+     * currently bound. Measured, in one single capture:
      *
-     *     dev=0x01/btn=0x02[05:..]   one slide direction
-     *     dev=0x01/btn=0x03[05:..]   the other
+     *     LEFT   dev=0x01/btn=0x01[.. 05:07]      slide inside btn 0x01, bound (volume)
+     *     RIGHT  dev=0x02/btn=0x02[05:00]         slide split into its own groups,
+     *            dev=0x02/btn=0x03[05:00]         both unbound (fn=0x00)
      *
-     * *** THIS IS THE BUG THAT MADE SLIDE DO NOTHING, AND THE COMMENT HERE USED TO
-     * ARGUE THE OPPOSITE. *** An earlier revision read the 18-entry table, saw a single
-     * `act 0x05` inside `btn 0x01`, and concluded "one binding drives both directions,
-     * do NOT expand into two entries". That was right about the OLD shape and became
-     * wrong when the slide slots MOVED OUT of `btn 0x01` into `0x02`/`0x03`: our writes
-     * then aimed at `btn 0x01 act 0x05`, a slot that no longer existed. The log shows it
-     * exactly — five writes, every one followed by `KEYFN DIFF: NO CHANGE (20 slots
-     * identical)`. Writing to a slot the device does not have fails silently.
+     * *** THIS IS WHY SLIDE KEPT "NOT WORKING", AND TWICE THE FIX WAS WRONG. ***
+     * Revision 1 wrote `btn 0x01` and silently missed the split shape. Revision 2 replaced
+     * that with a hardcoded `btn 0x02`/`0x03` and then silently missed the LEFT bud, whose
+     * slide is in `btn 0x01` — the log line was `NO SLOT MATCHED for dev=0x01`. Both
+     * hardcodings are wrong half the time.
      *
-     * BOTH directions are written with the SAME action, deliberately: this screen shows
-     * a single "Slide" row, so both physical directions should do the same thing. Which
-     * of `0x02`/`0x03` is up and which is down is still UNKNOWN to us, and rather than
-     * guess, both get the same binding — the row's promise is kept either way, and no
-     * wrong claim about direction is baked into the code.
+     * THE FIX IS THAT NEITHER THIS ENUM NOR THE UI DECIDES. `writeGestureBinding()` reads
+     * the buds' own table and writes EVERY slot that bud has for `act 0x05`, so whichever
+     * shape is in front of it is the shape it writes.
+     *
+     * AND THE DEVICE THEN NORMALISES IT — captured, not assumed: after that right-bud write
+     * the re-read showed the two split groups GONE and `dev=0x02/btn=0x01[.. 05:07]` in
+     * their place. The split shape is a "two unbound halves" state that the firmware folds
+     * back into one `btn 0x01` slot once both are given the same function. Writing every
+     * matching slot is also what makes both halves agree, which is what triggers that.
      */
-    SLIDE(
-        R.string.gesture_slide, intArrayOf(0x07, 0x08), false,
-        keyFnAction = 0x05,
-        keyFnButtons = intArrayOf(0x02, 0x03)
-    ),
+    SLIDE(R.string.gesture_slide, intArrayOf(0x07, 0x08), false, keyFnAction = 0x05),
 
     TAP_HOLD(R.string.gesture_hold, intArrayOf(0x04), true, keyFnAction = 0x04)
 }

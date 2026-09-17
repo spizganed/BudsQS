@@ -209,6 +209,31 @@ object OpoProtocol {
 
     fun queryBattery(): ByteArray = buildPacket(CMD_QUERY_BATTERY, seq = 0xF0)
     fun queryAncMode(): ByteArray = buildPacket(CMD_QUERY_ANC, payload = byteArrayOf(0x01, 0x01))
+
+    /**
+     * getNoiseReductionSwitchMode — WHICH ANC modes the hold cycles through.
+     *
+     * `0x010C` is one command number carrying several different questions, selected by the
+     * payload. `[OSS]`, from the Melody-derived tables:
+     *
+     *     01 01   getCurrentNoiseReductionMode   what is active right now  <- queryAncMode()
+     *     02 01   getNoiseReductionSwitchMode    the HOLD's mode list
+     *     02 03   "                              (list may be one of these)
+     *     02 04   "                              (…the source lists all three)
+     *     04 01   getIntelligentNoiseReductionMode
+     *
+     * WHY THIS EXISTS: the hold's ANC cycle is the one thing this app cannot yet configure.
+     * Its key-function byte (`0x08`) only *reports* that the hold cycles ANC — measured on
+     * the device, clearing that byte did not stop the cycle, and which modes it stepped
+     * through was decided entirely on the vendor side. The mode list lives HERE instead, and
+     * this read is the cheap, read-only way to see it before anyone writes `0x0404`.
+     *
+     * READ-ONLY, so it cannot change a binding. Only `02 01` is sent, not all three
+     * variants: sending three near-identical queries would clutter the capture, and the
+     * first one is the best-supported. If it comes back empty, try `02 03` / `02 04` next.
+     */
+    fun queryNoiseSwitchModes(): ByteArray =
+        buildPacket(CMD_QUERY_ANC, payload = byteArrayOf(0x02, 0x01))
     fun queryEq(): ByteArray = buildPacket(CMD_QUERY_EQ)
     fun queryEqAll(): ByteArray = buildPacket(CMD_QUERY_EQ_ALL, payload = byteArrayOf(0x01, 0x05))
 

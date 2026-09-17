@@ -55,19 +55,27 @@ object KeyFunctionParser {
     const val HEADER_SIZE = 2
 
     /**
-     * The `button` id this app writes bindings to: the physical-button group.
+     * The physical-button group: what every `F1` frame this project has captured reports
+     * (`btn=0x01` on both buds), so it is where the user's taps and holds live.
      *
-     * 0x01 is the ONLY group we touch. Every F1 frame this project has captured carries
-     * `btn=0x01` on both buds, so that is the group the user actually presses.
-     *
-     * The reply also carries a `btn 0x06` group (`act 02/03/06`) whose meaning is unknown
-     * — no capture has ever reported it. It is left strictly alone: a write sends the
-     * whole table rebuilt from the last reading, so that group goes back byte-for-byte
-     * untouched. `writeGestureBinding()` matches on button as well as side for the same
-     * reason — `act 0x02` exists in BOTH groups, so matching on side+action would change
-     * a second binding with nothing in our UI to show for it.
+     * It is NOT the only group a gesture writes to, and treating it as such was a real bug
+     * — see [BUTTON_ON_CALL_GUESS] and `writeGestureBinding()`.
      */
     const val BUTTON_PRIMARY = 0x01
+
+    /**
+     * The group we NEVER write: `btn 0x06`, believed to be the on-call bindings.
+     *
+     * It carries its own smaller gesture list (`act 02/03/06`) and every entry in it reads
+     * `fn=0x00` = "no action", which is what an unset on-call group looks like. NO capture
+     * has ever reported an `F1` frame for it, so the guess is unconfirmed — which is exactly
+     * why a write leaves it **byte-for-byte untouched** rather than "fixing" it.
+     *
+     * This matters because `act 0x02` and `act 0x03` exist in BOTH `btn 0x01` and `btn 0x06`.
+     * A write that matched on (side, action) alone would silently re-bind a second, unrelated
+     * gesture — the kind of change nothing in our UI would show.
+     */
+    const val BUTTON_ON_CALL_GUESS = 0x06
 
     data class Entry(
         val deviceType: Int,

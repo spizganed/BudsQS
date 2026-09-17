@@ -186,10 +186,13 @@ class GestureActivity : Activity() {
      * yet the manager REFUSES the write and says so in the log, rather than inventing the
      * other entries; that refusal is deliberate, not a silent no-op.
      *
-     * WHICH BUTTON GROUPS ARE WRITTEN comes from [Gesture.keyFnButtons], not from a
-     * constant here. That is not tidiness — hardcoding `btn 0x01` is exactly what broke
-     * slide, because slide's slots moved out of `0x01` and the writes kept going to the
-     * old address and silently doing nothing.
+     * WHICH BUTTON GROUPS ARE WRITTEN is NOT decided here or in [Gesture]. The manager reads
+     * the buds' own table and writes every slot that bud actually has for this action, which
+     * is the only rule that survives what the hardware does: slide has been seen inside
+     * `btn 0x01` on one bud and split across `btn 0x02`/`0x03` on the other, in the SAME
+     * capture. Both a hardcoded `0x01` and a hardcoded `0x02,0x03` are wrong half the time,
+     * and each failure is silent — which is exactly how slide looked "broken but sometimes
+     * working" for a session. See BudsConnectionManager.writeGestureBinding().
      *
      * THE HOLD'S EMPTY CASE SENDS NOTHING, and that is deliberate too. Measured on the
      * device: clearing the hold's function byte to `0x00` does NOT stop the ANC cycle —
@@ -209,7 +212,6 @@ class GestureActivity : Activity() {
             action = BudsService.ACTION_SET_GESTURE
             putExtra(BudsService.EXTRA_GESTURE_DEVICE, side.deviceType)
             putExtra(BudsService.EXTRA_GESTURE_ACTION, gesture.keyFnAction)
-            putExtra(BudsService.EXTRA_GESTURE_BUTTONS, gesture.keyFnButtons)
             putExtra(BudsService.EXTRA_GESTURE_FUNCTION, GestureAction.functionByteFor(actions))
         }
         startService(intent)

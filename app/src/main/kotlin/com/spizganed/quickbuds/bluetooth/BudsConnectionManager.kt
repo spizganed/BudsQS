@@ -216,6 +216,10 @@ class BudsConnectionManager(private val context: Context) {
                 // Read-only: reports the CURRENT gesture bindings so a capture can
                 // reveal the `function` enum. See OpoProtocol.queryKeyFunction().
                 delay(200); sendRawBlocking(OpoProtocol.queryKeyFunction(), "query key function")
+                // Read-only: the HOLD's ANC mode list, which is the one gesture this app
+                // still cannot configure — its key-function byte only reports that the hold
+                // cycles ANC, not which modes. See OpoProtocol.queryNoiseSwitchModes().
+                delay(200); sendRawBlocking(OpoProtocol.queryNoiseSwitchModes(), "query noise switch")
             } catch (e: Exception) {
                 log("Init sequence error: ${e.message}")
             }
@@ -329,21 +333,28 @@ class BudsConnectionManager(private val context: Context) {
      * (keyfn 1=single; F1 0x00=single), so passing an F1 byte here would write the wrong
      * slot. See `Gesture.keyFnAction`.
      *
-     * `buttons` is matched as well as `side` and `keyFnAction`, and that is NOT decoration:
-     * the table carries SEVERAL groups per bud (`btn 0x01`, `0x02`, `0x03`, `0x06`), and
-     * `act 0x02` appears in more than one of them. Matching on (side, action) alone would
-     * rewrite a binding the user never touched. Every slot is identified by all THREE
-     * fields.
+     * WHICH SLOTS ARE WRITTEN IS DECIDED BY THE TABLE, NOT BY A LIST IN OUR CODE. That is
+     * the correction of a real bug, and the reason is worth keeping: a table in this very
+     * project's capture history has held a gesture in THREE different places.
      *
-     * This takes a LIST because one gesture is not always one slot: SLIDE occupies two
-     * groups (`btn 0x02` and `btn 0x03`, one per physical direction) while every other
-     * gesture lives in `btn 0x01`. See [Gesture.keyFnButtons].
+     *     LEFT   19 entries   dev=0x01/btn=0x01[.. 05:07]      slide in btn 0x01
+     *     RIGHT  19 entries   dev=0x02/btn=0x02[05:00]         slide split out
+     *                         dev=0x02/btn=0x03[05:00]
+     *     both   20 entries   (an earlier session)             slide split out, other side
      *
-     * ZERO MATCHES REFUSES THE WRITE, LOUDLY. A write that matches no slot is by
-     * definition a no-op, and silently sending one is how slide appeared "broken but
-     * sometimes working" for a whole session: the writes went to `btn 0x01 act 0x05`, a
-     * slot that had moved, and every one came back unchanged with nothing in the log to
-     * say why. Now it says so outright, which turns a mystery into a one-line answer.
+     * A hardcoded per-gesture button list was tried and it broke: aiming slide's write at
+     * `btn 0x02`/`0x03` produced `NO SLOT MATCHED` on a bud whose slide sits in `btn 0x01`,
+     * and aiming at `0x01` misses the split shape. So the rule is now simply "every slot
+     * this bud actually has for this action", excluding only [KeyFunctionParser.BUTTON_ON_CALL_GUESS].
+     *
+     * MEASURED BONUS: writing slide's two split groups makes the DEVICE CONSOLIDATE them
+     * into `btn 0x01 act 0x05` and drop the extras. So the split shape is not permanent,
+     * the device normalises it, and our table-driven rule follows that automatically.
+     *
+     * ZERO MATCHES REFUSES THE WRITE, LOUDLY. A write that matches no slot is by definition
+     * a no-op, and silently sending one is what made slide look "broken but sometimes
+     * working": the writes went to a group that bud did not have, and came back unchanged
+     * with nothing in the log to say why. A one-line answer beats a mystery.
      *
      * Returns false and does nothing when no table has been read yet. That is the point:
      * a write needs all the other entries, and guessing them would silently destroy
@@ -351,7 +362,6 @@ class BudsConnectionManager(private val context: Context) {
      */
     fun writeGestureBinding(
         side: Int,
-        buttons: IntArray,
         keyFnAction: Int,
         functionByte: Int
     ): Boolean {
@@ -362,17 +372,20 @@ class BudsConnectionManager(private val context: Context) {
         }
 
         var matched = 0
+        val buttons = LinkedHashSet<Int>()
         val updated = table.entries.map { e ->
-            if (e.deviceType == side && e.action == keyFnAction && buttons.contains(e.button)) {
+            if (e.deviceType == side && e.action == keyFnAction &&
+                e.button != KeyFunctionParser.BUTTON_ON_CALL_GUESS) {
                 matched++
+                buttons.add(e.button)
                 e.copy(function = functionByte)
             } else {
                 e
             }
         }
         if (matched == 0) {
-            log("KEYFN WRITE: NO SLOT MATCHED for dev=0x%02X btn=%s act=0x%02X - nothing sent"
-                .format(side, buttons.joinToString(",") { "0x%02X".format(it) }, keyFnAction))
+            log("KEYFN WRITE: no slot for dev=0x%02X act=0x%02X - nothing sent"
+                .format(side, keyFnAction))
             return false
         }
 

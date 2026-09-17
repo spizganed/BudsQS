@@ -17,7 +17,6 @@ import android.os.Looper
 import android.os.PowerManager
 import android.util.Log
 import com.spizganed.quickbuds.R
-import com.spizganed.quickbuds.protocol.KeyFunctionParser
 import com.spizganed.quickbuds.widget.AncWidgetProvider
 import com.spizganed.quickbuds.widget.WidgetStateStore
 
@@ -126,27 +125,24 @@ class BudsService : Service(), BudsConnectionManager.Listener {
                 val device = intent.getIntExtra(EXTRA_GESTURE_DEVICE, -1)
                 val gestureAction = intent.getIntExtra(EXTRA_GESTURE_ACTION, -1)
                 val function = intent.getIntExtra(EXTRA_GESTURE_FUNCTION, -1)
-                // Which button groups this gesture owns. Defaults to the physical-button
-                // group when absent, so an older caller cannot break the tap gestures.
-                val buttons = intent.getIntArrayExtra(EXTRA_GESTURE_BUTTONS)
-                    ?: intArrayOf(KeyFunctionParser.BUTTON_PRIMARY)
                 statusLog("<< SET_GESTURE: dev=0x${
-                    "%02X".format(device)} btn=${
-                    buttons.joinToString(",") { "0x%02X".format(it) }} " +
-                    "act=0x${"%02X".format(gestureAction)} fn=0x${"%02X".format(function)}")
+                    "%02X".format(device)} act=0x${
+                    "%02X".format(gestureAction)} fn=0x${"%02X".format(function)}")
                 if (device < 0 || gestureAction < 0 || function < 0) {
                     statusLog("<< SET_GESTURE: malformed extras, ignored")
                 } else if (manager?.isConnected() != true) {
                     statusLog("<< SET_GESTURE: not connected, not sent")
                 } else {
-                    // The manager returns false when no slot matches the gesture or when it
+                    // WHICH SLOTS GET THE VALUE is the manager's business, not this caller's:
+                    // it reads them from the buds' own table (see writeGestureBinding), because
+                    // a gesture's button group is not fixed — slide has appeared in btn 0x01
+                    // AND split across 0x02/0x03, on different buds and in different sessions.
+                    // The manager returns false when no slot exists for the gesture or when it
                     // has no 0x8108 reading to rebuild the full table from. Both refusals are
-                    // the SAFE outcome, so they are logged as their own case and NOT retried:
-                    // sending a table aimed at a slot the device does not have does nothing,
-                    // and sending a made-up table could wipe bindings we don't model.
-                    val sent = manager?.writeGestureBinding(
-                        device, buttons, gestureAction, function
-                    ) ?: false
+                    // the SAFE outcome, so they are logged and NOT retried: a write aimed at a
+                    // slot the device does not have does nothing, and a made-up table could
+                    // wipe bindings we don't model.
+                    val sent = manager?.writeGestureBinding(device, gestureAction, function) ?: false
                     if (!sent) statusLog("<< SET_GESTURE: refused (see KEYFN WRITE line above)")
                 }
             }
@@ -352,7 +348,5 @@ class BudsService : Service(), BudsConnectionManager.Listener {
         const val EXTRA_GESTURE_DEVICE = "gesture_device"
         const val EXTRA_GESTURE_ACTION = "gesture_action"
         const val EXTRA_GESTURE_FUNCTION = "gesture_function"
-        /** IntArray of `button` groups to write; slide needs two, everything else one. */
-        const val EXTRA_GESTURE_BUTTONS = "gesture_buttons"
     }
 }

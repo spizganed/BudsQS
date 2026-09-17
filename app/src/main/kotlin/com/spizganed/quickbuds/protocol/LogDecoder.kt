@@ -198,7 +198,27 @@ object LogDecoder {
                 }
                 sb.toString()
             }
-            0x810C -> "ANC query response ($cmdHex)"
+            0x810C -> {
+                // 0x010C IS ONE COMMAND NUMBER CARRYING SEVERAL QUESTIONS, chosen by the
+                // REQUEST payload: `01 01` asks the current mode, while `02 01`/`02 03`/`02 04`
+                // ask the hold's switch list (OpoProtocol.queryNoiseSwitchModes). The reply
+                // cannot name which was asked from the command alone, which is why the raw
+                // payload is printed — the hold probe used to come back as the bare words
+                // "ANC query response (0x810C)" and told us nothing.
+                //
+                // THE NOTIFY TABLE, NOT THE SET ONE. This is the single easiest mistake in
+                // this file: `ancPayloadToString()` names SET_ANC payloads, and the query
+                // reply reports the buds' state with the bits the ANC push uses (Off = bit 3,
+                // Transparency = bit 8). Feeding it through the SET table reads its constant
+                // `01 01` prefix as data and calls Transparency "Off". So the mode is decoded
+                // with AncEventParser, the same table the 0x0204 subType 0x03 push uses.
+                //
+                // The caveat, stated so the line is not over-trusted: for the SWITCH-LIST
+                // query (`02 01`) the reply's shape is unknown, so the name is only meaningful
+                // for the current-mode query. The hex is the part that is always true.
+                val hex = payload.joinToString(" ") { "%02X".format(it) }
+                "ANC query response (0x810C): ${AncEventParser.describe(payload)} [$hex]"
+            }
             0x8109 -> {
                 val sb = StringBuilder("Wearing query response (0x8109)")
                 WearingStatusParser.parseQueryResponse(payload)?.let { w ->
