@@ -64,6 +64,22 @@ class SegmentedBarDrawable(
         typeface = android.graphics.Typeface.DEFAULT_BOLD
     }
 
+    /**
+     * Drawable alpha, 0..255, applied to EVERY paint on each draw.
+     *
+     * WHY THIS IS STORED AND RE-APPLIED: Paint.alpha is per-Paint and gets reset
+     * every time a colour is assigned (setting `paint.color` overwrites the alpha
+     * packed into it). The dividers, the track, the fill and the label all assign a
+     * colour in draw(), so an alpha set once in setAlpha() would be wiped by the
+     * first colour assignment — which is exactly why the bars did not fade while the
+     * cards around them did. So `setAlpha` records the value and `draw()` re-applies
+     * it after every colour it sets.
+     *
+     * The LABEL is faded with the rest. It used a separate Paint that setAlpha never
+     * touched, so at alpha 0 the bar vanished and the number stayed behind.
+     */
+    private var drawAlpha: Int = 255
+
     /** Updates the label without rebuilding the drawable. */
     fun setLabel(text: String?) {
         labelText = text
@@ -79,17 +95,37 @@ class SegmentedBarDrawable(
 
     private val rect = RectF()
 
+    /**
+     * Applies the stored alpha to a colour, so every element fades together.
+     *
+     * Multiplying rather than replacing: a colour that already carries alpha (the
+     * transparent divider case) keeps its transparency instead of becoming opaque.
+     */
+    private fun faded(color: Int): Int {
+        if (drawAlpha == 255) return color
+        val a = (android.graphics.Color.alpha(color) * drawAlpha) / 255
+        return android.graphics.Color.argb(
+            a,
+            android.graphics.Color.red(color),
+            android.graphics.Color.green(color),
+            android.graphics.Color.blue(color)
+        )
+    }
+
     override fun draw(canvas: Canvas) {
         val w = bounds.width().toFloat()
         val h = bounds.height().toFloat()
         if (w <= 0f || h <= 0f) return
+        // Nothing to draw at all when faded out, which avoids a frame of stray
+        // antialiasing at alpha 0.
+        if (drawAlpha == 0) return
 
         val left = bounds.left.toFloat()
         val top = bounds.top.toFloat()
         rect.set(left, top, left + w, top + h)
 
         // 1. Track
-        paint.color = trackColor
+        paint.color = faded(trackColor)
         canvas.drawRoundRect(rect, cornerRadius, cornerRadius, paint)
 
         // 2. Fill
@@ -101,26 +137,57 @@ class SegmentedBarDrawable(
             // battery-bar look.
             canvas.clipRect(left, top, left + fillW, top + h)
             rect.set(left, top, left + w, top + h)
-            paint.color = fillColor
+            paint.color = faded(fillColor)
             canvas.drawRoundRect(rect, cornerRadius, cornerRadius, paint)
             canvas.restoreToCount(saved)
         }
 
         // 3. Dividers, on top. n-1 of them, at i/n of the width.
+        //
+        // ROUNDED SLOTS, not square cuts. A plain drawRect gives each cell a square
+        // end, which at this bar height reads as a hard-edged notch; the request was
+        // for the cells to have rounded edges. Each divider is therefore drawn as a
+        // rounded rect one cell-gap wide, whose own corner radius is a fraction of the
+        // bar height — big enough to round the cut, small enough that it still reads
+        // as a gap rather than as a dot.
         if (segments > 1 && dividerWidth > 0f) {
-            paint.color = dividerColor
+            paint.color = faded(dividerColor)
+            val slotR = dividerSlotRadius(h)
             for (i in 1 until segments) {
                 val x = left + w * (i.toFloat() / segments)
-                canvas.drawRect(
-                    x - dividerWidth / 2f, top,
-                    x + dividerWidth / 2f, top + h,
-                    paint
-                )
+                if (slotR > 0f) {
+                    rect.set(
+                        x - dividerWidth / 2f, top,
+                        x + dividerWidth / 2f, top + h
+                    )
+                    canvas.drawRoundRect(rect, slotR, slotR, paint)
+                } else {
+                    canvas.drawRect(
+                        x - dividerWidth / 2f, top,
+                        x + dividerWidth / 2f, top + h,
+                        paint
+                    )
+                }
             }
         }
 
         // 4. The label, inside the last filled cell.
         drawLabel(canvas, w, h)
+    }
+
+    /**
+     * Corner radius for the divider slots, derived from the bar height.
+     *
+     * WHY DERIVED AND NOT FIXED: the bar is only `battery_bar_height` (13dp) tall and
+     * the widget's is 5dp. A fixed radius that rounds nicely on the app bar would
+     * over-round the widget's into lozenges. A fraction of the height scales, and it
+     * is capped at half the divider's own width so the shape can never bulge wider
+     * than the gap it is carving.
+     */
+    private fun dividerSlotRadius(barHeight: Float): Float {
+        val fromHeight = barHeight * DIVIDER_SLOT_RADIUS_FRACTION
+        val maxUseful = dividerWidth / 2f
+        return if (fromHeight > maxUseful) maxUseful else fromHeight
     }
 
     /**
@@ -171,14 +238,16 @@ class SegmentedBarDrawable(
         val cellCentreX = bounds.left + cellWidth * (labelCell - 0.5f)
 
         // Colour contrasts with the cell's OWN background.
-        textPaint.color = if (isLabelCellFilled) labelColorOnFill else labelColorOnTrack
+        textPaint.color = faded(if (isLabelCellFilled) labelColorOnFill else labelColorOnTrack)
 
         val baseline = bounds.top + h / 2f - (textPaint.descent() + textPaint.ascent()) / 2f
         canvas.drawText(text, cellCentreX, baseline, textPaint)
     }
 
     override fun setAlpha(alpha: Int) {
-        paint.alpha = alpha
+        // Records the value; draw() re-applies it to each paint after setting a
+        // colour, because assigning a colour would otherwise reset the alpha.
+        drawAlpha = alpha.coerceIn(0, 255)
         invalidateSelf()
     }
 
@@ -198,5 +267,17 @@ class SegmentedBarDrawable(
     companion object {
         /** Transparent, for callers that want no dividers at all. */
         val NO_DIVIDER: Int = Color.TRANSPARENT
+
+        /**
+         * How rounded each divider slot is, as a fraction of the bar's height.
+         *
+         * 0.5 rounds a slot into a stadium at the bar's full height, which is too
+         * much: the gap starts to look like a filled dot rather than a cut. 0.28 was
+         * chosen by working down from 0.5 — it visibly rounds the cell corners while
+         * leaving the slot reading as a gap. It is also capped at half the divider
+         * width in dividerSlotRadius, so a wide divider cannot bulge past its own
+         * edges.
+         */
+        private const val DIVIDER_SLOT_RADIUS_FRACTION = 0.28f
     }
 }

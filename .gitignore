@@ -20,7 +20,10 @@ Thumbs.db
 *.log
 *.log.txt
 commit-title.txt
-next-session-prompt.txt
+commit-title-short.txt
 testlogs/
 module.toml
 *.toml
+
+# NOTE: NEXT-SESSION.md is deliberately NOT ignored — the handover plan should
+# travel with the repo. It replaced the old ignored next-session-prompt.txt.

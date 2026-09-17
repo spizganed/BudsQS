@@ -1,122 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  RIGHT earbud — the user's latest SVG (400x500 viewBox), MIRRORED horizontally as
-  requested.
+  RIGHT EARBUD — svgs/bud_right.svg, copied VERBATIM.
 
-  COLOUR RULE (the user's own): white = transparent, black = icon colour. But this
-  SVG uses STROKES as well as fills, and they need opposite handling:
+  The `d` attribute below is the user's own path data, character for character. No
+  rescaling, no mirroring, no re-transcription, no added strokes — the user drew the
+  two buds separately and each keeps its own geometry. The viewport is the source's
+  own viewBox (0 0 460 717.456).
 
-    fill="#000000"                 -> ink
-    stroke="#ffffff"               -> an outline that must stay VISIBLE, so it is
-                                      converted to an ink STROKE with the enclosed
-                                      shape left hollow
-    fill="#ffffff" (grille centre)  -> a cut-out
-    fill="#000000" (3 micro-ports)  -> ink islands inside that cut-out (omitted, see
-                                      below)
+  COLOUR RULE (the user's own): white = transparent, black = icon colour.
+  The source is a single `fill="black"` path with `fill-rule="evenodd"`, so it becomes
+  one white ink path with `fillType="evenOdd"`. Both subpaths stay in that one path:
+    - the bud body / stem, starting `M 316.781 1.77`
+    - the bud head's oval with its centre knocked out, starting `M 125.121 148.435`
+  The second is a HOLE inside the first under evenOdd, exactly as the source renders it.
 
-  ==================================================================
-  THE MIRROR, AND WHY IT IS DONE PER-COORDINATE
-  ==================================================================
-  The user asked for this icon flipped. It is mirrored about the viewport's vertical
-  centre line, X -> 53.58 - X, where 53.58 is the source shape's own centre line
-  (the bud body spans x 12.30..41.28, centre 26.79, so mirroring about the SHAPE
-  keeps it in place instead of sliding it across the viewport).
+  INTRINSIC SIZE — matched to the layout box:
+  `android:width/height` is 62 x 96dp, the SAME size the card gives this icon
+  (`battery_bud_width` x `battery_wear_height`), so fitCenter scales by 1 and there is
+  no rounding mismatch to clip the artwork. The ratio 62:96 = 0.646 is the source's
+  460:717.456 = 0.641 to within the dp rounding available.
 
-  IT IS NOT DONE with <group scaleX="-1">. That flips the winding order of every
-  subpath, and this icon relies on fillType="evenOdd" for its cut-outs: reversed
-  winding turns holes into islands and vice versa, so the body would hollow out and
-  the grille would fill in. Mirroring each coordinate and swapping the arc sweep
-  flags gives the same picture with the winding intact.
-
-  ==================================================================
-  TRANSFORM AND ARITHMETIC
-  ==================================================================
-  Source 400x500 -> 48x48, scale by the long side:
-      scale = 48/500 = 0.096
-      xOffset from the original fit: X0 = x*0.096 + 5.58
-      mirror about the shape centre: X = 53.58 - X0 = 48.00 - x*0.096
-      Y = y*0.096
-  So:  X = 48 - x*0.096    Y = y*0.096
-
-    body     70,160 -> 41.28,15.36    250,160 -> 24.00,15.36   r 90 -> 8.64
-             240,225-> 24.96,21.60    150,210 -> 33.60,20.16   150,250 -> 33.60,24.00
-             150,380-> 33.60,36.48     70,380 -> 41.28,36.48   r 40 -> 3.84
-    glass    centre 85,108 -> 39.84,10.37  (half-length 1.63, angle -38)
-    ear tip  200,210 -> 28.80,20.16   rx 6.14  ry 5.18
-    nozzle   218,222 -> 27.07,21.31   rx 1.73  ry 2.69
-    grille   218,222 -> 27.07,21.31   rx 1.15  ry 1.92
-
-  ==================================================================
-  TWO DELIBERATE SIMPLIFICATIONS (losses, stated plainly)
-  ==================================================================
-  1. STROKE WIDTHS RAISED. The source's 4.5 and 4 become 0.43 and 0.38 units, i.e.
-     under half a pixel at 42dp — invisible. Raised to 1.2 so the rims render.
-  2. THE THREE MICRO-PORTS ARE OMITTED. At r=3.2 they scale to 0.31 units, well
-     below one pixel. Drawing them would cost rasterisation per frame for something
-     unseen, and on some densities reads as grime rather than detail.
-
-  If the icon is ever drawn large — Find my earbuds uses 120dp — this file should
-  gain a scaled-up sibling that restores the fine detail.
+  NEVER put the viewBox numbers in android:width/height: the widget rasterises these
+  into bitmaps for RemoteViews, and a ~1000dp intrinsic size is rasterised at that
+  size, which crashed the app on connect with
+  "RemoteViews for widget update exceeds maximum bitmap memory usage
+   (used: 464658432, max: 15500160)".
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="48dp" android:height="48dp"
-    android:viewportWidth="48" android:viewportHeight="48">
+    android:width="62dp" android:height="96dp"
+    android:viewportWidth="460" android:viewportHeight="717.456">
 
     <path
         android:fillColor="#FFFFFF"
         android:fillType="evenOdd"
-        android:pathData="
-            M 41.28 15.36
-            A 8.64 8.64 0 0 0 24 15.36
-            C 24.96 21.6 33.6 20.16 33.6 24
-            L 33.6 36.48
-            A 3.84 3.84 0 0 0 41.28 36.48
-            Z
-
-            M 39.84 9.37
-            C 39.36 8.99 38.81 9.0 38.83 9.75
-            C 38.86 10.38 39.26 10.86 40.51 11.63
-            C 41.76 12.4 42.4 12.99 43.0 12.7
-            C 43.7 12.36 43.46 11.66 42.4 11.37
-            C 41.36 11.09 40.32 9.75 39.84 9.37
-            Z" />
-
-    <!-- Ear tip rim: stroked, not filled. -->
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="1.2"
-        android:pathData="
-            M 28.8 14.98
-            C 25.41 14.98 22.66 17.35 22.66 20.16
-            C 22.66 22.97 25.41 25.34 28.8 25.34
-            C 32.19 25.34 34.94 22.97 34.94 20.16
-            C 34.94 17.35 32.19 14.98 28.8 14.98
-            Z" />
-
-    <!-- Nozzle rim: also stroked. -->
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="1.2"
-        android:pathData="
-            M 27.07 18.62
-            C 25.85 19.19 25.19 20.19 25.19 21.31
-            C 25.19 22.43 25.85 23.43 27.07 24
-            C 28.29 24.57 29.53 24.57 28.75 23.43
-            C 27.97 22.29 27.97 20.33 28.75 19.19
-            C 29.53 18.05 28.29 18.05 27.07 18.62
-            Z" />
-
-    <!-- Grille centre: a cut-out. -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:fillType="evenOdd"
-        android:pathData="
-            M 28.26 21.31
-            C 28.26 20.64 27.69 20.11 26.99 20.11
-            C 26.29 20.11 25.72 20.64 25.72 21.31
-            C 25.72 21.98 26.29 22.51 26.99 22.51
-            C 27.69 22.51 28.26 21.98 28.26 21.31
-            Z" />
+        android:pathData="M 316.781 1.77 C 353.085 7.054, 384.553 22.813, 410.76 48.836 C 437.479 75.367, 454.206 107.78, 458.266 140.893 C 460 155.037, 459.553 177.79, 457.285 190.856 C 452.2 220.141, 437.391 251.716, 416.867 277.034 C 400.127 297.686, 374.564 320.65, 349.114 337.9 L 341.411 343.12 341.95 373.461 C 342.246 390.149, 342.593 457.938, 342.72 524.105 L 342.953 644.407 340.789 652.459 C 333.613 679.144, 314.656 701.335, 290.8 710.97 C 279.627 715.484, 267.232 717.456, 253.84 716.853 C 240.012 716.229, 231.254 714.038, 219.368 708.227 C 198.592 698.067, 181.865 677.299, 176.147 654.565 C 172.874 641.554, 172.263 628.802, 171.697 561.73 C 171.396 526.06, 170.865 481.905, 170.518 463.608 L 169.886 430.34 173.743 429.72 C 180.682 428.604, 199.174 422.134, 209.455 417.224 C 242.904 401.249, 260.92 381.843, 268.939 353.15 C 271.524 343.899, 271.663 342.323, 271.66 322.115 C 271.658 305.218, 271.284 299.092, 269.845 292.411 C 262.682 259.149, 248.865 230.058, 227.427 203.103 C 218.446 191.811, 200.404 174.66, 188.825 166.409 C 159.846 145.76, 125.578 136.038, 96.984 140.351 C 91.31 141.206, 86.467 141.705, 86.222 141.46 C 85.203 140.442, 100.216 111.83, 107.546 100.818 C 122.722 78.023, 138.755 61.094, 160.763 44.627 C 192.768 20.68, 230.51 5.513, 268.406 1.37 C 280.94 0, 306.042 0.207, 316.781 1.77 M 125.121 148.435 C 157.705 154.185, 190.289 174.093, 215.603 203.718 C 248.399 242.099, 265.554 286.392, 263.953 328.551 C 262.722 360.946, 251.039 382.189, 224.847 399.657 C 210.267 409.38, 185.002 419.338, 166.212 422.767 C 153.292 425.125, 130.916 425.121, 119.676 422.76 C 84.292 415.325, 53.533 393.352, 31.379 359.683 C 7.956 324.088, 0 282.59, 9.245 244.231 C 18.869 204.294, 46.683 167.584, 78.654 152.624 C 90.309 147.169, 108.601 145.52, 125.121 148.435" />
 </vector>

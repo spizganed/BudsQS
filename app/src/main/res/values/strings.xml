@@ -6,6 +6,9 @@
     <string name="default_device_name">OnePlus Buds 4</string>
 
     <string name="widget_anc_label">ANC</string>
+    <!-- Widget picker label. Without a label on the provider receiver some launchers
+         show a blank or unnamed entry, or fail the entry outright. -->
+    <string name="widget_name">Buds Quick Settings</string>
     <string name="widget_game_label">Game</string>
     <string name="widget_buds_desc">Earbuds</string>
     <string name="widget_battery_left">L</string>
@@ -22,6 +25,12 @@
     <!-- Main screen header actions (icon buttons) -->
     <string name="action_dev_tools">Dev tools</string>
     <string name="action_settings">Settings</string>
+
+    <!-- Connection status pill in the header. Short by necessity: it sits beside the
+         device name and must not crowd it out. -->
+    <string name="conn_on">Connected</string>
+    <string name="conn_off">Disconnected</string>
+    <string name="conn_status_desc">Connection status</string>
 
     <!-- ==================== Redesigned home screen ==================== -->
 

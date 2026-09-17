@@ -7,6 +7,7 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.TextView
+import com.spizganed.quickbuds.R
 
 /**
  * Turns a laid-out view tree into PLAIN TEXT — the numbers, not the pixels.
@@ -64,6 +65,194 @@ object LayoutReport {
      */
     fun capture(activity: Activity, onReady: (String) -> Unit) {
         activity.window.decorView.post { onReady(build(activity)) }
+    }
+
+    /**
+     * Reports the WIDGET layout, measured at the widget's real size.
+     *
+     * WHY THIS IS SEPARATE FROM build(activity):
+     * a home-screen widget is not an Activity. It has no window, no decorView, and
+     * is drawn by the LAUNCHER — a different process — from a RemoteViews parcel.
+     * So no amount of walking an Activity's view tree can ever describe it, which is
+     * why the widget had no diagnostic until now.
+     *
+     * What this does instead: inflates R.layout.widget_anc directly, forces a
+     * measure/layout pass at the size the launcher would use, and prints the same
+     * per-view report. That is NOT the launcher's actual rendering — the real widget
+     * may be resized by the user, and RemoteViews rewrites some properties — but it
+     * is the same layout file measured at the same size, so every bug this file can
+     * describe (overlapping icons, wrong widths, clipped text, a collapsed parent)
+     * shows up here too.
+     *
+     * @param widthPx the widget's real width from AppWidgetManager, in pixels.
+     * @param heightPx the widget's real height from AppWidgetManager, in pixels.
+     */
+    fun buildWidget(context: android.content.Context, widthPx: Int, heightPx: Int): String {
+        val density = context.resources.displayMetrics.density
+        val sb = StringBuilder()
+        sb.appendLine("WIDGET LAYOUT REPORT")
+        sb.appendLine("inflated at ${widthPx}x${heightPx}px  density=$density")
+        sb.appendLine()
+        sb.appendLine("!! READ THIS BEFORE TRUSTING ANYTHING BELOW !!")
+        sb.appendLine("This measures the INITIAL layout only. It CANNOT tell you whether")
+        sb.appendLine("the widget actually updates — it has no state applied and no")
+        sb.appendLine("RemoteViews run. It reported 'layout is fine' while the widget was")
+        sb.appendLine("still broken, which is why the check below now exists.")
+        sb.appendLine("USE IT FOR: sizes, ratios, weights, margins, gating.")
+        sb.appendLine("DO NOT USE IT FOR: 'is the widget working'.")
+        sb.appendLine()
+        sb.appendLine("HOW TO READ THIS — the coordinates below are per-view and LOCAL.")
+        sb.appendLine("A detached view tree has no window, so getLocationInWindow returns")
+        sb.appendLine("0,0 for every child and a walk cannot resolve absolute positions.")
+        sb.appendLine("Each view's own width/height, its layout params (lp=), weights,")
+        sb.appendLine("margins, padding and text metrics ARE exact and are what to read")
+        sb.appendLine("here. IGNORE any x/y of 0,0.")
+        sb.appendLine()
+        sb.appendLine("lp= shows MATCH / WRAP for the -1 and -2 sentinels rather than")
+        sb.appendLine("dividing them by density (which printed '-0.4dp' and looked like a")
+        sb.appendLine("broken size).")
+        sb.appendLine()
+        sb.appendLine("progress=N/100 and any empty text below are the INITIAL layout being")
+        sb.appendLine("measured — no state has been applied to it. Real values come from the")
+        sb.appendLine("LIVE STATE block above; a bar showing 0 here while the state says 100")
+        sb.appendLine("is expected, not a bug.")
+        sb.appendLine()
+        sb.appendLine("VISIBILITY is the most useful column: a row gated INVISIBLE because")
+        sb.appendLine("its data is absent is why a widget can look empty while measuring")
+        sb.appendLine("perfectly.")
+        sb.appendLine()
+
+        val root = try {
+            android.view.LayoutInflater.from(context).inflate(R.layout.widget_anc, null)
+        } catch (e: Exception) {
+            sb.appendLine("!! inflate FAILED: $e")
+            return sb.toString()
+        }
+
+        // Measure/layout at the launcher's size, EXACTLY, so the sizes below are the
+        // ones the widget would really be given. Positions are NOT usable: see the
+        // note above.
+        root.measure(
+            View.MeasureSpec.makeMeasureSpec(widthPx, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(heightPx, View.MeasureSpec.EXACTLY)
+        )
+        root.layout(0, 0, widthPx, heightPx)
+
+        // Sizes only — the gaps list is deliberately NOT produced, because it cannot
+        // be correct without a window.
+        walkSizesOnly(root, density, sb, 0)
+
+        return sb.toString()
+    }
+
+    /**
+     * Prints each view's own size and layout parameters, with no absolute positions.
+     *
+     * WHY THIS REPLACED THE NORMAL WALK for the widget: `walk()` reports bounds and
+     * sibling gaps from getLocationInWindow, which is 0,0 on every view of a detached
+     * tree. The first widget report was therefore a wall of `-92.6dp !! OVERLAP`
+     * lines that were pure artefacts — nothing was overlapping. Sizes do not have
+     * that problem: measure() computes them correctly with or without a window, and
+     * size is what a widget bug is nearly always about.
+     */
+    private fun walkSizesOnly(view: View, density: Float, sb: StringBuilder, depth: Int) {
+        val pad = "  ".repeat(depth)
+        // getResourceEntryName THROWS for View.NO_ID (0xffffffff), so the id has to be
+        // checked BEFORE the call, not wrapped around its RESULT. The original wrote
+        // `.let { if (view.id == View.NO_ID) "(no id)" else it }`, which still calls
+        // the lookup on NO_ID first — hence:
+        //   Resources$NotFoundException: Unable to find resource ID #0xffffffff
+        // A view with no id is completely normal here: most containers in these
+        // layouts are unnamed.
+        val name = if (view.id == View.NO_ID) {
+            "(no id)"
+        } else {
+            try {
+                view.resources.getResourceEntryName(view.id)
+            } catch (_: android.content.res.Resources.NotFoundException) {
+                // Not an app resource (a framework id, say). Still useful to print.
+                "0x%08x".format(java.util.Locale.US, view.id)
+            }
+        }
+        val toDp = { px: Int -> "%.1f".format(java.util.Locale.US, px / density) }
+
+        sb.append("$pad$name  [${view.javaClass.simpleName}]")
+        sb.append("  w=${view.width}px(${toDp(view.width)}dp)")
+        sb.append("  h=${view.height}px(${toDp(view.height)}dp)")
+
+        val lp = view.layoutParams
+        // NULL LP IS NORMAL HERE, not a bug: this tree is inflated with
+        // `inflate(id, null)`, and a detached root never gets layout params assigned
+        // (its parent would have provided them). Reading lp.width without this check
+        // crashed the app on the Widget button — an NPE inside a diagnostic.
+        //
+        // -1 and -2 are MATCH_PARENT and WRAP_CONTENT, NOT dimensions. Dividing them
+        // by density (as the first version did) printed "-0.4dp" and "-0.8dp", which
+        // reads like a broken size and sent me looking for a layout bug that did not
+        // exist. They are named here instead.
+        fun lpSize(v: Int): String = when (v) {
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT -> "MATCH"
+            android.view.ViewGroup.LayoutParams.WRAP_CONTENT -> "WRAP"
+            else -> "${toDp(v)}dp"
+        }
+        if (lp == null) {
+            sb.append("  lp=(none: detached root)")
+        } else {
+            when (lp) {
+                is android.widget.LinearLayout.LayoutParams ->
+                    sb.append("  lp=${lpSize(lp.width)}x${lpSize(lp.height)} weight=${lp.weight}")
+                else -> sb.append("  lp=${lpSize(lp.width)}x${lpSize(lp.height)}")
+            }
+            if (lp is android.view.ViewGroup.MarginLayoutParams &&
+                (lp.leftMargin != 0 || lp.topMargin != 0 ||
+                    lp.rightMargin != 0 || lp.bottomMargin != 0)
+            ) {
+                sb.append(
+                    " margins=${toDp(lp.leftMargin)},${toDp(lp.topMargin)}," +
+                        "${toDp(lp.rightMargin)},${toDp(lp.bottomMargin)}"
+                )
+            }
+        }
+        if (view.paddingLeft != 0 || view.paddingTop != 0 ||
+            view.paddingRight != 0 || view.paddingBottom != 0
+        ) {
+            sb.append(
+                " padding=${toDp(view.paddingLeft)},${toDp(view.paddingTop)}," +
+                    "${toDp(view.paddingRight)},${toDp(view.paddingBottom)}"
+            )
+        }
+        sb.append("  VISIBILITY=${visName(view.visibility)}")
+
+        when (view) {
+            is ImageView -> {
+                val d = view.drawable
+                sb.append(
+                    " scaleType=${view.scaleType}" +
+                        " drawableBounds=${view.drawable?.bounds?.width() ?: 0}x" +
+                        "${view.drawable?.bounds?.height() ?: 0}" +
+                        " intrinsic=${d?.intrinsicWidth ?: 0}x${d?.intrinsicHeight ?: 0}"
+                )
+            }
+            is ProgressBar -> sb.append(" progress=${view.progress}/${view.max}")
+            is TextView -> sb.append(
+                " text=\"${view.text}\" size=${toDp(view.textSize.toInt())}dp" +
+                    " style=${if (view.typeface?.isBold == true) "bold" else "normal"}"
+            )
+        }
+        sb.appendLine()
+
+        if (view is ViewGroup) {
+            for (i in 0 until view.childCount) {
+                walkSizesOnly(view.getChildAt(i), density, sb, depth + 1)
+            }
+        }
+    }
+
+    private fun visName(v: Int): String = when (v) {
+        View.VISIBLE -> "VISIBLE"
+        View.INVISIBLE -> "INVISIBLE"
+        View.GONE -> "GONE"
+        else -> "?"
     }
 
     /**

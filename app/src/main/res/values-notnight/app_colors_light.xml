@@ -36,4 +36,9 @@
 
     <!-- Dark, not white: white letters on a light chip would be invisible. -->
     <color name="app_letter">#101010</color>
+
+    <!-- Connection status pill. See values/app_colors.xml for why the pill is themed
+         but the connected/disconnected colours are not. -->
+    <color name="app_pill_fill">#FFFFFF</color>
+    <color name="app_pill_stroke">#D6D6D6</color>
 </resources>

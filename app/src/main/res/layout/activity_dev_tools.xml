@@ -64,6 +64,42 @@
             android:paddingEnd="12dp"
             android:text="Layout" />
 
+        <!--
+          Widget report. The Layout button walks an ACTIVITY's view tree, and a
+          home-screen widget is not an Activity — it is drawn by the launcher from a
+          RemoteViews parcel in another process, so it was invisible to the layout
+          log until this button existed. This inflates widget_anc in-process at the
+          launcher's reported size, and also prints the live widget state, which is
+          what distinguishes "measures wrong" from "state empty so everything is
+          gated INVISIBLE". See LayoutReport.buildWidget.
+        -->
+        <Button
+            android:id="@+id/btnWidgetLayout"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="0dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:text="Widg" />
+
+        <!--
+          Widget REMOTEVIEWS check. The "Widg" button above measures the widget's
+          layout, which is a different question and was misleading: the layout was
+          already correct while the widget still failed, so the button kept saying
+          "fine". This one runs the widget's REAL builder for the current state and
+          round-trips the result through a Parcel — the same thing the
+          AppWidgetService does before the launcher ever sees the update — and reports
+          any throw, plus how many times the live update path has already failed.
+        -->
+        <Button
+            android:id="@+id/btnWidgetLogic"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="0dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:text="Wlog" />
+
         <Button
             android:id="@+id/btnClear"
             android:layout_width="wrap_content"

@@ -75,4 +75,27 @@
       would be invisible. See values-notnight/app_colors_light.xml.
     -->
     <color name="app_letter">#FFFFFF</color>
+
+    <!--
+      Connection status pill (header). The pill is a themed surface; the DOT and its
+      LABEL colour are NOT themed — see below.
+
+      `app_pill_fill` is deliberately very close to the background: the pill should
+      read as a quiet container, not as a second card competing with the device name.
+      The stroke is what actually defines its edge.
+    -->
+    <color name="app_pill_fill">#141414</color>
+    <color name="app_pill_stroke">#333333</color>
+
+    <!--
+      Connection state colours. NOT theme-swapped, and that is on purpose: green means
+      connected and grey means not, in every theme, the same way the red accent means
+      "on" everywhere. A themed connection colour would change MEANING with the theme,
+      which is exactly what a status indicator must not do.
+
+      They are still tokens so the state colours are set in one place. Tints are
+      applied in code (ThemeRes.tint) because these drawables are vectors.
+    -->
+    <color name="app_conn_on">#4CAF50</color>
+    <color name="app_conn_off">#8A8A8A</color>
 </resources>

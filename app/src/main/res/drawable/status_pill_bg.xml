@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Status pill background — the small rounded box next to the device name that holds
+  the connection dot and its label.
+
+  No fill colour of its own; it draws a subtle themed outline and a very low-alpha
+  fill so the pill reads as a container in every theme without becoming a second
+  visual weight next to the device name. The colours come from theme attributes
+  (?attr/appColor*) so the OLED / Dark / Light swap needs no change here.
+
+  Corner radius 999dp = fully rounded (a stadium), which is the standard shape for
+  this kind of status chip and cannot mis-render at any height.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="?attr/appColorPillFill" />
+    <stroke
+        android:width="1dp"
+        android:color="?attr/appColorPillStroke" />
+    <corners android:radius="999dp" />
+</shape>

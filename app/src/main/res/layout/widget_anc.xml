@@ -8,6 +8,7 @@
     android:background="@drawable/widget_outer_bg">
 
     <LinearLayout
+        android:id="@+id/widget_battery_card"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="3"
@@ -16,30 +17,80 @@
         android:background="@drawable/widget_card_bg"
         android:gravity="center_vertical">
 
+        <!--
+          BUD COLUMN — two bud drawables, side by side with a GAP between them.
+
+          Both buds are the same 62 x 96dp drawable (ratio 0.641) that the app card
+          uses, so the widget shows the same artwork, just smaller.
+
+          THE BOX RATIO MUST MATCH THE ART RATIO (fixed 2026-09-18). Two bugs came
+          from getting this wrong, and both were visible in the layout report:
+
+          1. SQUISHED (first report): the row was `wrap_content` with a fixed 34dp
+             bud width, so the width was the binding constraint in `fitCenter` — the
+             ink drew 34dp wide and ~53dp tall in a ~74dp slot, leaving dead space
+             above and below.
+
+          2. FAT ON THE VERTICAL AXIS (second report): raising the box to 72dp made
+             it WIDER than the art ratio needs, so `fitCenter` scaled the ink UP in
+             width to fill the box — 72dp wide against 96dp of ink height, a rendered
+             ratio of 0.75 instead of the true 0.641. Nothing was distorted in the
+             file; the box was simply the wrong SHAPE and the art stretched to it.
+
+          `fitCenter` scales to whichever bound is proportionally SMALLER, so the
+          only way to keep the true ratio at every widget size is for the BOX to
+          carry the true ratio itself: width/height = 0.641. That is what
+          `widget_bud_width` and `widget_bud_height` now are — a matched pair, 72 x
+          112dp (72 / 0.641 = 112). The row keeps `match_parent` height, so the ink
+          scales down cleanly on small widgets and up on large ones, always at 0.641.
+
+          DO NOT change one of these dimens without changing the other, and keep the
+          ratio 0.641 (the source viewBox is 460 x 717.456). The in-app battery card
+          solves the same problem identically with battery_bud_width/battery_wear_height
+          (62 x 96dp, same 0.641) — match that pattern, not a stretched slot.
+        -->
         <LinearLayout
-            android:layout_width="88dp"
+            android:id="@+id/widget_bud_row"
+            android:layout_width="wrap_content"
             android:layout_height="match_parent"
             android:orientation="horizontal"
-            android:gravity="center"
+            android:gravity="center_vertical"
             android:paddingTop="2dp"
-            android:paddingBottom="2dp"
-            android:paddingStart="2dp"
-            android:paddingEnd="2dp">
+            android:paddingBottom="2dp">
 
             <ImageView
                 android:id="@+id/widget_bud_left"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
+                android:layout_width="@dimen/widget_bud_width"
+                android:layout_height="@dimen/widget_bud_height"
                 android:scaleType="fitCenter"
                 android:src="@drawable/ic_bud_left"
                 android:contentDescription="@string/widget_battery_left" />
 
+            <!--
+              The gap between the buds.
+
+              THIS IS A TextView, NOT A View, AND THAT IS DELIBERATE (2026-09-18).
+              It was a bare <View> with a fixed width. RemoteViews supports a limited
+              view set and builds its layout on the LAUNCHER's process from a
+              whitelist: a plain View is NOT reliably instantiated there. The
+              inflation succeeds in-process (which is why every layout report looked
+              perfect and buildViews() never threw) but the launcher fails to build
+              the view tree from the parcel, and shows "Can't load widget" — an error
+              that comes from the HOST, which is why nothing in this app ever saw it.
+
+              That is the exact shape of this bug: measurements fine, parcel fine,
+              logic fine, and the widget still refused. A TextView with no text is
+              inert, is on the whitelist, and is the standard spacer in widget
+              layouts.
+            -->
+            <TextView
+                android:layout_width="@dimen/widget_bud_gap"
+                android:layout_height="1dp" />
+
             <ImageView
                 android:id="@+id/widget_bud_right"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
+                android:layout_width="@dimen/widget_bud_width"
+                android:layout_height="@dimen/widget_bud_height"
                 android:scaleType="fitCenter"
                 android:src="@drawable/ic_bud_right"
                 android:contentDescription="@string/widget_battery_right" />
@@ -253,5 +304,49 @@
             android:textSize="11sp"
             android:textStyle="bold"
             android:background="@drawable/widget_button_bg" />
+    </LinearLayout>
+
+    <!--
+      CONNECTION STATUS, shown in the widget's empty state.
+
+      WHY THIS EXISTS: disconnected, every battery row is gated INVISIBLE (no data),
+      so the widget rendered as a blank card — indistinguishable from a broken one,
+      and reported as "the widget won't load". It was loading; it had nothing to say.
+      The widget now says so explicitly, using the same dot-and-word pill as the app
+      header, and the pill REPLACES the battery content while disconnected.
+
+      Visibility is driven in code: this shows only when !connected, and the two
+      content rows above hide. The fade between the two states uses the same staged
+      RemoteViews-update approach as the icon fade (see AncWidgetProvider.fadeIcons) —
+      a home-screen widget has no property animators, so a fade has to be a sequence
+      of complete updates with the alpha already baked in.
+    -->
+    <LinearLayout
+        android:id="@+id/widget_conn_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/widget_conn_dot"
+            android:layout_width="10dp"
+            android:layout_height="10dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_status_dot_empty"
+            android:contentDescription="@string/conn_status_desc" />
+
+        <TextView
+            android:id="@+id/widget_conn_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:text="@string/conn_off"
+            android:textColor="@color/widget_text_secondary"
+            android:textSize="12sp"
+            android:textStyle="bold" />
     </LinearLayout>
 </LinearLayout>

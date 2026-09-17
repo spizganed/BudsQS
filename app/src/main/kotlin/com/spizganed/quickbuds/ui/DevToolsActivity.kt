@@ -55,6 +55,8 @@ class DevToolsActivity : Activity() {
     private lateinit var logScroll: ScrollView
     private lateinit var btnScreenshot: Button
     private lateinit var btnLayout: Button
+    private lateinit var btnWidgetLayout: Button
+    private lateinit var btnWidgetLogic: Button
     private lateinit var btnTabHuman: Button
     private lateinit var btnTabRaw: Button
     private lateinit var btnClear: Button
@@ -222,6 +224,168 @@ class DevToolsActivity : Activity() {
         // problems — Dev Tools itself is a diagnostic screen and its own layout is
         // not interesting.
         btnLayout.setOnClickListener { writeLayoutReport() }
+
+        // WIDGET -> text, added 2026-09-18 because the widget had NO diagnostic.
+        //
+        // LayoutReport walks an Activity's view tree, and a widget is not an
+        // Activity: it is drawn by the launcher from a RemoteViews parcel, in
+        // another process. So the Layout button could never describe it, which is
+        // why "the widget won't load" had to be debugged blind. This inflates the
+        // widget layout in-process at the size the launcher currently reports and
+        // writes it out the same way.
+        btnWidgetLayout = findViewById<Button>(R.id.btnWidgetLayout)
+        btnWidgetLayout.setOnClickListener { writeWidgetReport() }
+
+        // The RemoteViews / logic check. See writeWidgetLogicReport: the layout button
+        // reports geometry, which was already correct; this one reports whether the
+        // widget's real update path produces something the launcher can accept.
+        btnWidgetLogic = findViewById<Button>(R.id.btnWidgetLogic)
+        btnWidgetLogic.setOnClickListener { writeWidgetLogicReport() }
+    }
+
+    /**
+     * Runs the widget's REAL RemoteViews builder and writes the result.
+     *
+     * This is the answer to "the widget's problem is logic, not layout" — which he
+     * was right about. It calls the same builder the live update uses, for the current
+     * state, and round-trips the RemoteViews through a Parcel, which is what the
+     * AppWidgetService does before the launcher sees it. Written to Downloads like the
+     * other diagnostics.
+     */
+    private fun writeWidgetLogicReport() {
+        val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        val name = "layout_widget_logic_$stamp.txt"
+        val text = try {
+            com.spizganed.quickbuds.widget.AncWidgetProvider
+                .buildWidgetRemoteViews(this)
+        } catch (t: Throwable) {
+            "WIDGET LOGIC CHECK FAILED TO RUN\n\n$t\n\n${t.stackTraceToString()}"
+        }
+        val copied = copyTextToDownloads(name, text)
+        showInLog(
+            "widget logic check written\n" +
+                if (copied == null) "Downloads copy FAILED"
+                else "Downloads/QuickBudsShot/$name"
+        )
+    }
+
+    /**
+     * Writes a report of the WIDGET layout.
+     *
+     * Reads the real widget size from AppWidgetManager so the report matches what
+     * the launcher has actually given it — a widget can be resized by the user, and
+     * reporting a guessed size would describe a layout that does not exist.
+     *
+     * Also reports the live widget state, because "the widget won't load" has two
+     * very different causes and this distinguishes them:
+     *   - the layout measures wrong  -> geometry lines below look wrong
+     *   - the state is empty/gated   -> hasLeft/hasRight/hasCase all false, so every
+     *                                   row is INVISIBLE and the widget is blank
+     * The second one is invisible in a geometry report alone, hence the state block.
+     */
+    private fun writeWidgetReport() {
+        val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        val name = "layout_widget_$stamp.txt"
+
+        val mgr = android.appwidget.AppWidgetManager.getInstance(this)
+        val ids = mgr.getAppWidgetIds(
+            android.content.ComponentName(
+                this,
+                com.spizganed.quickbuds.widget.AncWidgetProvider::class.java
+            )
+        )
+
+        val sb = StringBuilder()
+        sb.appendLine("WIDGET DIAGNOSTIC")
+        sb.appendLine("placed widget instances: ${ids.size}")
+        if (ids.isEmpty()) {
+            sb.appendLine("!! No widget instance is on the home screen. Add one first,")
+            sb.appendLine("   otherwise this reports the layout only, with no live state.")
+        }
+        sb.appendLine()
+
+        for (id in ids) {
+            val opts = mgr.getAppWidgetOptions(id)
+            val w = opts.getInt(android.appwidget.AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH)
+            val h = opts.getInt(android.appwidget.AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT)
+            sb.appendLine("--- widget id=$id  reported size ${w}x${h}dp ---")
+        }
+        sb.appendLine()
+
+        // Live state: this is the part that explains a blank widget.
+        //
+        // EVERYTHING BELOW IS INSIDE THE try, including the layout walk. This method
+        // is a DIAGNOSTIC, and it has now crashed the app twice on its own bugs (a
+        // null LayoutParams, then getResourceEntryName on View.NO_ID). A tool whose
+        // job is to report a problem must never itself become the problem: whatever
+        // fails, the stack trace is written into the report and the user still gets a
+        // file. It is also self-documenting, because the trace lands in the report
+        // rather than only in a crash log.
+        val state = try {
+            val s = com.spizganed.quickbuds.widget.WidgetStateStore.read(this)
+            sb.appendLine("LIVE STATE")
+            sb.appendLine("  connected   = ${s.connected}")
+            sb.appendLine("  leftStatus  = ${s.leftStatus}  hasLeft=${s.hasLeft()}")
+            sb.appendLine("  rightStatus = ${s.rightStatus}  hasRight=${s.hasRight()}")
+            sb.appendLine("  caseBattery = ${s.caseBattery}  hasCase=${s.hasCase()}")
+            sb.appendLine("  caseLidClosed = ${s.caseLidClosed}  (gates the bud icons, not the case icon)")
+            sb.appendLine("  leftDocked=${s.leftDocked} rightDocked=${s.rightDocked}")
+            sb.appendLine("  bars: L=${s.leftProgress()}% C=${s.caseProgress()}% R=${s.rightProgress()}%")
+            sb.appendLine("  text: L='${s.leftText()}' C='${s.caseText()}' R='${s.rightText()}'")
+            sb.appendLine()
+            s
+        } catch (t: Throwable) {
+            sb.appendLine("!! reading widget state FAILED: $t")
+            sb.appendLine()
+            null
+        }
+
+        // Measure at the launcher's size where known, else the widget's own declared
+        // minimum (180x110dp), so the numbers are at least a real configuration.
+        val density = resources.displayMetrics.density
+        val px = { dp: Int -> (dp * density).toInt() }
+        val anyOpts = ids.firstOrNull()?.let { mgr.getAppWidgetOptions(it) }
+        val wPx = anyOpts
+            ?.getInt(android.appwidget.AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH)
+            ?.takeIf { it > 0 }?.let { px(it) } ?: px(180)
+        val hPx = anyOpts
+            ?.getInt(android.appwidget.AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT)
+            ?.takeIf { it > 0 }?.let { px(it) } ?: px(110)
+
+        try {
+            sb.appendLine(LayoutReport.buildWidget(this, wPx, hPx))
+        } catch (t: Throwable) {
+            sb.appendLine("!! widget layout walk FAILED: $t")
+            sb.appendLine()
+            sb.appendLine(t.stackTraceToString())
+        }
+
+        // THE PART THE LAYOUT REPORT CANNOT ANSWER.
+        //
+        // The layout walk above measures the INITIAL layout, which is already correct
+        // — so it kept saying "the layout is fine" while the widget still failed. He
+        // spotted that the button was misleading, and it was. This runs the REAL
+        // builder for the CURRENT state and round-trips the result through a Parcel,
+        // which is exactly what the AppWidgetService does before the launcher ever
+        // sees it. A throw here is the actual cause.
+        sb.appendLine()
+        try {
+            sb.appendLine(
+                com.spizganed.quickbuds.widget.AncWidgetProvider
+                    .buildWidgetRemoteViews(this)
+            )
+        } catch (t: Throwable) {
+            sb.appendLine("!! RemoteViews check FAILED: $t")
+            sb.appendLine(t.stackTraceToString())
+        }
+
+        val copied = copyTextToDownloads(name, sb.toString())
+        showInLog(
+            "widget report: ${ids.size} instance(s), ${sb.lineSequence().count()} lines\n" +
+                "state read: ${if (state == null) "FAILED" else "ok"}\n" +
+                if (copied == null) "Downloads copy FAILED"
+                else "Downloads/QuickBudsShot/$name"
+        )
     }
 
     /**

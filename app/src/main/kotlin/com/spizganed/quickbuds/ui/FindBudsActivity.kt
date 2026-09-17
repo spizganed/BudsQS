@@ -85,7 +85,7 @@ class FindBudsActivity : Activity() {
         }
 
         budRow.addView(
-            budButton(R.drawable.ic_bud_left_hq, R.string.widget_battery_left) {
+            budButton(R.drawable.ic_bud_left, R.string.widget_battery_left) {
                 play(ChimePlayer.Side.LEFT)
             }
         )
@@ -95,7 +95,7 @@ class FindBudsActivity : Activity() {
         })
 
         budRow.addView(
-            budButton(R.drawable.ic_bud_right_hq, R.string.widget_battery_right) {
+            budButton(R.drawable.ic_bud_right, R.string.widget_battery_right) {
                 play(ChimePlayer.Side.RIGHT)
             }
         )
@@ -149,7 +149,10 @@ class FindBudsActivity : Activity() {
     ): ImageButton {
         val dp = { v: Float -> ThemeRes.dp(this, v) }
         return ImageButton(this).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(120f), dp(120f))
+            // SQUARE box at the drawable's own ratio, so fitCenter fills it exactly.
+            // The bud drawables are 62 x 96dp (ratio 0.646), so a square box would
+            // letterbox them and shrink the ink; this matches the ratio instead.
+            layoutParams = LinearLayout.LayoutParams(dp(120f), dp(186f))
             background = getDrawable(R.drawable.app_card_bg)
             setPadding(dp(14f), dp(14f), dp(14f), dp(14f))
             scaleType = ImageView.ScaleType.FIT_CENTER

@@ -51,6 +51,53 @@
             android:textStyle="bold"
             android:textColor="?attr/appColorTextPrimary" />
 
+        <!--
+          CONNECTION STATUS PILL.
+
+          A small stadium-shaped box holding a dot and a word, beside the device name.
+          Why a pill and not just a coloured dot: the dot alone is ambiguous the first
+          time it is seen (is green "connected" or "connected AND something else"?),
+          and the word is what makes it self-explanatory. The dot is what makes it
+          readable at a glance without reading.
+
+          ORDER: dot, then label. The dot is tinted in code (ThemeRes.tint) because
+          it is a vector and its colour is connection STATE, not a theme surface — it
+          must stay green/grey in every theme. The LABEL colour comes from the same
+          state colours, set in MainActivity.renderConnectionPill.
+
+          `wrap_content` on both sides: the pill must not stretch, and it must not
+          reserve space for the longer word when showing the shorter one.
+        -->
+        <LinearLayout
+            android:id="@+id/connPill"
+            android:layout_width="wrap_content"
+            android:layout_height="26dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/status_pill_bg"
+            android:paddingStart="8dp"
+            android:paddingEnd="10dp"
+            android:layout_marginEnd="8dp">
+
+            <ImageView
+                android:id="@+id/connDot"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_status_dot_empty"
+                android:contentDescription="@string/conn_status_desc" />
+
+            <TextView
+                android:id="@+id/connText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:text="@string/conn_off"
+                android:textColor="?attr/appColorTextSecondary" />
+        </LinearLayout>
+
         <ImageButton
             android:id="@+id/btnDevTools"
             android:layout_width="@dimen/header_icon_button"
@@ -97,65 +144,85 @@
                  SPACING: the two buds sit at the outer edges with a gap between them
                  for the case icon, which is why they are weighted rather than packed
                  together. The case is centred in that gap. -->
+            <!-- ======== CARD 1: THE ICONS ONLY ======== -->
             <LinearLayout
                 android:id="@+id/batteryCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
+                android:orientation="vertical"
                 android:padding="@dimen/battery_card_padding"
                 android:paddingTop="@dimen/battery_card_padding_v"
                 android:paddingBottom="@dimen/battery_card_padding_v"
                 android:background="@drawable/app_card_outline_bg"
-                android:gravity="center_vertical">
+                android:gravity="center_horizontal">
 
-                <!-- LEFT HALF: bud, space, case, space, bud -->
+                <!-- ICON BLOCK: bud, case, bud — each from its OWN source SVG.
+
+                     The three icons are three separate drawables, each copied verbatim
+                     from its own file in svgs/, each on its own source viewBox:
+
+                         ic_bud_left.xml   460 x 717.456      (svgs/bud_left.svg)
+                         ic_case.xml       856.154 x 659.929  (svgs/case.svg)
+                         ic_bud_right.xml  460 x 717.456      (svgs/bud_right.svg)
+
+                     The buds are TALL and the case is WIDE, so they cannot share one
+                     box. They share a HEIGHT: `battery_wear_height` for all three, with
+                     each width given EXPLICITLY from that icon's true ratio.
+
+                     DO NOT switch these back to wrap_content + adjustViewBounds. That
+                     clips the artwork: the drawable's intrinsic size is stored in PIXELS
+                     at the screen density, so 24dp x 37dp becomes 63 x 97 px at 2.625
+                     (37 * 2.625 = 97.125, rounded down), giving an intrinsic ratio of
+                     0.649 against the SVG's 0.641. adjustViewBounds then sizes the view
+                     from the distorted ratio while the vector rasterises at the true
+                     one, and the difference clips the icon at the box bounds.
+                -->
                 <LinearLayout
-                    android:layout_width="0dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
                     android:orientation="horizontal"
                     android:gravity="center_vertical">
 
                     <ImageView
                         android:id="@+id/status_bud_left"
-                        android:layout_width="@dimen/battery_bud_size"
-                        android:layout_height="@dimen/battery_bud_size"
+                        android:layout_width="@dimen/battery_bud_width"
+                        android:layout_height="@dimen/battery_wear_height"
                         android:scaleType="fitCenter"
                         android:src="@drawable/ic_bud_left"
                         android:contentDescription="@string/widget_battery_left" />
 
-                    <FrameLayout
-                        android:layout_width="0dp"
-                        android:layout_height="@dimen/battery_case_height"
-                        android:layout_weight="1">
-
-                        <ImageView
-                            android:id="@+id/status_case_icon"
-                            android:layout_width="@dimen/battery_case_width"
-                            android:layout_height="@dimen/battery_case_height"
-                            android:layout_gravity="center"
-                            android:scaleType="fitCenter"
-                            android:src="@drawable/ic_case"
-                            android:contentDescription="@string/widget_battery_case" />
-                    </FrameLayout>
+                    <ImageView
+                        android:id="@+id/status_case_icon"
+                        android:layout_width="@dimen/battery_case_width"
+                        android:layout_height="@dimen/battery_wear_height"
+                        android:layout_marginStart="@dimen/battery_icon_gap"
+                        android:layout_marginEnd="@dimen/battery_icon_gap"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/ic_case"
+                        android:contentDescription="@string/widget_battery_case" />
 
                     <ImageView
                         android:id="@+id/status_bud_right"
-                        android:layout_width="@dimen/battery_bud_size"
-                        android:layout_height="@dimen/battery_bud_size"
+                        android:layout_width="@dimen/battery_bud_width"
+                        android:layout_height="@dimen/battery_wear_height"
                         android:scaleType="fitCenter"
                         android:src="@drawable/ic_bud_right"
                         android:contentDescription="@string/widget_battery_right" />
                 </LinearLayout>
+            </LinearLayout>
 
-                <!-- RIGHT HALF: three labelled bars, no numeric labels on the
-                     outside — the numbers now live INSIDE the segments. -->
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical"
-                    android:layout_marginStart="14dp">
+                <!-- ======== CARD 2: THE BARS ONLY ========
+                     A card of its own, so its padding and height are independent of the
+                     icon card above. The numbers live INSIDE the bars, so there are no
+                     numeric labels on the outside, just the L / C / R letters. -->
+            <LinearLayout
+                android:id="@+id/batteryBarsCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="10dp"
+                android:padding="@dimen/battery_card_padding"
+                android:background="@drawable/app_card_outline_bg">
 
                     <LinearLayout
                         android:id="@+id/status_row_left"
@@ -282,7 +349,6 @@
                         </FrameLayout>
                     </LinearLayout>
                 </LinearLayout>
-            </LinearLayout>
 
             <!-- ============ 2. ANC CIRCLES ============ -->
             <!--

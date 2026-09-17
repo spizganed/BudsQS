@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Connection dot, FILLED — the "connected" state.
+
+  A plain circle. Tinted in code (ThemeRes) rather than coloured here, because the
+  connection colour is a state, not a theme attribute: the same green means connected
+  in every theme, and a themed dot would change meaning with the theme.
+
+  The counterpart is ic_status_dot_empty.xml. Both are drawn at the same size so the
+  dot does not shift when the state changes.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="10dp" android:height="10dp"
+    android:viewportWidth="10" android:viewportHeight="10">
+
+    <!-- A circle drawn as four arcs with the exact radius, not as a bezier with
+         straight joins — at 10dp a wrong join is visible as a flat edge. -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="
+            M 5 0
+            A 5 5 0 0 1 5 10
+            A 5 5 0 0 1 5 0
+            Z" />
+</vector>

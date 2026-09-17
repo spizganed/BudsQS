@@ -1,12 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Widget metadata.
+
+  THE DECLARATION NOW MATCHES WHAT THE DEVICE ACTUALLY GIVES IT (2026-09-18).
+  The device reports 257x164dp for this widget, but the file declared
+  minWidth/minHeight 180x110dp with targetCell 3x2. Three cells wide is about
+  230-260dp and TWO cells tall is about 110-120dp on a standard grid, so the
+  declared height was roughly 50dp SHORTER than the space the launcher hands over.
+  A launcher that cannot reconcile the declared footprint with the grid it must
+  place the widget on falls back to its own placeholder, which is the "Can't load
+  widget" the user sees — and it was never a RemoteViews failure. The logic check
+  proved that: buildViews() OK, writeToParcel() OK, 44 actions, zero recorded
+  update failures.
+
+  So the minimums are the ones the device itself reports, and the cell count is
+  declared to match. Raising minHeight is safe: minResizeHeight stays lower so the
+  user can still shrink it, and `resizeMode` is unchanged.
+
+  WHY THERE IS NO previewImage (removed 2026-09-18):
+  it pointed at @drawable/widget_preview_buds, a VECTOR. The widget PICKER loads
+  previewImage as a BITMAP, and launchers that cannot rasterise a vector there show
+  "Can't load widget" in the picker. Omitting it is valid — the picker falls back to
+  the app icon, which is a bitmap and always loads. **Never set a vector here.**
+  A real bitmap preview would be fine if one is wanted later.
+-->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
-    android:minWidth="180dp"
-    android:minHeight="110dp"
+    android:minWidth="250dp"
+    android:minHeight="160dp"
     android:minResizeWidth="180dp"
     android:minResizeHeight="110dp"
-    android:targetCellWidth="3"
+    android:targetCellWidth="4"
     android:targetCellHeight="2"
     android:resizeMode="horizontal|vertical"
     android:updatePeriodMillis="0"
-    android:initialLayout="@layout/widget_anc"
-    android:previewImage="@drawable/widget_preview_buds" />
+    android:initialLayout="@layout/widget_anc" />

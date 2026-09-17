@@ -1,0 +1,48 @@
+widget: fix bud icon blink and bud aspect ratio
+
+Two widget bugs, both diagnosed from the layout reports in testlogs/ rather
+than guessed at.
+
+ICONS BLINK ON STATE CHANGE. Every icon signature change routed into
+fadeIcons(), whose first pushed frame draws the icons at 25% opacity. For a
+colour-only change -- a bud going out-of-ear grey to in-ear white, where the
+icon is on screen the whole time -- that made the icon visibly dim and then
+brighten again. That is the blink: there was nothing to fade in, so the 25%
+frame was a flash, not a transition. The comment above fadeIcons already warned
+that a dim frame followed by the real one is a flicker; it just did not gate the
+path that fed it.
+
+The fade is now gated on something genuinely appearing: a bud going
+hidden -> visible, or the connection pill appearing (the widget going
+disconnected, which keeps its cross-fade). A colour-only change, or an icon
+disappearing, pushes the settled frame directly. A settled push also cancels any
+in-flight fade, so late frames cannot land and repaint at a stale alpha.
+
+Disappearance stays instant, as before: RemoteViews is stateless, so a removed
+icon is no longer in the new tree and there is nothing left to draw at falling
+alpha.
+
+BUDS DISTORTED BY THE BOX'S SHAPE (same root cause, two symptoms). fitCenter
+scales to whichever bound is proportionally smaller, so the view box must carry
+the artwork's true ratio (0.641) or the ink stretches to fill it:
+
+  - 34dp wide x ~74dp tall box -> ink rendered 34 x 53dp: squished
+    horizontally, with dead space above and below, because the width was the
+    binding constraint.
+  - 72dp wide x ~70dp tall box -> ink rendered 72 x 96dp, a ratio of 0.75
+    against the true 0.641: too big and fat on the vertical axis. The box was
+    wider than the ratio needs, so the art scaled UP in width.
+
+widget_bud_width/widget_bud_height are now a matched pair, 48 x 75dp
+(48 / 0.641 = 74.9), and both ImageViews take an explicit height instead of
+match_parent, which was letting the box shape drift from the art.
+
+Also fixes the left bud being CUT OFF at 2x2 while 3x2 looked fine: two fixed
+72dp boxes plus the 8dp gap is 152dp, which overflows the ~108dp card at 2x2.
+48 + 8 + 48 = 104dp now fits the smaller widget.
+
+widget_bud_width and widget_bud_height must ALWAYS change together, keeping the
+ratio 0.641 (the source viewBox is 460 x 717.456), or the buds distort again.
+
+Built, signed and installed. The 2x2 fit is arithmetic only -- a layout report
+at 2x2 is still pending.

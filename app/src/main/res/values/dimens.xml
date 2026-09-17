@@ -71,10 +71,84 @@
       This is also what stops the case being clipped: its slot is now the full 40dp
       tall, which is what the drawable's intrinsic size expects.
     -->
-    <dimen name="battery_bud_size">52dp</dimen>
-    <dimen name="battery_case_width">52dp</dimen>
-    <dimen name="battery_case_height">52dp</dimen>
-    <dimen name="battery_letter_size">14dp</dimen>
+    <!--
+      THE WEAR ICONS — three separate drawables, copied verbatim from svgs/.
+
+          ic_bud_left.xml   460 x 717.456      (svgs/bud_left.svg)
+          ic_case.xml       856.154 x 659.929  (svgs/case.svg)
+          ic_bud_right.xml  460 x 717.456      (svgs/bud_right.svg)
+
+      The buds are tall, the case is wide, so the three CANNOT share one box. They
+      share a HEIGHT: `battery_wear_height` is the common height, and each icon is
+      given an EXPLICIT width computed from its own ratio.
+
+      WHY THE WIDTHS ARE EXPLICIT AND NOT `wrap_content + adjustViewBounds`:
+      that combination clips the artwork. The drawable's intrinsic size is stored in
+      PIXELS at the screen density, so declaring 24dp x 37dp becomes 63 x 97 px at
+      2.625 (37 * 2.625 = 97.125, rounded DOWN to 97). The resulting intrinsic ratio,
+      63:97 = 0.649, no longer matches the SVG's 460:717.456 = 0.641. adjustViewBounds
+      then sizes the view from the DISTORTED ratio (62.1dp wide at 96dp tall) while
+      the vector rasterises at the true ratio, and the difference shows up as the
+      artwork being clipped at the box's bounds.
+
+      Sizing the box explicitly from the TRUE ratio removes the mismatch. The values
+      below are the source ratios applied to `battery_wear_height`:
+
+          bud   0.641 x 96 = 61.6 -> 62dp
+          case  1.297 x 96 = 124.5 -> 124dp
+
+      Change `battery_wear_height` and scale these three widths with it (the case
+      width is 1.297/0.641 = 2.024x the bud width).
+    -->
+    <dimen name="battery_wear_height">96dp</dimen>
+    <dimen name="battery_bud_width">62dp</dimen>
+    <dimen name="battery_case_width">124dp</dimen>
+    <!--
+      Gap between the icons. The SVGs' ink runs to their viewBox edges, so with no
+      margin the three read as one touching mass; this separates them. Applied as the
+      case's start and end margin, which spaces bud : case : bud at once.
+      
+      Total icon block width = 62 + 10 + 124 + 10 + 62 = 268dp, inside the card's
+      351dp inner width, so the block still centres with room either side.
+    -->
+    <dimen name="battery_icon_gap">10dp</dimen>
+
+    <!--
+      WIDGET bud column.
+
+      `widget_bud_width` and `widget_bud_height` are a MATCHED PAIR: the box must
+      carry the artwork's TRUE ratio (0.641) or `fitCenter` stretches the ink to the
+      box's shape. Two bugs came from breaking that rule (both visible in
+      testlogs/layout_widget_*):
+
+        1. 34dp wide x ~74dp tall box -> ink rendered 34 x 53dp: SQUISHED
+           horizontally with dead space above and below, because the width was the
+           binding constraint.
+        2. 72dp wide x ~70dp tall box -> ink rendered 72 x 96dp, a ratio of 0.75
+           against the true 0.641: FAT on the vertical axis, exactly as reported.
+           The box was wider than the ratio needs, so the art scaled UP in width.
+
+      So: 72 / 0.641 = 112dp. Height 112dp against width 72dp reproduces the source
+      viewBox (460 x 717.456) at 0.641 and the ink can no longer be distorted.
+
+      SIZED TO FIT A 2x2 WIDGET. At 2x2 the widget is ~130dp wide, leaving roughly
+      ~108dp of card width; a 72dp bud plus 8dp gap plus 72dp bud = 152dp does NOT
+      fit, which is why the left bud was CUT OFF at 2x2 while looking fine at 3x2.
+      The pair is therefore 48 x 75dp (48 / 0.641 = 74.9), giving 48 + 8 + 48 =
+      104dp, which fits the 2x2 card with a little room and still grows on larger
+      widgets because the row height stretches.
+
+      CHANGE THESE TWO TOGETHER, ALWAYS AT RATIO 0.641, or the buds distort again.
+      The in-app battery card uses the same rule (battery_bud_width 62dp /
+      battery_wear_height 96dp = 0.646) — match that pattern.
+    -->
+    <dimen name="widget_bud_width">48dp</dimen>
+    <dimen name="widget_bud_height">75dp</dimen>
+    <dimen name="widget_bud_gap">8dp</dimen>
+    <!-- Kept for the drawables' own logical size; not used for layout sizing. -->
+    <dimen name="battery_bud_size">96dp</dimen>
+    <dimen name="battery_case_height">96dp</dimen>
+    <dimen name="battery_letter_size">20dp</dimen>
 
     <!--
       Battery bar height. Raised so the 10 segment dividers stay legible and the

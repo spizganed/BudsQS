@@ -1,79 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Charging case, from the user's SVG (500x400 viewBox).
+  CHARGING CASE — svgs/case.svg, copied VERBATIM.
+
+  The `d` attribute below is the user's own path data, character for character. No
+  rescaling, no re-transcription, no derived control points. The viewport is the
+  source's own viewBox (0 0 856.154 659.929).
 
   COLOUR RULE (the user's own): white = transparent, black = icon colour.
-      <ellipse cx=250 cy=200 rx=210 ry=155 fill=#000>       -> body (ink)
-      <line x1=42 y1=162 x2=458 y2=162 stroke=#fff w=4 />   -> lid slit (CUT)
-      <circle cx=250 cy=305 r=7 fill=#fff />                -> LED (CUT)
-  Both white elements are cuts in the body, not marks on it.
+  The source is a single `fill="black"` path with `fill-rule="evenodd"`, so it becomes
+  one white ink path with `fillType="evenOdd"`. All three subpaths (the lid band, the
+  body, and the LED dot) stay together in that one path, exactly as the source has them.
 
-  ==================================================================
-  SIZING: now on the SAME viewport AND the same optical scale as the buds
-  ==================================================================
-  All three battery icons (ic_bud_left, ic_bud_right, ic_case) are now authored on
-  a 48x48 viewport and drawn into a 40x40dp slot, so one vector unit means the same
-  physical distance on screen in every file: 40/48 = 0.833dp per unit.
+  The LED dot is KEPT, at the user's explicit request: it is the third subpath,
+  `M 421.372 531.601 ...`.
 
-  WHY THIS FILE CHANGED (the bug it fixes):
-  Previously the case was a 48x40 viewport drawn into a 48x40dp slot (a 1:1
-  mapping), so the ellipse ran edge to edge and filled 100% of its box. The buds, on
-  a 48x48 viewport drawn into 40x40dp, have their ink inset (the source transform is
-  X = x*0.096 + 5.58, which uses roughly 38 of the 48 units, about 79% fill). So a
-  unit of case artwork was 48/48dp while a unit of bud artwork was 40/48dp: the case
-  rendered about 20% larger per unit AND sat on a different optical line. That is the
-  "icons are misaligned, different sizes" report.
+  INTRINSIC SIZE — matched to the layout box:
+  `android:width/height` is 124 x 96dp, the SAME size the card gives this icon
+  (`battery_case_width` x `battery_wear_height`), so fitCenter scales by 1 and there is
+  no rounding mismatch to clip the artwork. The ratio 124:96 = 1.292 is the source's
+  856.154:659.929 = 1.297 to within the dp rounding available.
 
-  Matching the VIEWPORT alone would not have fixed it: the fill fraction had to
-  match too. The ellipse is therefore scaled to the buds' ~79% ink fill and centred
-  on the 48x48 viewport.
-
-  SCALE: source ellipse is 420 units wide (2 x rx=210) in a 500-wide viewBox.
-  Target ink width = 38 units on a 48 viewport (the buds' fill).
-      factor = 38 / 420 = 0.090476
-      centre   250,200 -> 24.00, 24.00
-      radii    210,155 -> 19.00, 14.02
-      lid      y=162   -> 24 + (162-200)*0.090476 = 20.56
-      lid width 4      -> 0.36
-      lid span  42..458 -> 24 + (42-250)*f = 5.19  ..  24 + (458-250)*f = 42.81
-      LED      250,305 -> 24 + (305-200)*f = 33.50, r 7 -> 0.63
-  Vertical: y spans 24-14.02 = 9.98 .. 24+14.02 = 38.02 in the 48 viewport, so it is
-  centred with 9.98 units of clearance top and bottom.
-
-  ELLIPSE: drawn as FOUR ARCS (A commands) with the exact radii, not as beziers with
-  straight joins. An earlier draft used line segments between control points, which
-  flattens the sides into a lozenge, visible immediately at this size.
-
-  The lid slit keeps the source's rounded ends (stroke-linecap="round"), so it is a
-  stadium: height 0.36, semicircular ends of radius 0.18.
+  NEVER put the viewBox numbers in android:width/height: the widget rasterises these
+  into bitmaps for RemoteViews, and a ~1000dp intrinsic size is rasterised at that
+  size, which crashed the app on connect with
+  "RemoteViews for widget update exceeds maximum bitmap memory usage
+   (used: 464658432, max: 15500160)".
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="48dp" android:height="48dp"
-    android:viewportWidth="48" android:viewportHeight="48">
+    android:width="124dp" android:height="96dp"
+    android:viewportWidth="856.154" android:viewportHeight="659.929">
 
     <path
         android:fillColor="#FFFFFF"
         android:fillType="evenOdd"
-        android:pathData="
-            M 5 24
-            A 19 14.02 0 0 1 43 24
-            A 19 14.02 0 0 1 5 24
-            Z
-
-            M 5.19 20.38
-            C 5.19 20.28 5.27 20.2 5.38 20.2
-            L 42.62 20.2
-            C 42.73 20.2 42.81 20.28 42.81 20.38
-            L 42.81 20.74
-            C 42.81 20.84 42.73 20.92 42.62 20.92
-            L 5.38 20.92
-            C 5.27 20.92 5.19 20.84 5.19 20.74
-            Z
-
-            M 24 32.87
-            C 24.4 32.87 24.72 33.19 24.72 33.5
-            C 24.72 33.81 24.4 34.13 24 34.13
-            C 23.6 34.13 23.28 33.81 23.28 33.5
-            C 23.28 33.19 23.6 32.87 24 32.87
-            Z" />
+        android:pathData="M 391.427 0.233 C 389.227 0.439, 381.802 1.103, 374.927 1.708 C 327.429 5.885, 272.158 18.887, 227.927 36.288 C 137.537 71.851, 71.309 129.147, 33.331 204.642 C 27.762 215.711, 16.927 241.582, 16.927 243.808 C 16.927 244.267, 201.877 244.642, 427.927 244.642 C 688.521 244.642, 838.927 244.292, 838.927 243.686 C 838.927 241.991, 830.321 220.429, 825.714 210.583 C 816.563 191.023, 801.779 167.413, 786.863 148.54 C 776.47 135.388, 749.781 108.814, 735.427 97.325 C 679.965 52.932, 604.372 20.956, 522.25 7.15 C 488.746 1.518, 476.09 0.512, 434.427 0.174 C 412.977 0, 393.627 0.026, 391.427 0.233 M 12.53 258.391 C 5.364 280.236, 0 323.203, 1.388 347.642 C 5.027 411.686, 26.494 467.924, 66.524 518.283 C 77.061 531.538, 96.505 551.29, 110.672 563.132 C 170.001 612.72, 253.078 645.019, 348.427 655.567 C 380.159 659.077, 400.897 659.929, 440.303 659.338 C 500.404 658.438, 538.92 653.588, 588.559 640.669 C 638.968 627.549, 687.052 605.861, 724.427 579.386 C 788.876 533.734, 832.999 468.039, 848.3 394.95 C 854.554 365.082, 856.154 330.218, 852.515 303.142 C 850.587 288.793, 845.727 264.256, 843.594 258.094 L 842.226 254.142 428.157 253.891 L 14.089 253.64 12.53 258.391 M 421.372 531.601 C 418.086 532.932, 413.082 539.298, 412.38 543.042 C 410.546 552.818, 418.024 561.642, 428.143 561.642 C 436.621 561.642, 443.873 554.7, 443.911 546.549 C 443.934 541.5, 440.083 534.731, 435.918 532.497 C 432.324 530.57, 425.028 530.12, 421.372 531.601" />
 </vector>

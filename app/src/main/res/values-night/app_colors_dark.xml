@@ -32,4 +32,9 @@
     <color name="app_icon_tint">#E0E0E0</color>
 
     <color name="app_letter">#FFFFFF</color>
+
+    <!-- Connection status pill. See values/app_colors.xml for why the pill is themed
+         but the connected/disconnected colours are not. -->
+    <color name="app_pill_fill">#242424</color>
+    <color name="app_pill_stroke">#3A3A3A</color>
 </resources>

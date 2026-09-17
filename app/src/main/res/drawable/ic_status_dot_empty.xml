@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Connection dot, EMPTY — the "disconnected" state.
+
+  A ring: same outside radius as ic_status_dot_filled.xml, with the centre cut out by
+  fillType="evenOdd". Ring thickness is 1.6 of the 5-unit radius, i.e. about 1.6dp at
+  the declared size — thick enough to read at 10dp, thin enough that the middle is
+  clearly hollow next to the filled version.
+
+  The outer circle is the SAME radius as the filled dot on purpose: the pill must not
+  change size or nudge the text when the connection state flips.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="10dp" android:height="10dp"
+    android:viewportWidth="10" android:viewportHeight="10">
+
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="
+            M 5 0
+            A 5 5 0 0 1 5 10
+            A 5 5 0 0 1 5 0
+            Z
+
+            M 5 1.6
+            A 3.4 3.4 0 0 1 5 8.4
+            A 3.4 3.4 0 0 1 5 1.6
+            Z" />
+</vector>
