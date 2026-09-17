@@ -64,11 +64,15 @@
       ACTION CARD — the seven buttons, in two weighted rows.
 
       Grouped by what they do, which also decides the split:
-        row A  Mark / Shot / Layout / Widg   the ones used while capturing
-        row B  Wlog / Clear / Export         the report and log-management ones
+        row A  Mark / Screen / Layout / Widget   the ones used while capturing
+        row B  Logic / Clear / Export            the report and log-management ones
 
-      Labels are kept SHORT (Widg, Wlog) on purpose: these are the abbreviations
-      already in use in the logs and in the capture notes, so they stay recognisable.
+      LABELS: "Shot" -> "Screen", "Widg" -> "Widget" and "Wlog" -> "Logic". The old
+      abbreviations were only decipherable if you already knew what they did, which
+      is the opposite of what a diagnostic screen should require. They stay SHORT
+      (<= 6 characters) on purpose and are spelled out in full in the legend below,
+      because a taller font (accessibility display size) clips a long label in a
+      4-across row. Short label + visible legend beats a long label that disappears.
     -->
     <LinearLayout
         android:layout_width="match_parent"
@@ -114,7 +118,7 @@
                 android:paddingStart="4dp"
                 android:paddingEnd="4dp"
                 android:textSize="12sp"
-                android:text="Shot" />
+                android:text="Screen" />
 
             <!--
               Layout report. Writes the measured geometry of the main screen out as
@@ -156,7 +160,7 @@
                 android:paddingStart="4dp"
                 android:paddingEnd="4dp"
                 android:textSize="12sp"
-                android:text="Widg" />
+                android:text="Widget" />
         </LinearLayout>
 
         <LinearLayout
@@ -185,7 +189,7 @@
                 android:paddingStart="4dp"
                 android:paddingEnd="4dp"
                 android:textSize="12sp"
-                android:text="Wlog" />
+                android:text="Logic" />
 
             <Button
                 android:id="@+id/btnClear"
@@ -216,6 +220,29 @@
                 android:text="Export" />
         </LinearLayout>
     </LinearLayout>
+
+    <!--
+      BUTTON LEGEND.
+
+      The buttons have to stay short to survive a 4-across weighted row, and a
+      short label cannot explain a diagnostic. This spells each one out, so the
+      screen is usable without already knowing what "Layout" or "Logic" writes.
+
+      Deliberately plain small text under the card rather than a second card: it
+      is reference material, not a control, and giving it a card would make the
+      two rows of buttons look like four rows of equally important things.
+      Colour comes from a theme attribute so it is legible in all three themes.
+    -->
+    <TextView
+        android:id="@+id/devToolsLegend"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="8dp"
+        android:paddingBottom="2dp"
+        android:textSize="11sp"
+        android:lineSpacingExtra="3dp"
+        android:textColor="?attr/appColorTextSecondary"
+        android:text="Mark: timestamp an action · Screen: screenshot to text&#10;Layout: main screen geometry · Widget: widget state&#10;Logic: widget update check · Clear / Export: log file" />
 
     <!--
       Live clock: current time with milliseconds, plus time since the last Mark.
