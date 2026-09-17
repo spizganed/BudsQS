@@ -92,6 +92,60 @@
     <string name="update_install">Install</string>
     <string name="update_failed">Could not check for updates: %1$s</string>
 
+    <!-- ==================== Earbud controls (gesture config) ==================== -->
+
+    <!-- Home-screen row that opens this screen. Placed above App update. -->
+    <string name="row_gesture_title">Earbud controls</string>
+    <string name="row_gesture_sub">Bind taps and slides</string>
+
+    <string name="gesture_title">Earbud controls</string>
+
+    <!-- Bud selector. Two buttons; the selected one is highlighted. -->
+    <string name="gesture_bud_left">Left</string>
+    <string name="gesture_bud_right">Right</string>
+    <string name="gesture_bud_desc">Choose which earbud to configure</string>
+
+    <!-- Section header. The call variant is deliberately absent: not implemented. -->
+    <string name="gesture_section_not_in_call">When not on call</string>
+
+    <!-- Gesture names. -->
+    <string name="gesture_single">Single tap</string>
+    <string name="gesture_double">Double tap</string>
+    <string name="gesture_triple">Triple tap</string>
+    <string name="gesture_slide">Slide</string>
+    <string name="gesture_hold">Tap and hold</string>
+
+    <!-- Subtitle on the tap-and-hold row only, so the fact that it cycles is
+         visible before the dialog is opened. -->
+    <string name="gesture_hold_multi_sub">Cycles through the actions you pick</string>
+
+    <!-- Actions. -->
+    <string name="gesture_action_none">No action</string>
+    <string name="gesture_action_play_pause">Play/Pause</string>
+    <string name="gesture_action_prev">Previous track</string>
+    <string name="gesture_action_next">Next track</string>
+    <string name="gesture_action_assistant">Voice assistant</string>
+    <string name="gesture_action_game">Game mode</string>
+    <string name="gesture_action_volume">Volume control</string>
+    <string name="gesture_action_switch_track">Switch track</string>
+    <string name="gesture_action_anc_on">ANC</string>
+    <string name="gesture_action_anc_adaptive">Adaptive</string>
+    <string name="gesture_action_anc_transparency">Transparency</string>
+    <string name="gesture_action_anc_off">ANC off</string>
+
+    <string name="gesture_not_set">Not set</string>
+    <string name="gesture_choose_title">Assign action</string>
+    <string name="gesture_multi_hint">Tap to add or remove. More than one makes the gesture cycle through them.</string>
+    <string name="gesture_done">Done</string>
+
+    <!--
+      The honest status line. The selections are stored on the phone only: the
+      write command (0x0402) needs the `function` enum, which is not yet known,
+      and sending a guessed value is the mistake that already cost this project
+      one regression. Shown on the screen rather than hidden in a comment.
+    -->
+    <string name="gesture_not_written">Saved on this phone only. Sending these to the earbuds needs the action values, which are not confirmed yet — so the buds keep their current bindings.</string>
+
     <!-- Misc -->
     <string name="dialog_close">Close</string>
     <string name="theme_title">Theme</string>

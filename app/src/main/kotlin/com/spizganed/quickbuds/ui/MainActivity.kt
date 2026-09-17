@@ -1456,7 +1456,20 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
             ) { startActivity(Intent(this, FindBudsActivity::class.java)) }
         )
 
-        // --- 6. App update (never automatic; the screen enforces that) ---
+        // --- 6. Earbud controls (gesture config) ---
+        // Placed above App update, as requested. The screen it opens is complete
+        // and stores its selections, but does NOT write them to the buds yet: the
+        // `function` enum for setKeyFunction (0x0402) is still unknown, and a
+        // guessed value is the mistake that already cost this project a
+        // regression. See GestureConfigStore and PROTOCOL.md §6.
+        addRow(
+            SettingRowFactory.build(
+                this, R.drawable.ic_gesture, R.string.row_gesture_title, R.string.row_gesture_sub,
+                SettingRowFactory.buildChevron(this)
+            ) { startActivity(Intent(this, GestureActivity::class.java)) }
+        )
+
+        // --- 7. App update (never automatic; the screen enforces that) ---
         addRow(
             SettingRowFactory.build(
                 this, R.drawable.ic_app_update, R.string.row_update_title, R.string.row_update_sub,

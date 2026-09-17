@@ -91,6 +91,10 @@
             android:exported="false" />
 
         <activity
+            android:name=".ui.GestureActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".ui.UpdateActivity"
             android:exported="false" />
 
