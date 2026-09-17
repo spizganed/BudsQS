@@ -1,8 +1,0 @@
-Label and describe the Dev Tools buttons
-
-- Shot/Widg/Wlog were undecipherable unless you already knew the
-  tool. Now Screen, Widget, Logic.
-- Add a short legend under the card spelling out all seven, since a
-  label short enough to fit a 4-across row cannot explain itself.
-- Ids unchanged, so no wiring moved; nothing branches on button
-  text (checked).

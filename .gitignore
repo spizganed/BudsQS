@@ -19,11 +19,29 @@ Thumbs.db
 # Logs
 *.log
 *.log.txt
-commit-title.txt
-commit-title-short.txt
-testlogs/
 module.toml
 *.toml
 
-# NOTE: NEXT-SESSION.md is deliberately NOT ignored — the handover plan should
-# travel with the repo. It replaced the old ignored next-session-prompt.txt.
+# ==================== local/ — everything that does NOT belong on GitHub ====================
+#
+# One folder for all the working material, so the repo root stays readable and
+# there is one rule to remember instead of a growing list of one-off patterns.
+#
+#   local/NEXT-SESSION.md  the session plan — moved here at his request, it is a
+#                          private working note, not part of the project
+#   local/commits/     commit messages for `git commit -F` (they do not fit the
+#                      CodeAssist box, so they live in a file)
+#   local/crashlogs/   crash reports pulled off the device
+#   local/logs/        captured packet logs and layout reports
+#   local/notes/       internal MDs GitHub does not need (HANDOFF, GRADLE-EXPORT,
+#                      the gesture-capture brief, open questions)
+#   local/svgs/        the source SVGs the three wear icons were traced from
+#
+# IGNORED WHOLE, not file by file: a new file dropped into any of these is ignored
+# automatically, which is the point. Do not add narrower patterns below — if
+# something must be shared, it belongs at the repo root with the other public docs.
+#
+# WHAT DELIBERATELY STAYS TRACKED at the root: README.md, PROTOCOL.md, CREDITS.md,
+# ROADMAP.md and LICENSE. Everything in local/ is working material — including the
+# handover plan, which is written for whoever picks the work up next, not for GitHub.
+local/

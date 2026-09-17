@@ -130,4 +130,4 @@ Check the license of each source before copying anything verbatim.
   here is our own.
 
 If in doubt, re-derive from a capture rather than copying, and add the capture to
-`testlogs/`.
+`local/logs/`.

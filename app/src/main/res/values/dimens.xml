@@ -72,11 +72,11 @@
       tall, which is what the drawable's intrinsic size expects.
     -->
     <!--
-      THE WEAR ICONS — three separate drawables, copied verbatim from svgs/.
+      THE WEAR ICONS — three separate drawables, copied verbatim from local/svgs/.
 
-          ic_bud_left.xml   460 x 717.456      (svgs/bud_left.svg)
-          ic_case.xml       856.154 x 659.929  (svgs/case.svg)
-          ic_bud_right.xml  460 x 717.456      (svgs/bud_right.svg)
+          ic_bud_left.xml   460 x 717.456      (local/svgs/bud_left.svg)
+          ic_case.xml       856.154 x 659.929  (local/svgs/case.svg)
+          ic_bud_right.xml  460 x 717.456      (local/svgs/bud_right.svg)
 
       The buds are tall, the case is wide, so the three CANNOT share one box. They
       share a HEIGHT: `battery_wear_height` is the common height, and each icon is
@@ -119,7 +119,7 @@
       `widget_bud_width` and `widget_bud_height` are a MATCHED PAIR: the box must
       carry the artwork's TRUE ratio (0.641) or `fitCenter` stretches the ink to the
       box's shape. Two bugs came from breaking that rule (both visible in
-      testlogs/layout_widget_*):
+      local/logs/layout_widget_*):
 
         1. 34dp wide x ~74dp tall box -> ink rendered 34 x 53dp: SQUISHED
            horizontally with dead space above and below, because the width was the

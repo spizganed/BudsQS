@@ -39,13 +39,21 @@ The official apps are heavy, account-bound, and push features you don't want. Qu
   source of several invisible-on-light bugs, e.g. white L/C/R letters)
 - Main screen: battery card, circular ANC switcher (tap the active circle for the full mode
   list), and a settings card — Game Mode (live), Hi-Res codec, spatial audio, Equalizer,
-  Find my earbuds, App update
-- Dedicated screens: **Dev Tools**, **Equalizer**, **Find my earbuds**, **App update**
+  Find my earbuds, Earbud controls, App update
+- Dedicated screens: **Dev Tools**, **Equalizer**, **Find my earbuds**, **Earbud controls**,
+  **App update**
+- **Earbud controls** — bind each bud's gestures (single / double / triple tap, slide, hold)
+  separately, since the two buds can be configured differently. Tap-and-hold takes several
+  actions and cycles through them. **The choices are stored on the phone only:** sending them
+  to the buds needs the `function` value for each action, which is not yet confirmed, and the
+  screen says so rather than pretending otherwise — see ROADMAP #26 and PROTOCOL.md §6
+- Dialogs are the app's own **bottom sheets**, so the theme picker, the ANC mode chooser and
+  the gesture picker match the app's palette instead of the platform's
 - Dev Tools screen with a human-readable log and a raw-hex log, hold-to-copy, and
   export-to-file; packet logging captures every sent command and received frame, timestamped
-- Dev Tools also dumps a **layout report**: the measured view tree as text (bounds, weights,
-  margins, text sizes, gaps between siblings). This exists because the AI that works on this
-  repo cannot read screenshots — see *Reading the layout* below
+- Dev Tools also holds Reconnect / Disconnect, and dumps a **layout report**: the measured view
+  tree as text (bounds, weights, margins, text sizes, gaps between siblings). This exists
+  because the AI that works on this repo cannot read screenshots — see *Reading the layout* below
 
 > The main screen carries **no** log — Dev Tools owns logging. Status events on the main
 > screen are silent by design; a toast on a packet-listener path storms the UI.
@@ -68,7 +76,7 @@ numbers that a screenshot only approximates — exactly, and with view ids attac
   spacing is visible at a glance
 
 To capture: open the main screen once (it parks a report in `onResume`), then
-Dev Tools → *Layout report*. Files land in `testlogs/`.
+Dev Tools → *Layout report*. Files land in `local/logs/`.
 
 **If you change `collectGaps`, keep it to direct children of each container, measured against
 that container's own origin and on its own stacking axis.** Two earlier versions broke that
@@ -141,11 +149,24 @@ remaining 60-second poll is now a pure keep-alive.
 | --- | --- |
 | [ROADMAP.md](./ROADMAP.md) | The priority list. Read this first if you want to help. |
 | [**PROTOCOL.md**](./PROTOCOL.md) | **The wire format, end to end** — frame layout, every command, ANC, gestures, and the mistakes already made. Read before touching anything protocol-related. |
-| [HANDOFF.md](./HANDOFF.md) | Current state, key files, storage/log paths, known issues. |
 | [CREDITS.md](./CREDITS.md) | **Whose reverse-engineering this stands on, and which parts are ours.** Read before adding protocol constants. |
-| [GRADLE-EXPORT.md](./GRADLE-EXPORT.md) | How to take this project to a desktop Gradle setup. |
-| `testlogs/` | Not committed (git-ignored): log captures and layout reports handed over for analysis. |
-| `screenshots/` | Predate the current redesign, and **the AI agent cannot read them.** For anything about geometry or spacing, capture a layout report instead — see *Reading the layout*. |
+| [LICENSE](./LICENSE) | GPL-3.0. |
+
+Everything else the developer works with lives under a git-ignored `local/` folder, so the
+public repo stays readable:
+
+| Path | What is in it |
+| --- | --- |
+| `local/NEXT-SESSION.md` | The session plan and handover note. **Deliberately not published** — it is a working note, and it does not travel with a clone. |
+| `local/notes/` | Internal notes: the handoff document, the desktop Gradle export guide, the gesture-capture brief, open questions. |
+| `local/logs/` | Packet captures and layout reports handed over for analysis. |
+| `local/crashlogs/` | Crash reports pulled off the device. |
+| `local/commits/` | Commit messages, because the commit box on the target device is too small to paste into. |
+| `local/svgs/` | The source SVGs the three wear-icon drawables were traced from. |
+
+There are no committed screenshots. This project is developed by an AI agent that **cannot read
+images**, so screenshots are useless to it — for anything about geometry or spacing, a layout
+report is captured instead. See *Reading the layout* below.
 
 ## Credits
 

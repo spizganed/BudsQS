@@ -159,11 +159,11 @@
                 <!-- ICON BLOCK: bud, case, bud — each from its OWN source SVG.
 
                      The three icons are three separate drawables, each copied verbatim
-                     from its own file in svgs/, each on its own source viewBox:
+                     from its own file in local/svgs/, each on its own source viewBox:
 
-                         ic_bud_left.xml   460 x 717.456      (svgs/bud_left.svg)
-                         ic_case.xml       856.154 x 659.929  (svgs/case.svg)
-                         ic_bud_right.xml  460 x 717.456      (svgs/bud_right.svg)
+                         ic_bud_left.xml   460 x 717.456      (local/svgs/bud_left.svg)
+                         ic_case.xml       856.154 x 659.929  (local/svgs/case.svg)
+                         ic_bud_right.xml  460 x 717.456      (local/svgs/bud_right.svg)
 
                      The buds are TALL and the case is WIDE, so they cannot share one
                      box. They share a HEIGHT: `battery_wear_height` for all three, with

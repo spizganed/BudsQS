@@ -323,7 +323,7 @@ class BudsConnectionManager(private val context: Context) {
                 return
             }
             // Write bytes FIRST, log after. The buds ACK most commands in under 100ms
-            // (see any handshake in testlogs), so logging first is a race: a fast reply
+            // (see any handshake in local/logs), so logging first is a race: a fast reply
             // could land in the log ABOVE our own TX line and look causally backwards.
             thread.write(data)
             markAncFlush()

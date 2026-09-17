@@ -9,7 +9,7 @@ can re-learn the whole wire format without re-deriving it from captures.
 1. Every claim is marked with how we know it. `[VENDOR]` = from an official APK
    or vendor method name. `[OSS]` = from a public reverse-engineering project
    (see `CREDITS.md`). `[CAPTURE]` = observed on our own device, with the capture
-   in `testlogs/`. `[GUESS]` = unverified. **Never promote a claim without
+   in `local/logs/`. `[GUESS]` = unverified. **Never promote a claim without
    evidence, and never delete a `[GUESS]` marker to make the doc look tidy.**
 2. The test device is **OnePlus Buds 4**, firmware `B4.1-260810-1153`, Android.
    Other models differ — notably in feature IDs and button IDs.
@@ -464,6 +464,7 @@ RX  AA 17 00 00 0D 81 00 10 00 00 07 05 01 04 00 0B 01 11 01 18 01 06 00 1B 00
 | `ANC EVT:` | `0x0204` subType `0x03` decoded — the ANC mode, from the buds |
 | `GAME EVT:` | `0x0204` subType `0x05` decoded — game mode, from the buds |
 | `WEAR EVT:` / `WEAR QRY:` | Wearing push / reply |
+| `KEYFN:` | `0x8108` reply decoded — the current gesture bindings. Ends with `RAW=[...]` |
 | `UNATTR RX:` | A frame we do not decode, with its payload head |
 | `ancFlush=` | Whether we had *just* written an ANC command — attribution aid |
 
