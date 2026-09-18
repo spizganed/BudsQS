@@ -1,0 +1,126 @@
+PROMPT FOR CLAUDE CODE — QuickBuds, first session on the PC
+==========================================================
+
+Temporary file. Delete it once the steps below are done.
+
+IMPORTANT — THIS FILE IS UNCOMMITTED, SO A PC CLONE WILL NOT HAVE IT.
+It cannot be committed: the push is blocked (see "WHY THIS FILE EXISTS" at the
+bottom), which is the whole reason this task exists. So read it HERE, on the
+phone, and paste the text into Claude Code on the PC. Do not go looking for it
+in the clone.
+
+Copy everything between the two rule lines below, i.e. everything under
+"PROMPT" up to "WHY THIS FILE EXISTS".
+
+--------------------------------------------------------------------
+PROMPT
+--------------------------------------------------------------------
+
+This is QuickBuds, an Android app (spizganed/QuickBuds, branch main). Read
+START-HERE.md first, then AGENTS.md — they are the entry point and the durable
+reference. Do not change any code in this session; this is a git/docs task only.
+
+Start by reporting the repo state, then work through ONE of the two cases below.
+Do not guess which case you are in — the git output decides it.
+
+Report first:
+
+    git log --oneline -5
+    git status
+    git rev-parse HEAD
+    git rev-parse origin/main
+
+
+CASE A — local HEAD is b373b511
+
+That means this working copy came from the phone, with a local commit that never
+reached GitHub. Do not re-apply any doc edits; the content is already correct.
+
+The commit is unpushed because it is a SIBLING of the one on GitHub, not a
+descendant (an amend replaces a commit instead of adding one), so git rejects the
+push as a non-fast-forward.
+
+Make it an ordinary fast-forward:
+
+    git fetch origin
+    git reset --soft origin/main     # moves HEAD back; YOUR FILES ARE NOT TOUCHED
+    git commit -m "Docs: PROTOCOL.md 6 - byte2/byte3 confirmed as act/function"
+    git push origin main
+
+(`git reset --soft` only moves the branch pointer. It never modifies files, so
+nothing can be lost.)
+
+
+CASE B — local HEAD is 8fbf35a7 (a fresh clone)
+
+Then the phone's final docs commit did not come across, and PROTOCOL.md section 6
+is stale in two ways: it contradicts its own section 6.1, and it repeats a
+duplicated sentence. Apply the corrections below, find and replace the text as it
+actually reads in the file. If any change is already present, skip it.
+
+  1. In the ASCII diagram at the top of section 6, the byte labels are wrong:
+
+       byte3 is labelled "modifier / flag bits"      -> "FUNCTION it resolves to (not a modifier, see 6.1)"
+       byte2 is labelled "ACTION"                    -> "ACTION (a key-function act, not an F1 action id)"
+
+  2. In the field table just below that diagram:
+
+       the "modifier (byte3)" row says it is "[CONTENDED], may be the FUNCTION".
+       Replace the row label with "function (byte3)" and the value with:
+       "**the FUNCTION** the gesture resolves to - [CONFIRMED] in 6.1. The [OSS] calls
+       this field *modifier / flag bits*, which is wrong"
+
+       the "action (byte2)" row lists the old F1 action numbers
+       (00 single tap, 02 double tap, 03 triple tap, 04 long press, 07 slide up,
+       08 slide down). Replace with:
+       "**a key-function `act`, 1..6** - NOT the [OSS] F1 action id. See 6.1, which
+       established this by matching four F1 frames against their 0x8108 entries:
+       0x01 single, 0x02 double, 0x03 triple, 0x04 long press [CONFIRMED]"
+
+  3. The heading of the "What this frame can and cannot tell you" subsection says
+     "A CLAIM HERE IS NOW CONTESTED - see 6.1". That is wrong; 6.1 resolved it in
+     favour of the frame carrying the function. Replace that opening sentence with
+     one saying the section used to conclude the opposite and was wrong, i.e. the
+     frame does tell you what the gesture does via byte2/byte3 - but note the F1
+     log line is still diagnostic only, never a control signal.
+
+  4. Further down, in the gesture-enum section, one sentence is duplicated. The
+     text contains BOTH of these lines, one after the other:
+
+       "Two traps, both already paid for elsewhere in this document:"
+       "The two traps that were live at the time, kept because they generalise to
+        any future diff - not just this one:"
+
+     Keep only the second. Delete the first and the blank line after it.
+
+Then:
+
+    git add -A
+    git commit -m "Docs: PROTOCOL.md 6 - byte2/byte3 confirmed as act/function"
+    git push origin main
+
+
+AFTER EITHER CASE
+
+Verify, and show the output:
+
+    git log --oneline -3
+    git rev-parse HEAD origin/main      # the two lines must match
+
+Then delete this file (PUSH-PROMPT.txt) and stop. Do not start the Gradle build
+in this session - that is the next task, and START-HERE.md section 2 covers it.
+
+--------------------------------------------------------------------
+WHY THIS FILE EXISTS — background, not instructions
+--------------------------------------------------------------------
+
+The last docs commit was amended after it had already been pushed. An amend
+creates a NEW commit rather than adding one, so the new commit (b373b511) and the
+pushed one (8fbf35a7) are siblings, both children of c0ef231. Git refuses that as
+a non-fast-forward, which is the error seen on the phone.
+
+The phone cannot fix it: the project lives under Android/data/, which Termux
+cannot reach and the Shizuku setup was removed. So it is handled here, on the PC.
+
+Safe either way: solo repo, nothing references 8fbf35a7, and the v1.1.0 release
+tag points at 2875262 which is untouched.
