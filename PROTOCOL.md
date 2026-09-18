@@ -149,15 +149,27 @@ A working connection is exactly this, in order `[CAPTURE]`:
 6. TX 0x010C query ANC                -> 0x810C
 7. TX 0x0106 query battery            -> 0x8106
 8. TX 0x0109 query wearing            -> 0x8109
-9. TX 0x0108 query key function       -> 0x8108   (added 2026-09-19, READ-ONLY)
+9. TX 0x0108 query key function       -> 0x8108   (READ-ONLY, see §6)
+10. TX 0x010C query noise switch modes -> 0x810C  (READ-ONLY, payload 02 01, see §5)
 ```
 
-Then a periodic status poll (the app uses ~60 s).
+Each step is 200 ms apart, with a 300 ms delay before the first. Source:
+`BudsConnectionManager.runInitSequence()`.
 
-`[CAPTURE]` Step 9 is settled: the buds answer it in ~40 ms and nothing objects,
-so it stays. It is a read, so it cannot change a binding. See §6 for the reply.
-**If the timing of the earlier steps ever looks disturbed, step 9 is still the
-first suspect** — it remains the only step here that was added late.
+Then a periodic status poll (the app uses `POLL_INTERVAL_SECONDS = 60`). It sends the status
+query only — wear is NOT polled, because the buds push it (§8).
+
+Steps 9 and 10 are READ-ONLY additions, so neither can corrupt a binding.
+
+`[CAPTURE]` Step 9 is settled: the buds answer it in ~40 ms and nothing objects, so it stays.
+**If the timing of the earlier steps ever looks disturbed, these late additions are the first
+suspect** — they are the only steps here that were appended after the sequence was stable.
+
+`[GUESS]` **Step 10 is NOT settled — nothing has ever answered it.** No capture has shown a
+`0x810C` reply to payload `02 01`, so even its reply SHAPE is unknown. It is sent anyway because
+it is read-only and cheap, and it is the read that must be confirmed before the hold mode picker
+can be built (§5). Every log search so far has found no `810C` line at all, which is the whole
+reason the hold's mode list is still unwired.
 
 ### The broadcast codes reply (0x8200) is the map of what exists
 
@@ -288,8 +300,7 @@ treats it as an enum will be wrong half the time.
 
 `[CAPTURE]` 2026-09-21 — a four-stop gesture cycle (`low -> adaptive ->
 transparency -> off`) returned **`0x0800` for the Adaptive stop**, which had been
-`[OSS]`-only until then. Full capture: `local/logs/anc-cycle-gesture-4stop.txt`.
-Two consequences worth keeping:
+`[OSS]`-only until then. Two consequences worth keeping:
 
 - `0x0020` was NOT the "ANC on" stop in general. The cycle above never produced
   it, because Light was the level in force. Both earlier captures that read it as
@@ -431,8 +442,10 @@ supports the conclusion, because a binding is exactly one function per
 `(device, button, action)` — so the frame *would* still look identical on every
 occurrence even if it carried the function.
 
-The safe reading, until §6.1 is settled: the `F1` log line is **diagnostic only, never
-a control signal**. The *effect* must come from a separate event (§5) or a query.
+The safe reading, and it still stands now that §6.1 is confirmed: the `F1` log line is
+**diagnostic only, never a control signal**. The *effect* must come from a separate event (§5) or a
+query. Knowing what a gesture is bound to does not tell you what the buds just did — read that from
+the ANC/game-mode/wear pushes instead.
 
 ### 6.1 `[CONFIRMED]` `F1` byte3 IS the bound function
 
@@ -639,8 +652,7 @@ ignored in total silence, `0x0401` is acked. See the IMPLEMENTED table above.
 
 #### Route 1 — ANSWERED. The reply is readable, and the layout guess was WRONG.
 
-`[CAPTURE]` The buds answer `0x0108`, and the reply decodes completely. The capture
-is in `local/logs/keyfn-reply-capture.txt`.
+`[CAPTURE]` The buds answer `0x0108`, and the reply decodes completely.
 
 ```
 TX  AA 07 00 00 08 01 30 00 00        query key function (payload empty)
@@ -684,18 +696,17 @@ Three places print the reply, so a capture can always be read even if the parse 
 wrong: the raw `RX:` line, `BudsConnectionManager`'s `KEYFN:` line, and
 `LogDecoder`'s description — **all of which end with `RAW=[...]`**.
 
-#### STILL UNKNOWN, AND STILL NOT TO BE NAMED
+#### THE `function` VALUES ARE NOW MEASURED — see the table above
 
-The `function` VALUES are unread: `0x00`, `0x07`, `0x08`, `0x11`. Reading them off
-this one reply is not possible — the app has no idea what its own bindings currently
-are, so there is nothing to compare against. `fn` is printed as a **number and never
-named**, and no UI may offer a function list yet: a dropdown of guessed values looks
-finished while sending the wrong thing, which is the SET-ANC mistake again (§5).
+This section used to say they were unread and that no UI may offer a function list. **Both are
+obsolete.** The values were obtained by diffing two `0x8108` readings around changes made in the
+vendor app, cross-checked against what he had actually bound (zero contradictions, two values
+confirmed on two separate slots). They live in `GestureAction.functionByte`, and the Earbud controls
+screen offers a real function list built from them.
 
-`[GUESS]` Two weak hints, recorded so the next capture can confirm or kill them:
-`0x00` on 13 of 18 entries (so, something like "unbound/default"); long press
-(`act 0x04`) is `0x08` on BOTH buds, and the slide-ish `act 0x05` is `0x07` on both
-— consistent with `fn` being an action-level value.
+The two hints recorded here at the time both held up: `0x00` is indeed the unbound/default value
+(13 of 18 entries), and long press (`act 0x04`) is `0x08` on both buds. **Do not re-derive the
+enum** — the work is done and a "refutation" was already attempted once with a bad sample.
 
 `[USER]` **The hold is offered nothing but the ANC modes, and they CYCLE.** In
 HeyMelody the hold's menu is `ANC on / adaptive / transparency / ANC off`, and a press
@@ -720,13 +731,19 @@ consistent with the menu he sees:** double and triple tap each accept game mode,
 which is why `act 0x02` and `act 0x03` both appear under `btn 0x01` with values,
 while the hold row is a single cycle entry.
 
-#### THE ONE CAPTURE THAT FINISHES IT — no HCI snoop needed
+#### HOW THE ENUM WAS MEASURED — the diff that finished it (DONE 2026-09-22)
 
-`0x8108` describes the CURRENT binding, so **DIFF TWO READINGS**: change ONE gesture
-in HeyMelody, reconnect our app, and compare the `KEYFN:` lines. Whichever `fn` byte
-moves for that `act` is that function's value, and each further action can be learned
-the same way. This is why the reply is printed GROUPED per `dev/btn` — the single
-entry that changed is meant to be visible at a glance.
+This section used to be a plan. **It was carried out, and it is where the `function` table above
+comes from.**
+
+`0x8108` describes the CURRENT binding, so **DIFF TWO READINGS**: change ONE gesture in the vendor
+app, reconnect our app, and compare the `KEYFN:` lines. Whichever `fn` byte moves for that `act` is
+that function's value, and each further action can be learned the same way. This is why the reply is
+printed GROUPED per `dev/btn` — the single entry that changed is meant to be visible at a glance.
+
+**Do not re-run this to "verify" the table.** It has been done, the values are in `GestureAction`,
+and a re-derivation was already attempted once with a bad sample and drew a wrong conclusion (§6.1).
+The method below is kept for the next genuinely-unknown value, not for this enum.
 
 **Pick the change from the UNBOUND side, not the bound one.** The reply above has
 `fn=0x00` on 13 of its 18 entries and only three distinct non-zero values, so a
@@ -737,6 +754,9 @@ first diff: one `0x00` should move, and the value it becomes is Game Mode.
 
 Two traps, both already paid for elsewhere in this document:
 
+The two traps that were live at the time, kept because they generalise to any future diff — not
+just this one:
+
 - **Do not diff the hold.** It offers only the ANC cycle (§6.1), so the `fn` byte
   cannot vary and a "no change" result would tell us nothing while looking like one.
 - `[USER]` **`fn` may not be 1:1 with the menu label.** "ANC on" is ambiguous on the
@@ -745,9 +765,10 @@ Two traps, both already paid for elsewhere in this document:
   So a diff that moves for "ANC on" names the *slot*, not a level — do not write down
   "0xNN = ANC on" as if it were a level constant.
 
-**Note the write path is not built.** `0x0402` is deliberately not defined as a
-constant yet, and `buildPacket()` still lacks LEB128 `TotalLen` (§2), which a
-multi-entry write needs. Neither should be added until the enum is known.
+**Note the write path IS built now.** `0x0401` is defined as a constant and the app writes the full
+key-function table back (`BudsConnectionManager.writeGestureBinding`). `buildPacket()` still lacks
+real LEB128 `TotalLen` (§2), but no frame the app builds reaches 127 bytes, so it has never been
+needed in practice.
 
 ---
 
@@ -877,6 +898,7 @@ sessions:
 5. **Never guess an enum.** Log the raw value and let the device name it.
 6. **Write the brief before capturing.** The capture brief worked because it
    predicted a small number of named outcomes and said exactly which lines to send.
+   The procedure now lives in [PACKET-CAPTURE.md](./PACKET-CAPTURE.md).
 
 ### Things that look like bugs and are not
 
@@ -891,7 +913,9 @@ sessions:
 
 ## 12. Open questions
 
-- `function` enum values for gesture configuration (§6). **Blocks the feature.**
+- **The hold's mode list.** `0x810C` request `02 01` is sent in the init sequence, but no capture has
+  ever shown a reply, so the shape is unknown. This blocks the hold mode picker (§5). Everything else
+  about gesture configuration is settled — the `function` enum was MEASURED, see §6.
 - What `0x0501` / `0x0500` are.
 - Broadcast codes `0x04`, `0x08`, `0x0B`.
 - The `0x810D` batch status reply layout.

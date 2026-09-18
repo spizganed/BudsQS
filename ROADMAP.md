@@ -11,8 +11,8 @@ and it is the first thing the agent should read to know what to work on next.
   nothing here is marked "must ship in version X".
 - **Protocol findings do not live here.** They belong in [PROTOCOL.md](./PROTOCOL.md), which is the
   single reference for the wire format. Where an item below depends on protocol work, it points there.
-- Screenshots and log files are not committed. Working material lives in `local/` — see the
-  transfer note at the end.
+- This file replaced the old numbered priority tables. **Do not reintroduce item numbers** or
+  version targets — that structure is what made the previous roadmap unreadable.
 
 ## State of play: mobile → PC
 
@@ -22,7 +22,9 @@ and it is the first thing the agent should read to know what to work on next.
   environment, and none of its prerequisites or dependencies apply any more.
 - The build is plain desktop Gradle from here: **AGP 8.13.0, Kotlin 2.4.0, Gradle 8.13**,
   compileSdk 36 / minSdk 26 / targetSdk 35, Java 8, one dependency (`androidx.core:core:1.13.1`).
-- Source, docs and build files live on **GitHub**. Only logs and other debug documents stay local.
+- Source, docs and build files are on **GitHub**. `local/` was tracked temporarily to carry the
+  mobile working state across — packet captures that PROTOCOL.md cites as evidence, the source SVGs,
+  and the v1.1.0 release notes. Most of it is disposable: see AGENTS.md → *Post-move cleanup*.
 
 ## Working principles
 
@@ -75,9 +77,11 @@ and it is the first thing the agent should read to know what to work on next.
 - **Theming is not properly finished**, and the Light theme is the known offender — it is the source
   of invisible-on-light bugs, e.g. white L/C/R letters. Decision: either remove it, or leave it
   exactly as it is until the final UI lands. Do not polish it in the meantime.
-- **The widget is on hold** until the final UI and full HeyMelody parity. The decided colour rule
-  (in-ear full strength, out-of-ear grey, in-case full strength, all theme-aware) is therefore not
-  implemented in the widget yet.
+- **The widget is on hold** until the final UI and full HeyMelody parity. Its bud styling is already
+  implemented and is the source of truth the app copies: `AncWidgetProvider.budStyle()` draws a bud
+  **white** in ear (`#FFFFFF`), **grey** out of ear (`#8A8A8A`), and **hidden** in the case. Those
+  two colours are the widget's own fixed palette, **not** theme attributes — deliberately, because
+  the widget is always dark. `MainActivity.budStyle()` is a port of it so the two cannot disagree.
 
 ## Undecided
 
@@ -122,7 +126,8 @@ and it is the first thing the agent should read to know what to work on next.
 Foundation & debugging:
 
 - Packet logging foundation — every received `AA` frame and sent command, timestamped.
-- Bud icon states on the widget: in case / grey out-of-ear / full strength in-ear.
+- Bud icon states on the widget: **white in ear, grey out of ear, hidden in the case** — matching
+  `AncWidgetProvider.budStyle()`, which the app's own renderer copies.
 - Battery rows show last-known values, updated on every hardware packet.
 
 Push and control:
@@ -148,13 +153,15 @@ Appearance and tooling:
 ## Build and transfer notes
 
 - **Build and run:** Gradle on PC. No CodeAssist prerequisites — the toolchain is Gradle 8.13 +
-  AGP 8.13.0 + Kotlin 2.4.0.
-- **adb over USB** pushes the `.apk` to the device and is the debugging path. On-device logs, and
-  the Dev Tools output that cannot be reached from the PC, move to `local/logs` at the root.
-- `local/commits/` (commit-message files) is no longer needed now that commits are made on PC.
-- `local/` is brought onto GitHub **temporarily**, to carry the workflow across to the PC. Logs and
-  other pure debug documents stay out.
+  AGP 8.13.0 + Kotlin 2.4.0. Full setup and first-run steps are in
+  [START-HERE.md](./START-HERE.md) and [AGENTS.md](./AGENTS.md).
+- **adb over USB** pushes the `.apk` to the device and is the debugging path. Dev Tools output that
+  cannot be reached from the PC is exported to `local/logs`.
+- `local/` is on GitHub **temporarily**, to carry the mobile working state across to the PC. What is
+  in it, what has lasting value, and what to delete after the move are all in AGENTS.md →
+  *Post-move cleanup checklist*.
 
 **Docs:** [README.md](./README.md) is the accurate feature summary. [PROTOCOL.md](./PROTOCOL.md) is
 the wire format end to end — read it before touching anything protocol-related.
 [CREDITS.md](./CREDITS.md) is whose reverse-engineering this stands on.
+[AGENTS.md](./AGENTS.md) is how the project is built and worked on.

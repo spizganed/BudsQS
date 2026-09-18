@@ -39,26 +39,25 @@ object OpoProtocol {
     /**
      * setKeyFunction — write the gesture bindings back.
      *
-     * THE DEVICE PROVED 0x0402 WRONG; 0x0401 IS THE CANDIDATE THAT REPLACES IT. Both are
-     * `[OSS]`, so this is the better-supported of two unverified numbers — NOT a
-     * confirmed one:
-     *   - 0x0402 was sent repeatedly in a WELL-FORMED frame (`TotalLen 80 = 7 + 73`,
+     * **`0x0401` IS CONFIRMED ON THE DEVICE (2026-09-22).** Every write is acked
+     * immediately — `RX AA 08 00 00 01 84 .. 01 00 00`, payload `00` = success — and the
+     * `0x8108` read-back then shows a real `KEYFN DIFF:` change. The feature works.
+     *
+     * How the wrong number got in, kept because it is the trap:
+     *   - `0x0402` was sent repeatedly in a WELL-FORMED frame (`TotalLen 80 = 7 + 73`,
      *     payload `12` + 18x4) and the buds ignored it in total silence: no ack, and the
-     *     0x8108 read-back still showed the old table. That much IS settled — 0x0402 is
-     *     not the write.
-     *   - **0x0401** is what the Melody-derived setting tables list for `setKeyFunction`
+     *     0x8108 read-back still showed the old table. **A wrong command number fails
+     *     silently** — "it worked" and "it did nothing" are indistinguishable without
+     *     reading the table back, which is why every write re-reads and diffs.
+     *   - `0x0401` is what the Melody-derived setting tables list for `setKeyFunction`
      *     (`BtOperate.m2699L`), and those tables run 0x0400, 0x0401, 0x0403, 0x0404 —
      *     0x0402 does not appear among them at all.
      *   - OppoPodsManager mentions 0x0402 only inside a COMMENT on its 0x0108 query line,
-     *     and defines no constant for it. The old note here took that comment as a table
-     *     entry, which is how the wrong number got in.
+     *     and defines no constant for it. An earlier note here took that comment as a table
+     *     entry, which is how the wrong number got in — and it cost a session.
      *
-     * STILL UNVERIFIED: only the device can confirm 0x0401, and if it is also wrong the
-     * failure is equally silent, so the read-back is the only evidence either way.
-     *
-     * Payload SHAPE is corroborated rather than assumed: `<count> [deviceType, button,
-     * buttonAction, function]...` is what the 0x8108 read reply returns (minus the read's
-     * leading status byte), and the Melody tables list the write payload in that form.
+     * Payload SHAPE: `<count> [deviceType, button, buttonAction, function]...`, which is
+     * what the `0x8108` read reply returns minus its leading status byte.
      */
     const val CMD_SET_KEY_FUNCTION = 0x0401
 

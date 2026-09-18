@@ -31,16 +31,14 @@ Thumbs.db
 # Everything in local/ is committed on purpose, to carry the working state from
 # the mobile setup to the PC, so a fresh clone has the full picture:
 #
-#   local/logs/        packet captures and layout reports handed over for analysis
-#   local/crashlogs/   crash reports pulled off the device
+#   local/logs/        packet captures handed over for analysis (evidence for PROTOCOL.md)
 #   local/svgs/        the source SVGs the wear-icon drawables were traced from,
 #                      referenced by comments in the drawables themselves
-#   local/commits/     commit messages prepared on the phone (obsolete now that
-#                      commits are made on PC, kept only so nothing is lost)
-#   local/NEXT-SESSION.md   working session note from the mobile era. Historical.
+#   local/commits/     the v1.1.0 commit message and release body
 #
-# (local/notes/ was deleted during the move — its content was folded into
-# AGENTS.md, PROTOCOL.md, ROADMAP.md and PACKET-CAPTURE.md.)
+# (local/notes/ and local/NEXT-SESSION.md were deleted during the move — their
+# content was folded into AGENTS.md, PROTOCOL.md, ROADMAP.md and PACKET-CAPTURE.md.
+# Do not add them back.)
 #
 # Nothing here is ignored — there is no rule for it, other than the `*.log` rule
 # above. To exclude something later, add a specific pattern rather than
