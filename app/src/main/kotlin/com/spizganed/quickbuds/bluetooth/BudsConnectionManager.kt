@@ -555,20 +555,30 @@ class BudsConnectionManager(private val context: Context) {
     }
 
     /**
-     * Attribution probe for gestures that produce no known event.
+     * Attribution probe for frames we do not decode.
      *
-     * Why this exists: ANC changes made on the BUDS raise no 0x0204 event (verified
-     * three separate captures — Off/Light/Medium each emitted nothing identifiable).
-     * That leaves two possibilities and the raw log cannot tell them apart:
+     * WHY THIS EXISTS, AND WHAT IT USED TO CLAIM: it was written to settle whether a
+     * gesture produced no frame at all, or a frame we simply did not name. At the time
+     * the working belief was "ANC changes made on the BUDS raise no 0x0204 event",
+     * based on three captures — **and that belief was WRONG.** ANC does push, as
+     * `0x0204` subType `0x03` (see [AncEventParser]). It looked silent for a reason
+     * this comment is the best evidence of: `noteUnattributed()` excludes cmd
+     * `0x0204` from its output, so an undecoded `0x0204` subType printed NOTHING, and
+     * "no frame" was indistinguishable from "unparsed frame". Two separate fixes came
+     * out of that: subscribe to ANC (`0x03`) in the `0x0205` registration, and name
+     * the subType. Both are done.
      *
-     *   A. the buds said nothing at all, so the only fix is a poll-after-gesture;
-     *   B. the buds DID say something in a frame we don't decode yet (the recurring
-     *      `AA 0D 00 00 04 02 FF 06 00 F1 01 01 XX YY 02` shape), and it only looks
-     *      like silence because nothing in the log names it.
+     * The probe is still worth keeping, for the genuinely unknown families: it stamps
+     * unattributed frames, and `sendAnc`'s flush flag shows whether an ANC write had
+     * just gone out, which is what attributes a frame to our own command.
      *
-     * This stamps the two cases differently so one capture decides it. It is a
-     * DIAGNOSTIC only — it never changes state and never touches the UI, so it is
-     * safe to leave in permanently; `sendAnc`'s flush flag is the only extra signal.
+     * THE BLIND SPOT IS STILL THERE, deliberately: cmd `0x0204` is in the `explained`
+     * list below, so an undecoded `0x0204` subType prints no `UNATTR RX:` line. The
+     * Dev Tools decoder DOES show those (`Unattributed active report: subType=0x..`),
+     * so the information exists — it is just not in the raw log. **If a capture needs
+     * undecoded `0x0204` frames, remove that exemption first.**
+     *
+     * DIAGNOSTIC only — it never changes state and never touches the UI.
      *
      * Classification is deliberately "everything not already explained", because the
      * frames we DO decode (handshake, battery, wear, game mode, status/ANC query

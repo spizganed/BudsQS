@@ -29,7 +29,7 @@ What we use from it:
 | Area | What it gave us |
 |------|-----------------|
 | Frame layout | `AA <TotalLen> 00 00 <Cmd LE> <Seq> <PayLen LE> <Payload>`, and the LEB128 length encoding |
-| Command table | The 0x01xx query / 0x81xx response / 0x02xx broadcast / 0x04xx set layout, including `CmdSetAnc=0x0404`, `CmdQueryAnc=0x010C`, `CmdActiveReport=0x0204`, `CmdRegisterNotify=0x0205`, `CmdQueryFunctionKey=0x0108`, `CmdSetKeyFunction=0x0402` |
+| Command table | The 0x01xx query / 0x81xx response / 0x02xx broadcast / 0x04xx set layout — `CmdSetAnc=0x0404`, `CmdQueryAnc=0x010C`, `CmdActiveReport=0x0204`, `CmdRegisterNotify=0x0205`, `CmdQueryFunctionKey=0x0108`. **Exception: their `CmdSetKeyFunction=0x0402` is WRONG** — the real write is `0x0401`, and `0x0402` is ignored in total silence. See the *Key function* row below |
 | ANC (set) | `Protocol/OppoProtocol.Anc.cs` — the `AncOff/AncLight/AncMedium/AncDeep/AncTransparency` payloads and `PktAncByIndex()`, which is the exact bitmask algorithm in our `OpoProtocol.ancPayload()` |
 | ANC (notify) | `AncValues` — the `(Val1, Val2) -> name` dictionary for the 0x0204 subType 0x03 push, which matches our own captures exactly and is the basis of `AncEventParser.modeForRaw()` |
 | Button/gesture | `Models/UserInteractionEventInfo.cs` — the 0x0204 subType 0xF1 payload body (side, button, action, modifier, context, int16 options) and the action names (0x00 single, 0x02 double, 0x03 triple, 0x04 long press, 0x07 slide up, 0x08 slide down) |
@@ -88,10 +88,12 @@ To keep the credits honest, these are our own captures and findings, not taken
 from anyone else:
 
 - The **ANC gesture push** mapping for OnePlus Buds 4 (firmware
-  `B4.1-260810-1153`), captured on-device: `0x0008` Off, `0x0020` Medium,
-  `0x0010` Deep, `0x0100` Transparency, `0x0001`/`0x0002` Transparency with voice
-  enhance — and the finding that the ANC-on stop **echoes the last level**, so the
-  value is a bitmask rather than a fixed enum.
+  `B4.1-260810-1153`), captured on-device: `0x0008` Off, `0x0002` ANC (generic),
+  `0x0080` Smart, `0x0040` Light, `0x0020` Medium, `0x0010` Deep, `0x0100`
+  Transparency, `0x0200` Transparency with voice enhance, `0x0800` Adaptive —
+  and the finding that the ANC-on stop **echoes the last level**, so the value is a
+  bitmask rather than a fixed enum. (`AncEventParser.modeForRaw()` is the
+  implementation; PROTOCOL.md §5 has the table.)
 - The observation that the **SET and NOTIFY ANC encodings differ** (set uses bit
   0 for Off and bit 2 for Transparency; the buds report bits 3 and 8). This is a
   genuine trap and is documented in `OpoProtocol.ancPayload()`.
@@ -174,16 +176,44 @@ model — is what makes the claims in [PROTOCOL.md](./PROTOCOL.md) checkable.**
 | Start | **DeepSeek chat** | ~15% | The first codebase, the first reverse-engineering steps, basic UI, packet logger, core logic, and a basic ANC-button widget. **That widget was subsequently rewritten almost entirely** — treat the early history as scaffolding, not as the current design. |
 | Main | **DeepSeek v4.1-fast**, via the CodeAssist agent + OpenRouter | ~80% | The large majority of what is here now: the protocol parsers, the widget and theme rework, the gesture configuration, the dev tools. |
 | Small tasks | Kimi chat, Gemini (image generation), Grok | ~5% | Occasional side work. Kimi was never the main model; ROADMAP said otherwise for a while. |
+| Move to PC | **Claude Code** | from v1.1.0 onward | Development moved off the phone: the Gradle build, the docs restructure (AGENTS.md, the ROADMAP rewrite) and everything after. |
 
-**All of it ran on free tiers.** No paid API budget was involved.
+The three mobile-era rows account for all of it up to **v1.1.0** (commit `2875262`), and they are
+the "who wrote this" record for everything that exists today.
 
-### Tools
+**Everything up to the move ran on free tiers.** No paid API budget was involved.
 
-- **CodeAssist** (Tyron) — the on-device IDE this is developed in
+### Environment and tools
+
+The environment changed with the move, so this is split by era. **The mobile column is history** —
+it built everything up to and including v1.1.0, and none of it is needed to work on the project now.
+
+**Mobile era, up to v1.1.0**
+
+- **CodeAssist** (Tyron) — the on-device IDE the project was built in, driving the build itself from
+  a `module.toml` project model rather than Gradle
 - **Termux** — terminal, scripting, git
 - **GitHub mobile** — repo management
 - **decompile.com** — HeyMelody (Melody) decompilation, used as a secondary reference
 - Brave browser, Google Files, a hex editor — research and inspection
+
+Two CodeAssist artefacts still sit in the working copy. **Neither is in the repo, and neither is
+needed on the PC** — they exist only so the phone build keeps working until it is retired:
+
+- `app/module.toml` — CodeAssist's project model (module type, source sets, dependencies, SDK
+  levels, and a second copy of the version number). This is what CodeAssist built from. The Gradle
+  files now in the repo were originally *generated* from it.
+- `.platform/` — CodeAssist's cache, settings and generated Gradle export. It also held the AI
+  agent's private memory, which was copied into
+  [DeepSeek_CodeAssist_memory.md](./DeepSeek_CodeAssist_memory.md) so it survived the move.
+
+**From the move to the PC onward**
+
+- **Claude Code** — the agent doing the work
+- **Gradle 8.13** + **AGP 8.13.0** + **Kotlin 2.4.0**, on a **JDK 17 or newer**, building from the
+  committed Gradle files (the `gradlew` wrapper is generated once on the PC — see AGENTS.md)
+- **adb over USB** — deploying to the phone and reading `logcat`
+- The **phone is still the test device**. Only the build and the agent moved.
 
 ---
 

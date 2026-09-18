@@ -46,7 +46,9 @@ See [ROADMAP.md](./ROADMAP.md) for the ordered plan and what is already done.
 **Home-screen widget (4x2)**
 - Battery bars for Left / Case / Right, always showing last-known values
 - Wear icons that update from the buds' own pushes — milliseconds, not poll-bound
-- Bud status: **full strength (theme colour)** = in ear, **grey** = out of ear
+- Bud status: **white** in ear, **grey** out of ear, **hidden** in the case. Those two colours are
+  the widget's fixed palette (`#FFFFFF` / `#8A8A8A`), not theme attributes, because the widget is
+  always dark
 - Six-segment ANC switcher (Off / Trans / Low / Med / High / Adpt) plus a Game Mode row, working
   even with the app closed
 - Nothing to configure; it reacts as fast as the hardware reports
@@ -113,7 +115,8 @@ protocol-related. A few facts worth knowing up front, because each one cost real
   for a long time, which is wrong — those are the command byte welded to its sequence value.)
 - `0x0205` makes the buds push `0x0204` events. Its payload is a **count** byte followed by event
   ids, and getting that shape wrong fails silently: `01 01 02 02` reads as "count=1, battery only",
-  so wear events never arrive.
+  so wear events never arrive. The app sends `03 01 02 03` — battery, wearing **and ANC**; dropping
+  `03` is what made bud-side ANC gestures look silent for three captures.
 - **The SET and NOTIFY encodings for ANC are different tables** and are not supposed to agree.
   Setting uses bit 0 = Off and bit 2 = Transparency; the buds *report* Off as bit 3 and
   Transparency as bit 8.
@@ -147,6 +150,7 @@ the next step — see [PROTOCOL.md](./PROTOCOL.md) §5 and [ROADMAP.md](./ROADMA
 
 | File | What it is |
 | --- | --- |
+| [START-HERE.md](./START-HERE.md) | Where a new agent session begins: read order, PC setup, first task. Temporary — it goes away once the move is settled. |
 | [ROADMAP.md](./ROADMAP.md) | The plan: what is next, in order, and what is already done. |
 | [AGENTS.md](./AGENTS.md) | How the project is built and worked on — toolchain, conventions, and the mistakes already paid for. |
 | [PROTOCOL.md](./PROTOCOL.md) | The wire format end to end. Read before touching anything protocol-related. |
@@ -159,12 +163,13 @@ Everything else lives under `local/`, which is tracked while the workflow moves 
 
 | Path | What is in it |
 | --- | --- |
-| `local/logs/` | Packet captures and layout reports handed over for analysis. |
-| `local/crashlogs/` | Crash reports pulled off the device. |
+| `local/logs/` | Packet captures handed over for analysis — cited as evidence by PROTOCOL.md. |
 | `local/svgs/` | The source SVGs the wear-icon drawables were traced from. |
-| `local/NEXT-SESSION.md` | A working session note from the mobile era. Historical. |
+| `local/commits/` | The v1.1.0 commit message and release body, kept so nothing was lost in the move. |
 
-There are no committed screenshots.
+`local/` is tracked only to carry the mobile workflow across to the PC. Most of it is disposable once
+the PC build is confirmed — [AGENTS.md](./AGENTS.md) has a cleanup checklist. There are no committed
+screenshots.
 
 ## Credits
 

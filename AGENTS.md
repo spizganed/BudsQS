@@ -20,12 +20,14 @@ the wear-state display). Only after that, other earbud models.
 
 | File | What it is |
 |---|---|
-| [README.md](./README.md) | The accurate feature summary. |
+| [START-HERE.md](./START-HERE.md) | **The entry point for a new session.** Read order, PC setup, and the first task. Temporary — delete it once the move is settled. |
 | [ROADMAP.md](./ROADMAP.md) | The plan: what is next, in order, and what is done or undecided. |
 | [PROTOCOL.md](./PROTOCOL.md) | **The wire format, end to end.** Read before any protocol work. |
+| [DeepSeek_CodeAssist_memory.md](./DeepSeek_CodeAssist_memory.md) | The previous agent's memory, carried over from the phone. Absorb what is useful, then delete it — it is NOT authoritative. See the cleanup checklist below. |
+| [README.md](./README.md) | The accurate feature summary. |
 | [CREDITS.md](./CREDITS.md) | Whose reverse-engineering this stands on. Add a row when you add a constant. |
 | [PACKET-CAPTURE.md](./PACKET-CAPTURE.md) | How to capture a packet log, kept as a backup procedure. |
-| AGENTS.md | This file. |
+| AGENTS.md | This file — the durable reference, loaded automatically. |
 
 ## Build and run
 
@@ -34,11 +36,26 @@ Plain desktop Gradle. There are no CodeAssist prerequisites or dependencies any 
 - **Toolchain:** Gradle **8.13** · Android Gradle Plugin **8.13.0** · Kotlin **2.4.0**
 - **SDK levels:** `compileSdk 36`, `minSdk 26`, `targetSdk 35`, Java 8
 - **Only dependency:** `androidx.core:core:1.13.1`
-- `./gradlew assembleRelease` → `app/build/outputs/apk/release/app-release.apk`
+- `./gradlew assembleDebug` → `app/build/outputs/apk/debug/app-debug.apk` — **use this one.** There
+  is no signing config, so a release build comes out unsigned and will not install (see *Signing*).
+- `./gradlew assembleRelease` → `app/build/outputs/apk/release/app-release-unsigned.apk`
 - `./gradlew bundleRelease` → `app/build/outputs/bundle/release/app-release.aab`
 - Deploy with `adb install -r <apk>`. **adb over USB is the debugging path**; use `adb logcat` for
   anything the in-app logs do not show.
 - `local.properties` must contain `sdk.dir=...`; it is git-ignored and must not be committed.
+
+### Environment you need
+
+Everything below is a one-time PC setup. Nothing here was recorded anywhere before the move,
+because the phone side had it all built in.
+
+| Need | Version / note |
+|---|---|
+| JDK | **17 or newer** — required by AGP 8.13. Set `JAVA_HOME`. |
+| Android SDK | `platforms;android-36` (for `compileSdk 36`) and `platform-tools` (for adb). `build-tools` matching AGP. |
+| Gradle | Only to generate the wrapper (below). After that `./gradlew` is self-sufficient. |
+| adb | For deploying to the phone and reading `logcat`. |
+| kotlin-stdlib | **No** manual install — it comes with the Kotlin Gradle plugin. The only app dependency is `androidx.core:core:1.13.1`. |
 
 ### First run on the PC
 
@@ -51,8 +68,15 @@ gradle wrapper --gradle-version 8.13     # writes gradlew, gradlew.bat, gradle-w
 ./gradlew assembleDebug                  # first real build
 ```
 
-Then set `sdk.dir` in a local `local.properties` (or export `ANDROID_HOME`). The wrapper JAR and
-scripts **should be committed** afterwards so nobody needs a local Gradle install again.
+Set `sdk.dir` in a local `local.properties` (or export `ANDROID_HOME`). `local.properties` is
+git-ignored — never commit it.
+
+The wrapper JAR and scripts **should be committed** afterwards, so nobody needs a local Gradle
+install or a matching Gradle version again. **Commit them as a follow-up, and note in the commit
+that they are generated.** They are the one piece of the build that is not yet in the repo.
+
+**The first build also downloads a lot** — Gradle 8.13, AGP, and the Kotlin plugin. That is expected,
+not a stall.
 
 **Expect a Kotlin-metadata warning on the first build.** Kotlin 2.4.0 is newer than the D8/R8 that
 AGP 8.13.0 bundles, which warns that it cannot rewrite the newer metadata. It is a warning, not an
@@ -136,9 +160,11 @@ Use [PROTOCOL.md](./PROTOCOL.md) as the reference; it tags every claim `[VENDOR]
 - **`0x01F0` / `0x01F2` are not commands.** They are the command byte welded to its SEQ value. The
   real numbers are **`0x0106`** (battery) and **`0x0109`** (wearing). Searching logs for `0x01F0`
   finds nothing because no such command exists.
-- **`0x0205`'s payload is count-first**, ids after. `01 01 02 02` means "count=1, battery only" —
-  the firmware accepts it and silently never pushes wear. Register `02 01 02` for battery + wear,
-  and include ANC (`03`).
+- **`0x0205`'s payload is count-first**, ids after: `[count][eventId...]`. `01 01 02 02` is a
+  misread — it means "count=1, battery only", which the firmware ACKs while silently never pushing
+  wear. **The app sends `03 01 02 03`** — count=3, then battery `01`, wearing `02`, **ANC `03`**
+  (`OpoProtocol.registerNotifications()`). Omitting `03` makes bud-side ANC gestures look silent,
+  which is exactly how that bug hid for three captures. Never shorten this list.
 - **The gesture write is `0x0401`, not `0x0402`.** `0x0402` is ignored in total silence and cost a
   session. **A wrong command number fails silently**, which is why every gesture write re-reads the
   table and diffs it.
@@ -340,20 +366,20 @@ a shared one hung.
 
 ## Repo hygiene
 
-- **`local/` is committed in full**, on purpose, to carry the working state from the mobile setup to
-  the PC: `logs/` (packet captures and layout reports), `crashlogs/`, `svgs/` (the source SVGs the
-  wear icons were traced from), `commits/`, and `NEXT-SESSION.md` (a historical session note).
-- **`local/notes/` is gone, on purpose.** It held `HANDOFF.md`, `GRADLE-EXPORT.md`, `QUESTIONS.md`
-  and the gesture-capture brief. All four were superseded: their surviving content was folded into
-  this file, PROTOCOL.md, ROADMAP.md and PACKET-CAPTURE.md, and the folder was deleted during the
-  move to the PC. **Do not recreate a notes folder.** Scattered per-purpose notes are exactly the
-  drift that AGENTS.md exists to stop — put new durable knowledge here, or in PROTOCOL.md if it is
-  about the wire format.
+- **`local/` is committed to carry the mobile working state to the PC**: `logs/` (packet captures
+  cited as evidence by PROTOCOL.md), `svgs/` (the source SVGs the wear icons were traced from, named
+  in the drawables' own headers), and `commits/` (the v1.1.0 commit message and release body).
+- **`local/notes/` and `local/NEXT-SESSION.md` are gone, on purpose** — all superseded, and their
+  surviving content was folded into this file, PROTOCOL.md, ROADMAP.md and PACKET-CAPTURE.md.
+  **Do not recreate a notes folder or a session-plan file.** Scattered per-purpose notes are exactly
+  the drift that AGENTS.md exists to stop — put new durable knowledge here, or in PROTOCOL.md if it
+  is about the wire format.
 - Runtime `*.log` files written by the app are ignored — they are regenerated every run. Handed-over
-  captures are evidence and are tracked.
+  captures (`*.log.txt`) are evidence and **are** tracked.
 - There are no committed screenshots.
 - Root docs: `README.md`, `ROADMAP.md`, `AGENTS.md`, `PROTOCOL.md`, `CREDITS.md`, `PACKET-CAPTURE.md`,
-  `LICENSE`, and `DeepSeek_CodeAssist_memory.md` (temporary — see below).
+  `LICENSE`, plus two temporary files — `START-HERE.md` and `DeepSeek_CodeAssist_memory.md`. Both are
+  listed in the cleanup checklist above and should be deleted once the move is settled.
 
 ### The carried-over memory file
 
@@ -361,3 +387,57 @@ a shared one hung.
 this project on the phone. It exists only so the move to the PC did not lose anything mid-flight.
 **Read it, fold anything still useful into this file, PROTOCOL.md or your own memory, then delete
 it.** Where it disagrees with this file, PROTOCOL.md or the code, those win.
+
+---
+
+## Post-move cleanup checklist
+
+The move happened, and it deliberately carried more than a PC needs. **Work through this once the PC
+build is confirmed working**, and delete what is listed. Everything here is either obsolete on the
+PC, or was only ever kept so nothing was lost mid-flight.
+
+**Do not do this before the first successful PC build** — the point of dragging the mobile material
+along was to survive a failed transfer.
+
+### Delete from the repo (safe once the build works on PC)
+
+| Item | Why it can go |
+|---|---|
+| `START-HERE.md` | Temporary bootstrap for the move. Once the build works and this checklist is done, AGENTS.md covers everything it says. **Delete this file last**, after the entries below are gone. |
+| `DeepSeek_CodeAssist_memory.md` | Temporary by design. Fold anything still useful into AGENTS.md or PROTOCOL.md first, then delete. |
+| `local/commits/` | Commit-message files, prepared because the phone's commit box was too small to paste into. Obsolete — commits are made on PC now. |
+
+**Already deleted during the move** — do not add them back: `local/notes/` (folded into AGENTS.md,
+PROTOCOL.md, ROADMAP.md and PACKET-CAPTURE.md) and `local/NEXT-SESSION.md` (a mobile-era session plan,
+fully superseded).
+
+### Delete from the phone's working copy (not in the repo, so no commit needed)
+
+- **`app/module.toml`** — CodeAssist's project model, which the phone build used. **Do not delete it
+  until you are confident nothing on the phone is still being built**: while it exists, the phone can
+  still build the project. Once the PC is the only build, it is dead weight. The version it holds is
+  already duplicated authoritatively in the manifest.
+- **`.platform/`** — CodeAssist's cache, settings and generated Gradle export. Pure IDE state. The
+  only thing in it of any value was the agent memory, now copied to
+  `DeepSeek_CodeAssist_memory.md`.
+
+Both are git-ignored, so deleting them is a local action with no repo consequence.
+
+### Keep
+
+- **`local/logs/`** — real captures, referenced as evidence by PROTOCOL.md and by source comments.
+  This is the one part of `local/` that has lasting value; do not delete it.
+- **`local/svgs/`** — the source SVGs the wear-icon drawables were traced from. The drawables
+  themselves say so in their headers, so these are the provenance for that artwork.
+- All root docs.
+
+### Also worth doing in that pass
+
+- **Re-check `CREDITS.md` and `README.md` end to end.** Both were edited piecemeal across the move
+  and have not had a full read-through since.
+- **Consider whether `local/` should stay in the repo at all** once the transfer is settled. It is
+  tracked now purely to carry the workflow across; if only `logs/` and `svgs/` are worth keeping,
+  narrowing `.gitignore` to the rest is the tidy end state.
+- **Empty folders are fine and need no attention.** Git does not track them, so they do not exist in
+  a fresh clone at all. Do not add `.gitkeep` files to force one in, and do not list empty
+  directories in any doc.
