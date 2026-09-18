@@ -756,6 +756,9 @@ first diff: one `0x00` should move, and the value it becomes is Game Mode.
 Two traps that were live at the time, kept because they generalise to any future diff — not
 just this one:
 
+The two traps that were live at the time, kept because they generalise to any future diff — not
+just this one:
+
 - **Do not diff the hold.** It offers only the ANC cycle (§6.1), so the `fn` byte
   cannot vary and a "no change" result would tell us nothing while looking like one.
 - `[USER]` **`fn` may not be 1:1 with the menu label.** "ANC on" is ambiguous on the
