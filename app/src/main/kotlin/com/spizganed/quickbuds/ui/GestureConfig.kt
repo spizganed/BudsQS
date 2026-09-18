@@ -16,8 +16,7 @@ import com.spizganed.quickbuds.R
  * what produced the SET-vs-NOTIFY regression this project had to revert (PROTOCOL.md
  * §5). It was filled in the honest way instead: he rebound slots in the vendor app, the
  * app diffed two `0x8108` readings, and he reported what he had bound. Every value
- * agreed, two of them across two separate slots. See PROTOCOL.md §6 and
- * `local/logs/keyfn-diff-batch-2026-09-21.txt`.
+ * agreed, two of them across two separate slots. See PROTOCOL.md §6.
  *
  * THE ONE THING THAT IS NOT WHAT IT LOOKS: tap-and-hold. All four ANC actions share ONE
  * key-function byte, because the device models the hold as a single "ANC cycle" function.
@@ -117,7 +116,7 @@ enum class Gesture(
  * `function` enum was unknown, and a guessed byte is the error that already cost this
  * project one regression. The bytes below are not guesses — they come from the
  * `0x8108` diff experiment, cross-checked against what he had actually bound. See the
- * class comment for the evidence and `local/logs/keyfn-diff-batch-2026-09-21.txt`.
+ * class comment for the evidence, or PROTOCOL.md §6.
  *
  * TWO LABELS, ON PURPOSE. [labelRes] is the full name and is what the dialog sheet
  * shows, where there is a whole row per option and room to be unambiguous.
@@ -139,8 +138,7 @@ enum class GestureAction(
      * EVERY VALUE HERE IS MEASURED, NOT GUESSED. The enum was filled in from a
      * `0x8108` diff: he rebound slots in the vendor app and reported what he set each
      * one to, and every value matched the reply with no contradictions (two of them
-     * twice, on two different slots). See PROTOCOL.md §6 and
-     * `local/logs/keyfn-diff-batch-2026-09-21.txt`.
+     * twice, on two different slots). See PROTOCOL.md §6.
      */
     val functionByte: Int = 0x00
 ) {
@@ -255,11 +253,15 @@ fun actionsFor(gesture: Gesture): List<GestureAction> = when (gesture) {
 }
 
 /**
- * Persists the per-bud, per-gesture selection ON THE PHONE.
+ * The per-bud, per-gesture selection as stored ON THE PHONE.
  *
- * Local-only on purpose — these are NOT sent to the buds while the `function`
- * enum is unknown. Stored per SIDE because the whole point of the Left/Right
- * selector is that the two buds can be bound differently.
+ * This is the screen's own record of what the user picked, NOT the authority —
+ * the buds' key-function table is. A save sends a `0x0401` write and then READS
+ * THE TABLE BACK to confirm it, because a wrong command number is ignored in
+ * complete silence; this store is what the UI renders from between those reads.
+ *
+ * Stored per SIDE because the whole point of the Left/Right selector is that the
+ * two buds can be bound differently.
  *
  * Uses the shared prefs file every other screen uses, so there is one place to
  * look and no second preferences file to discover later.
@@ -279,10 +281,10 @@ object GestureConfigStore {
         // It used to default to ANC alone, which the none-or-at-least-two rule now
         // forbids — a one-item cycle is not a cycle. Of the two valid options
         // (nothing, or a real cycle) "nothing" is the honest default: a two-mode
-        // cycle would be a guess about which modes the user wants, and this screen
-        // does not write to the buds yet, so a pre-filled cycle would be a
-        // suggestion that looks like a setting. Every other gesture defaults to
-        // NONE, so this is also consistent.
+        // cycle would guess which modes the user wants, and which modes the cycle
+        // contains is not settable from here anyway (that needs the separate
+        // `setSupportNoiseReduction` `0x0404` write — see PROTOCOL.md §5). Every
+        // other gesture defaults to NONE, so this is also consistent.
         Gesture.TAP_HOLD -> emptyList()
         else -> listOf(GestureAction.NONE)
     }

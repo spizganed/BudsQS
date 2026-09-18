@@ -27,17 +27,16 @@ import com.spizganed.quickbuds.bluetooth.BudsService
  * may be bound to. Tap-and-hold accepts MORE THAN ONE, which makes the gesture
  * cycle through them on each use; every other gesture takes exactly one.
  *
- * ON-CALL GESTURES ARE DELIBERATELY ABSENT. Not implemented by request, so there
- * is no "When on call" section and nothing to switch to it. The section header
- * exists as a single string for the not-on-call case; do not add the call variant
- * as an empty section, which would look like a bug.
+ * ON-CALL GESTURES ARE NOT IMPLEMENTED YET. There is no "When on call" section;
+ * the section header is a single string for the not-on-call case. Adding the call
+ * variant is planned for HeyMelody parity (see ROADMAP.md) — when it lands, add a
+ * real second section rather than an empty one, which would look like a bug.
  *
- * THE SELECTIONS ARE NOT SENT TO THE BUDS. See [GestureConfigStore] and the note
- * rendered at the bottom of this screen: the `function` enum is unknown, and
- * guessing it is the error that already cost this project one regression
- * (PROTOCOL.md §5). The screen is complete and usable; only the write is held
- * back, and it says so in plain words rather than looking finished and failing
- * silently.
+ * THE SELECTIONS ARE WRITTEN TO THE BUDS. Each save sends a `0x0401` setKeyFunction
+ * write (see BudsConnectionManager.writeGestureBinding), then reads the table back
+ * and diffs it, because a wrong command number fails in complete silence. The
+ * `function` bytes in [GestureAction] are MEASURED, not guessed — see [GestureConfig]
+ * and PROTOCOL.md §6.
  */
 class GestureActivity : Activity() {
 

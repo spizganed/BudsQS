@@ -1,0 +1,9 @@
+Adaptive button; QuickBuds rename; 1.1.0
+
+- Adaptive is a fourth ANC circle, wired through every ANC surface.
+- Adaptive's SET payload was wrong: bit 8 rendered as 01 01 00 01, a
+  different mode — it is mask 0x0800 (bit 11), now written literal.
+- Renamed BudsQS -> QuickBuds (repo, tags, prefs, docs); version
+  bumped to 1.1.0 — manifest said 0.4.0, module.toml said 1.0.
+- Doc fixes: 0x01F0/0x01F2 never were commands; widget is 4x2;
+  ROADMAP credited the wrong AI.

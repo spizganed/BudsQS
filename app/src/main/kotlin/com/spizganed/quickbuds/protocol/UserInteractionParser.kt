@@ -41,10 +41,9 @@ package com.spizganed.quickbuds.protocol
  * undecoded subType printed nothing at all (PROTOCOL.md §5).
  *
  * WHAT THE F1 FRAME IS FOR: it says WHEN, and which side and action. On a real ANC
- * hold, F1 lands FIRST and the 0x0204 subType 0x03 frame follows 1.3-2.0 s later
- * (capture: local/logs/anc-cycle-gesture-4stop.txt). So a capture window that stops
- * at the F1 line misses the answer, and the F1 log line stays diagnostic evidence,
- * never a control signal.
+ * hold, F1 lands FIRST and the 0x0204 subType 0x03 frame follows 1.3-2.0 s later.
+ * So a capture window that stops at the F1 line misses the answer, and the F1 log
+ * line stays diagnostic evidence, never a control signal.
  *
  * THE CONCLUSION THAT USED TO SIT HERE WAS TOO STRONG, and it is kept only so it is not
  * restored. It read "byte3 is identical for every gesture of the same action+side,

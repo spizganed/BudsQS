@@ -2,7 +2,7 @@ package com.spizganed.quickbuds.protocol
 
 /**
  * Decodes raw PacketLogger lines (e.g. "TX[handshake]: AA 07 00 00 ...")
- * into human-readable descriptions for the Dev Tools screen (roadmap #7).
+ * into human-readable descriptions for the Dev Tools screen.
  *
  * Lines that don't contain a hex payload (pure status messages like
  * "Already connecting/connected, ignoring." or "WEAR EVT: L=EAR ...")

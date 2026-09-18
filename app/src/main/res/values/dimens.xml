@@ -126,8 +126,7 @@
 
       `widget_bud_width` and `widget_bud_height` are a MATCHED PAIR: the box must
       carry the artwork's TRUE ratio (0.641) or `fitCenter` stretches the ink to the
-      box's shape. Two bugs came from breaking that rule (both visible in
-      local/logs/layout_widget_*):
+      box's shape. Two bugs came from breaking that rule:
 
         1. 34dp wide x ~74dp tall box -> ink rendered 34 x 53dp: SQUISHED
            horizontally with dead space above and below, because the width was the

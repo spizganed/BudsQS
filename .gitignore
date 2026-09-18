@@ -6,42 +6,42 @@ local.properties
 *.iml
 .idea/
 .cxx/
+captures/
 
-# CodeAssist IDE caches
+# CodeAssist leftovers — NOT used on the PC build (see AGENTS.md).
+# module.toml is CodeAssist's own project model; the real build is Gradle now.
+# NOTE: the old `*.toml` rule was removed deliberately — it would have swallowed
+# a Gradle version catalog (gradle/libs.versions.toml).
 .platform/
-.platform/caches/
+module.toml
 *.class
 
 # OS junk
 .DS_Store
 Thumbs.db
 
-# Logs
+# Runtime logs written by the app itself. These are regenerated on every run and
+# grow without bound; they are not committed. Packet captures that were handed
+# over for analysis are different — they are evidence, they live in local/logs/
+# and they ARE tracked.
 *.log
-*.log.txt
-module.toml
-*.toml
 
-# ==================== local/ — everything that does NOT belong on GitHub ====================
+# ==================== local/ — tracked for the move to PC ====================
 #
-# One folder for all the working material, so the repo root stays readable and
-# there is one rule to remember instead of a growing list of one-off patterns.
+# Everything in local/ is committed on purpose, to carry the working state from
+# the mobile setup to the PC, so a fresh clone has the full picture:
 #
-#   local/NEXT-SESSION.md  the session plan — moved here at his request, it is a
-#                          private working note, not part of the project
-#   local/commits/     commit messages for `git commit -F` (they do not fit the
-#                      CodeAssist box, so they live in a file)
+#   local/logs/        packet captures and layout reports handed over for analysis
 #   local/crashlogs/   crash reports pulled off the device
-#   local/logs/        captured packet logs and layout reports
-#   local/notes/       internal MDs GitHub does not need (HANDOFF, GRADLE-EXPORT,
-#                      the gesture-capture brief, open questions)
-#   local/svgs/        the source SVGs the three wear icons were traced from
+#   local/svgs/        the source SVGs the wear-icon drawables were traced from,
+#                      referenced by comments in the drawables themselves
+#   local/commits/     commit messages prepared on the phone (obsolete now that
+#                      commits are made on PC, kept only so nothing is lost)
+#   local/NEXT-SESSION.md   working session note from the mobile era. Historical.
 #
-# IGNORED WHOLE, not file by file: a new file dropped into any of these is ignored
-# automatically, which is the point. Do not add narrower patterns below — if
-# something must be shared, it belongs at the repo root with the other public docs.
+# (local/notes/ was deleted during the move — its content was folded into
+# AGENTS.md, PROTOCOL.md, ROADMAP.md and PACKET-CAPTURE.md.)
 #
-# WHAT DELIBERATELY STAYS TRACKED at the root: README.md, PROTOCOL.md, CREDITS.md,
-# ROADMAP.md and LICENSE. Everything in local/ is working material — including the
-# handover plan, which is written for whoever picks the work up next, not for GitHub.
-local/
+# Nothing here is ignored — there is no rule for it, other than the `*.log` rule
+# above. To exclude something later, add a specific pattern rather than
+# re-ignoring the whole folder.

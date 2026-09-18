@@ -32,7 +32,7 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Dev Tools screen (roadmap #7).
+ * Dev Tools screen.
  *
  * Shows two views of the PacketLogger log:
  *   - Human-readable: decoded packet descriptions (e.g. "L=EAR R=OUT Case=CASE", "ANC -> Deep")

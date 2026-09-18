@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Adaptive launcher foreground (108x108 viewport, ROADMAP #6).
+  Adaptive launcher foreground (108x108 viewport).
 
   Artwork is the traced bud pair from drawable/ic_bud_left.xml and
   drawable/ic_bud_right.xml — the same vectors the widget uses — arranged

@@ -68,9 +68,12 @@ miss because every short frame looks like a plain byte:
   groups until a clear high bit, then **add 1**.
 
 **Why this matters to us:** our frames are all small, so a naive single-byte
-writer works today. A gesture-config write (`0x0402`) with several entries can
-exceed 127 bytes, and would need real LEB128. `OpoProtocol.buildPacket()` does
-not implement it yet.
+writer is correct for everything the app sends today. The gesture-config write
+(`0x0401`, see §6) sends the whole key-function table back, which is the largest
+frame we build — on Buds 4 that is ~80 bytes with the 18-20 entries the bud
+reports, still under 127, so LEB128 has **not** been needed in practice. A bud
+with a much larger table, or a write that adds entries, would cross 127 and need
+real LEB128; `OpoProtocol.buildPacket()` does not implement it yet.
 
 ### Worked examples
 
