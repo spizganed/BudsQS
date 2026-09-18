@@ -8,6 +8,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import com.spizganed.quickbuds.ui.ThemeRes
 import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
@@ -88,7 +89,7 @@ class QuickBudsApp : Application() {
             // when the resource access that blocks applyOverrideConfiguration was
             // set up. Absent when nothing in the app appears in that path.
             runCatching {
-                val p = context.getSharedPreferences("BudsQSPrefs", Context.MODE_PRIVATE)
+                val p = context.getSharedPreferences(ThemeRes.PREFS_NAME, Context.MODE_PRIVATE)
                 val trace = p.getString("themeAccessTrace", null)
                 if (trace != null) appendLine("overrideResult: $trace")
             }

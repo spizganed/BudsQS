@@ -24,7 +24,7 @@ class AncTileService : TileService(), BudsConnectionManager.Listener {
     private var batteryCase: Int = -1
     private var batteryRight: Int = -1
 
-    private val ancCycle = listOf("Off", "Trans", "Smart")
+    private val ancCycle = listOf("Off", "Trans", "Smart", "Adaptive")
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
@@ -70,6 +70,10 @@ class AncTileService : TileService(), BudsConnectionManager.Listener {
             "Off" -> manager?.sendAncOff()
             "Trans" -> manager?.sendAncTransparency()
             "Smart" -> manager?.sendAncSmart()
+            // Adaptive is NOT Smart: different bits (0x0800 vs 0x0080) and a different
+            // bud state. It is appended to the cycle rather than replacing Smart, so
+            // this change adds a mode instead of quietly removing one.
+            "Adaptive" -> manager?.sendAncAdaptive()
         }
         updateTile()
     }
@@ -101,6 +105,9 @@ class AncTileService : TileService(), BudsConnectionManager.Listener {
         }
 
         tile.state = when (currentAncModeName) {
+            // Adaptive counts as ACTIVE: cancelling is on, the buds are just choosing
+            // the strength themselves. Treating it as inactive would make the tile
+            // read as "nothing is on" while the buds were actively cancelling.
             "Off", "Trans" -> Tile.STATE_INACTIVE
             else -> Tile.STATE_ACTIVE
         }

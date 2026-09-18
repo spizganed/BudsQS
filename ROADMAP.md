@@ -1,4 +1,20 @@
-## QuickBuds (BudsQS) - Development Roadmap & Priority List
+## QuickBuds - Development Roadmap & Priority List
+
+> ## ⚠️ THIS FILE IS SLATED FOR A FULL REWRITE (agreed 2026-09-22)
+>
+> The roadmap as a priority list has stopped working: it grew by appending passes, so it now
+> mixes **history**, **decisions**, **open questions** and **rejected ideas** into one document
+> where none of them can be read at a glance. It is still *useful* — the protocol findings and
+> the "why we did not do X" notes in it are good and should survive — but the **structure** is
+> being redone from scratch.
+>
+> The plan (his call): rebuild it by **interview** — a fresh document shaped by questions and
+> his answers, rather than another editing pass over this one. **Do not do that rewrite
+> unprompted, and do not "tidy" this file in the meantime:** a partial reorganisation now would
+> make the interview harder, because the current text is the raw material for it.
+>
+> Until then, **README.md is the accurate feature summary** — this file has known stale claims
+> (see the note below about the one that cost real time).
 
 > Living document. Updated as items complete or priorities shift.
 > Last updated: 2026-09-22 (FIFTH pass — **gesture configuration is DONE and verified on the
@@ -21,7 +37,12 @@
 ## Working principles
 
 - Mobile-only workflow: Nothing Phone (3a), Android 15, CodeAssist, Termux, GitHub mobile.
-- AI (Kimi) handles heavy logic: reverse-engineering, parsers, protocol work.
+- AI handles heavy logic: reverse-engineering, parsers, protocol work. **The real history, since
+  an earlier version of this line named Kimi and that was wrong:** the project began on
+  **DeepSeek chat** (first codebase, first RE steps, basic UI/logger/widget), then moved to the
+  **CodeAssist agent via OpenRouter running DeepSeek v4.1-fast**, which has written the large
+  majority of the code since. Kimi, Gemini (images) and Grok were used for smaller tasks. All
+  free tiers. See README's credits section.
 - Human handles: device testing, Termux commands, git operations, design decisions.
 - Feature philosophy: **only what I want** - every new idea is filtered through this list before any work starts.
 - North star for 1.1: **match the original HeyMelody functionality as much as possible**, with our smart-pause improvements on top.
@@ -101,6 +122,13 @@ verified 2026-09-22) -> icon rework (his brief)
 -> 14 -> 15 -> 17 (with 10/11 slotted in as the UI grows)
 ```
 
+> **2026-09-22, release prep for 1.1.0.** Done this pass: the **Adaptive** mode is on the main
+> screen (a fourth circle) and wired through every surface it touches — widget segment, tile,
+> service routing and the ANC-push decode. Adaptive turned out to have been sending a WRONG
+> packet (`01 01 00 01` from "mode 8"); the real payload is `01 01 00 08`, and it is fixed and
+> documented in PROTOCOL.md §5. The repo and app are renamed **QuickBuds** throughout. The ANC
+> hold-cycle question is answered under #1 below.
+
 Next up: **finish the gesture feature's leftovers, then replace the remaining placeholder rows.**
 The `function` enum is no longer a blocker — it was MEASURED (see #26 and PROTOCOL.md §6), and the
 write is confirmed working on the device. What is left:
@@ -109,6 +137,19 @@ write is confirmed working on the device. What is left:
    it to `0x00` did not stop the cycle, and its mode list lives in the separate
    `setSupportNoiseReduction` (`0x0404`) command, which is still unwired. Needs a decision on the UI
    (an on/off, or the mode picker wired properly).
+   - **ANSWERED 2026-09-22 — it is the PROTOCOL that limits us, not a design choice of the
+     original app.** HeyMelody's gesture settings for the hold are not a free mode picker
+     either: the key-function table stores one "ANC cycle" byte (`0x08`) and nothing about
+     which modes are in the cycle. Which modes it steps through is decided on the buds. The
+     vendor app still presents a mode list because it ALSO writes `setSupportNoiseReduction`
+     (`0x0404`, `[action=2][noiseType][modeMask LE]`) alongside the binding — that write is
+     the missing half here, not the hardware. The buds demonstrably hold a changeable list
+     (two modes once, four another time, same `0x08`), so high/medium/low IS expressible.
+     **Next step is a read, not a picker:** confirm the `0x010C` `02 01` reply shape
+     (`queryNoiseSwitchModes()` is already sent in the init sequence but no capture has ever
+     shown a `0x810c` answer to it), then build the picker on that. Wiring a picker before the
+     read is confirmed would be guessing at the payload, which is exactly the mistake
+     PROTOCOL.md §5 records twice.
 2. **Slide's two directions** (`btn 0x02` / `btn 0x03`) are written with the same action because
    which is up and which is down is not yet known. Harmless, and worth establishing.
 3. **The remaining placeholder rows** — Hi-Res codec, spatial audio, EQ, find-my-earbuds (#9/#10).

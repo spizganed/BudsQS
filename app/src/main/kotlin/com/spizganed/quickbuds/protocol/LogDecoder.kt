@@ -300,7 +300,14 @@ object LogDecoder {
             (bits and 0x0020) != 0 -> "Med"
             (bits and 0x0040) != 0 -> "Light"
             (bits and 0x0080) != 0 -> "Smart"
-            (bits and 0x0100) != 0 -> "Adaptive"
+            // Adaptive's SET mask is 0x0800, not 0x0100. The old 0x0100 was the
+            // "index 8 = bit 8" error that OpoProtocol.ancAdaptive() carried before
+            // it was fixed: the mask is little endian across the bytes AFTER the
+            // `01 01` prefix, so the real payload `01 01 00 08` reads back as 0x0800.
+            // Left at 0x0100, every Adaptive command would print as
+            // "Unknown (0x0800)" in the log — i.e. the very line you would read to
+            // check whether the Adaptive button sent the right thing.
+            (bits and 0x0800) != 0 -> "Adaptive"
             (bits and 0x0002) != 0 -> "On"
             else -> "Unknown (0x%04X)".format(bits)
         }

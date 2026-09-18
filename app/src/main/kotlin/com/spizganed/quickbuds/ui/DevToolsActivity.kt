@@ -175,7 +175,7 @@ class DevToolsActivity : Activity() {
         // action button below — an unbound lateinit would throw on open.
         btnReconnect = findViewById<Button>(R.id.btnReconnect)
         btnDisconnect = findViewById<Button>(R.id.btnDisconnect)
-        val prefs = getSharedPreferences("BudsQSPrefs", Context.MODE_PRIVATE)
+        val prefs = getSharedPreferences(ThemeRes.PREFS_NAME, Context.MODE_PRIVATE)
         val theme = prefs.getInt("theme", THEME_OLED)
         applyTheme(theme)
 

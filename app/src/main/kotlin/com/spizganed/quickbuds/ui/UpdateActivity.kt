@@ -47,7 +47,7 @@ class UpdateActivity : Activity() {
 
     private companion object {
         /** Owner/repo whose releases are the update source. */
-        const val REPO = "spizganed/BudsQS"
+        const val REPO = "spizganed/QuickBuds"
         const val API = "https://api.github.com/repos/$REPO/releases/latest"
         const val APK_NAME = "quickbuds-update.apk"
     }

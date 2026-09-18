@@ -20,6 +20,10 @@
     <string name="widget_anc_low">Low</string>
     <string name="widget_anc_med">Med</string>
     <string name="widget_anc_high">High</string>
+    <!-- Adaptive segment. Four letters because the segments are narrow and
+         "Trans" (5 chars, 10sp) is the widest label the row already fits, so this
+         adds no new width constraint. -->
+    <string name="widget_anc_adapt">Adpt</string>
     <string name="widget_game_mode_label">Game Mode</string>
 
     <!-- Main screen header actions (icon buttons) -->
@@ -43,6 +47,9 @@
     <string name="app_anc_light">ANC-L</string>
     <string name="app_anc_medium">ANC-M</string>
     <string name="app_anc_high">ANC-H</string>
+    <!-- The Adaptive circle. One word, no room for more: it must fit the same
+         62dp-wide button as OFF / ANC / TRANS. -->
+    <string name="app_anc_adapt">ADAPT</string>
 
     <!-- ANC mode chooser. Title is just "ANC"; the options are the three strengths
          in plain words, not the protocol's long "Noise cancelling - Light" form. -->

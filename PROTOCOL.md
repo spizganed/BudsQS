@@ -122,7 +122,7 @@ Responses are **`cmd | 0x8000`**. That is a reliable rule `[OSS]`.
 
 | Cmd | Name | Payload |
 |-----|------|---------|
-| `0x0402` | **setKeyFunction** (gestures) | `<count> [deviceType, button, buttonAction, function]...` `[OSS]` |
+| `0x0401` | **setKeyFunction** (gestures) | `<count> [deviceType, button, buttonAction, function]...` `[OSS]`+`[CAPTURE]` see §6 |
 | `0x0403` | Feature switch | `[featureId, status]`, status `01`/`00` |
 | `0x0404` | Set ANC | `01 01 <bit>` — see §5 |
 | `0x0406` | Set EQ | `[eqMode]` `[OSS]` |
@@ -234,9 +234,31 @@ the same algorithm as our `OpoProtocol.ancPayload()`:
 | Medium | `01 01 20` | 5 |
 | Light | `01 01 40` | 6 |
 | Smart | `01 01 80` | 7 |
-| Adaptive | `01 01 00 08` | 8 → note the **4-byte** payload |
+| Adaptive | `01 01 00 08` | mask `0x0800` = **bit 11**, 4-byte payload |
 
 The bitfield grows: `index / 8 + 1` bytes after the `01 01` prefix.
+
+**ADAPTIVE IS BIT 11, NOT BIT 8 — a real bug, found and fixed 2026-09-22.** The old
+row here said "8", and `OpoProtocol.ancAdaptive()` passed `8` to `ancPayload()`,
+which computes `index / 8 + 1 = 2` mask bytes and sets bit `8 % 8 = 0` of the
+SECOND one — producing `01 01 00 01`, a different mode entirely. The mask is
+little endian across the bytes after the `01 01` prefix, so `AncAdaptive`
+(`01 01 00 08`) is the value **0x0800**, whose bit index is **11**.
+
+**Say it precisely, because an earlier revision of this section said "Adaptive is the
+only mode that cannot be expressed as an index", which is WRONG.** `ancPayload(11)`
+does reproduce these bytes — the helper was never the problem, the number handed to it
+was. 8 is just the plausible-looking wrong answer: the vendor's list reads like
+"0-7, then the next one". The builder deliberately spells the four bytes literally
+instead, to match `AncAdaptive = { 0x01, 0x01, 0x00, 0x08 }` verbatim rather than
+re-deriving a number that was already derived wrong once. Every other row above is
+reproduced correctly by the index algorithm. `LogDecoder.ancPayloadToString()` was
+also reading `0x0100` for Adaptive and now reads `0x0800`, so an Adaptive command no
+longer prints as `Unknown (0x0800)` in our own log.
+
+The bug was INERT for as long as it existed: nothing called the builder. The
+Adaptive circle added to the main screen makes it live, which is why it is fixed
+in the same change rather than left as a latent wrong packet.
 
 #### Notify — `0x0204` subType `0x03`, and the `0x810C` query reply `[CAPTURE]`+`[OSS]`
 
@@ -270,13 +292,20 @@ Two consequences worth keeping:
   it, because Light was the level in force. Both earlier captures that read it as
   *the* ANC-on value were simply starting from Medium. The bitmask reading is the
   correct one and this capture is the second, independent confirmation.
-- **`0x0040` (Light) and `0x0800` (Adaptive) are byte-distinct but map to the same
-  UI state**, because the app has three ANC levels and lights Low for both. A log
-  that prints only the UI name shows two different stops as `ANC-Light`, so a
-  capture cannot be read back. `AncEventParser.describe()` therefore prints
-  `raw=0x0800 -> Adaptive (app shows ANC-Light)` while `modeForRaw()` — which the
-  circles and the widget actually use — still returns `ANC-Light` for it. **Do not
-  "unify" these two back into one name.**
+- **`0x0040` (Light) and `0x0800` (Adaptive) are byte-distinct and are now ALSO
+  UI-distinct.** While the app had three ANC levels and no Adaptive control,
+  `modeForRaw()` folded `0x0800` into `ANC-Light`, which meant a log line could not
+  be read back: the four-stop cycle above printed `raw=0x0040 -> ANC-Light` followed
+  by `raw=0x0800 -> ANC-Light`, two different stops rendered identically. That was
+  patched in the LOG (`describe()` special-cased `0x0800`) while the mapping itself
+  stayed folded, and the fold was right at the time. **SUPERSEDED 2026-09-22, when
+  the main screen gained an Adaptive circle:** `modeForRaw()` now returns `"Adaptive"`
+  and there is no special case in `describe()` any more, because the two are no
+  longer the same UI state — Adaptive lights its own circle. The old instruction
+  "do not unify these two back into one name" is therefore **retired**: they ARE one
+  name now, deliberately, and `circleFor()` maps `"Adaptive"` to the ADAPT circle.
+  If a future change removes the Adaptive control, the fold has to come back with it
+  or a bud-side Adaptive switch will light nothing.
 - `[USER]` The hold offers **only** the ANC cycle in HeyMelody, in exactly this order
   (`ANC on -> adaptive -> transparency -> ANC off`), so the four stops above are the
   cycle's canonical order and not an accident of what he happened to press. The
@@ -291,6 +320,50 @@ RX  AA 0C 00 00 0C 81 05 05 00 00 01 01 08 00
                                            ^^^^^ last two bytes = the notify bitmask
 ```
 `[CAPTURE]` Off returned `08 00` here, consistent with the notify table.
+
+#### The hold's SWITCH LIST is a different question on the same command number
+
+`0x010C` carries several questions, chosen by the REQUEST payload `[OSS]`:
+
+| Request | Question |
+|---------|----------|
+| `01 01` | current mode (above) |
+| `02 01` / `02 03` / `02 04` | **which modes the hold cycles through** (`getNoiseReductionSwitchMode`) |
+| `04 01` | intelligent noise reduction mode |
+
+**NO CAPTURE HAS EVER SHOWN A REPLY TO THE SWITCH-LIST VARIANT — `[GUESS]` beyond
+that.** `queryNoiseSwitchModes()` is sent in the init sequence, but searching every
+log in `local/logs/` finds no `0x810C` answer to `02 01`, and no `810C` line at all.
+So the reply's SHAPE is unknown, not merely unparsed. This matters for the obvious
+next question ("can we pick Low/Medium/High for the hold?") — see below.
+
+The write side is `setSupportNoiseReduction` (`0x0404`, payload
+`[action=2][noiseType][modeMask LE]`, `OppoProtocol.LongPressNoisePayload`), and
+`[OSS]` only, untested.
+
+#### Can the app choose which ANC modes the hold cycles? **Yes in principle — the
+#### limit is our own protocol coverage, not the hardware and not HeyMelody's design.**
+
+This is the short answer to a question worth recording, because the "it just uses the
+last manually-chosen mode" behaviour is real but its CAUSE is not what it looks like:
+
+- **It is not a hardware limit.** The buds hold a *changeable* list. Same stored `fn`
+  byte (`0x08`) covered two modes in one session and four in another, so membership is
+  stored somewhere on the device and is not fixed.
+- **It is not a HeyMelody design choice either.** The vendor app does offer the mode
+  list for the hold — so the capability is real and reachable.
+- **It IS the protocol's shape.** The key-function table stores ONE byte meaning "this
+  gesture cycles ANC". It carries no membership, so changing that byte cannot change the
+  cycle (measured: clearing it to `0x00` did not stop the cycle). HeyMelody shows a mode
+  list because it ALSO sends `setSupportNoiseReduction` alongside the binding. That write
+  is the missing half in this app — not the hardware.
+- **And what the app currently does** — leave the hold alone and set modes manually —
+  is therefore a consequence of the two gaps above, not a behaviour anyone chose.
+
+**Order of work, and why it is this order:** confirm the read (`0x010C` `02 01`) FIRST.
+A mode picker needs to know the current list and the mask encoding, and building it on a
+guessed `0x810C` shape would repeat the exact mistake §5 records three times over. The
+read is cheap and read-only, so it cannot cost anything to try.
 
 ### The History of Getting This Wrong
 
@@ -544,6 +617,11 @@ So the key-function table only *describes* the hold; the cycle itself lives in t
 `02 01` / `02 03` / `02 04`. `[OSS]`, untested. **Not wired** — it is a different command
 and folding it into the key-function save would make a failure impossible to attribute.
 The read reply's 2-byte header is our own finding — see just below.
+
+`[USER]` 2026-09-22 asked whether the hold could be given a Low/Medium/High choice, since
+today it only uses whatever mode was last set by hand. **Answered: the device can, and the
+vendor app does; what is missing is ours.** See "Can the app choose which ANC modes…" in
+§5's Querying section for the reasoning and the required order of work.
 
 **The `function` VALUES ARE NO LONGER UNKNOWN — they are in the table above, measured.**
 This paragraph used to say they were the one blocking gap and describe two routes to find

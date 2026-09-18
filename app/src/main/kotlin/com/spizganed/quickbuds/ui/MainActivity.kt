@@ -93,6 +93,7 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
     // ANC circles
     private lateinit var ancBtnOff: TextView
     private lateinit var ancBtnAnc: TextView
+    private lateinit var ancBtnAdapt: TextView
     private lateinit var ancBtnTrans: TextView
 
     // Settings rows that hold live state
@@ -862,12 +863,14 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
 
         ancBtnOff = findViewById<TextView>(R.id.anc_btn_off)
         ancBtnAnc = findViewById<TextView>(R.id.anc_btn_anc)
+        ancBtnAdapt = findViewById<TextView>(R.id.anc_btn_adapt)
         ancBtnTrans = findViewById<TextView>(R.id.anc_btn_trans)
 
-        // The three circles. ANC opens the chooser; Off and Transparency apply
-        // directly, since they have no sub-levels to pick between.
+        // The four circles. ANC opens the chooser; Off, Adaptive and Transparency
+        // apply directly, since none of them has a sub-level to pick between.
         ancBtnOff.setOnClickListener { onAncCircleTapped("Off") }
         ancBtnAnc.setOnClickListener { onAncCircleTapped("ANC") }
+        ancBtnAdapt.setOnClickListener { onAncCircleTapped("Adaptive") }
         ancBtnTrans.setOnClickListener { onAncCircleTapped("Transparency") }
 
         applyThemeTints()
@@ -1211,8 +1214,8 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
      * The stored strings ("ANC-Light", "ANC-Medium", "ANC-Deep") are the
      * protocol-level names shared with the widget. The circle shows the SHORT
      * form — ANC-L / ANC-M / ANC-H — so the current strength is visible without
-     * opening the chooser. Off and Transparency have their own circles and their
-     * own labels.
+     * opening the chooser. Off, Adaptive and Transparency have their own circles
+     * and their own labels.
      */
     private fun renderAnc(mode: String) {
         // The ANC circle always reads "ANC" unless a level is actually selected,
@@ -1230,11 +1233,22 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
         val active = circleFor(mode)
         styleCircle(ancBtnOff, active == "Off")
         styleCircle(ancBtnAnc, active == "ANC")
+        styleCircle(ancBtnAdapt, active == "Adapt")
         styleCircle(ancBtnTrans, active == "Trans")
     }
 
+    /**
+     * Which circle a stored mode lights.
+     *
+     * "Adaptive" gets its own arm. Before the circle existed this fell through to
+     * the `else` and lit OFF — so a bud-side Adaptive switch showed "no noise
+     * control is on" AND "cancelling is off" at the same time, both wrong. The
+     * fall-through to "Off" is kept for a genuinely unknown string, but Adaptive
+     * must never reach it.
+     */
     private fun circleFor(mode: String): String = when (mode) {
         "Transparency" -> "Trans"
+        "Adaptive" -> "Adapt"
         "ANC-Light", "ANC-Medium", "ANC-Deep" -> "ANC"
         else -> "Off"
     }
@@ -1270,6 +1284,9 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
             // second tap on an already-lit circle was an unnecessary step.
             "ANC" -> showAncChooser()
             "Off" -> selectAnc("Off")
+            // Adaptive is a plain state, not a chooser: unlike ANC it has no
+            // strengths to pick between, so the tap applies it directly.
+            "Adapt", "Adaptive" -> selectAnc("Adaptive")
             // The BUTTON passes "Transparency"; the display label and circleFor()
             // use "Trans". Accepting only "Trans" here meant every Transparency tap
             // fell through the when with NO else, so no command was sent and nothing
@@ -1284,9 +1301,14 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
     /**
      * Chooser for the ANC circle.
      *
-     * Shows ONLY the three noise-cancelling levels, because Off and Transparency
-     * are separate circles on the main screen and Adaptive has been removed
-     * entirely. The list is short by request: "low medium high".
+     * Shows ONLY the three noise-cancelling levels. Off, Adaptive and Transparency
+     * are separate circles on the main screen, so they are not repeated here. The
+     * list is short by request: "low medium high".
+     *
+     * ADAPTIVE IS DELIBERATELY NOT AN OPTION HERE, even though it is an ANC state.
+     * The three entries are STRENGTHS, and Adaptive is not one — the buds raise and
+     * lower it themselves. Listing it between Medium and High would read as "a fourth
+     * strength", which is the one thing it is not. It has its own circle instead.
      *
      * Order is Low -> Medium -> High, matching increasing strength.
      */
@@ -1321,11 +1343,16 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
     /**
      * Applies an ANC mode: sends the command, updates state, repaints everything.
      *
-     * Smart is deliberately NOT handled. The user does not want the adaptive mode,
-     * so there is no UI path that can select it and no command is sent for it.
-     * The command builder (OpoProtocol.ancSmart) and the manager's sendAncSmart
-     * remain, because the WIDGET's ANC cycle and the tile can still reach it and
-     * removing a protocol capability is a bigger change than this request.
+     * Smart is deliberately NOT handled. The user does not want it, so there is no UI
+     * path that can select it and no command is sent for it. The command builder
+     * (OpoProtocol.ancSmart) and the manager's sendAncSmart remain, because the tile
+     * can still reach it and removing a protocol capability is a bigger change than
+     * this request.
+     *
+     * ADAPTIVE, BY CONTRAST, IS HANDLED — and it is a different mode from Smart, not
+     * another name for it: the buds set them with different bits (0x0800 vs 0x0080)
+     * and report them differently too. "The adaptive mode" in the note above meant the
+     * one the vendor app calls Adaptive, which he now wants on the main screen.
      */
     private fun selectAnc(mode: String) {
         when (mode) {
@@ -1334,6 +1361,7 @@ class MainActivity : Activity(), BudsConnectionManager.Listener {
             "ANC-Light" -> manager.sendAncLight()
             "ANC-Medium" -> manager.sendAncMedium()
             "ANC-Deep" -> manager.sendAncDeep()
+            "Adaptive" -> manager.sendAncAdaptive()
         }
         activeAncMode = mode
         syncWidgetState()

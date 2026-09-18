@@ -158,8 +158,26 @@ object OpoProtocol {
      *     Deep         01 01 10      (bit 4)
      *     Medium       01 01 20      (bit 5)
      *     Light        01 01 40      (bit 6)
-     *     Smart        01 01 80      (bit 7)
-     *     Adaptive     01 01 00 08   (bit 8, 4-byte payload)
+     *     Smart        01 01 80      (mask 0x0080, bit 7)
+     *     Adaptive     01 01 00 08   (mask 0x0800 = bit 11, 4-byte payload)
+     *
+     * ADAPTIVE IS "BIT 11", NOT "BIT 8", AND PASSING 8 WAS A REAL BUG (fixed
+     * 2026-09-22). `ancPayload(8)` computes `byteCount = 8/8+1 = 2` and sets bit
+     * `8%8 = 0` of the SECOND mask byte, which yields `01 01 00 01` — a different mode
+     * entirely, not Adaptive. The true payload is `01 01 00 08`: the mask is little
+     * endian across the bytes after the `01 01` prefix, so `[00, 08]` is the value
+     * 0x0800, whose bit index is 11.
+     *
+     * State the fix exactly, because "Adaptive is not an index" would be WRONG:
+     * `ancPayload(11)` DOES reproduce these bytes — the helper was never the problem,
+     * the number handed to it was. 8 is simply the plausible-looking wrong answer,
+     * because the vendor's list reads like "0-7, then the next one". Verified against
+     * OppoPodsManager `Protocol/OppoProtocol.Anc.cs`, where
+     * `AncAdaptive = { 0x01, 0x01, 0x00, 0x08 }` sits alongside
+     * AncSmart/AncLight/AncMedium/AncDeep, all of which our index table reproduces
+     * correctly. The bug was inert while nothing called this function; the Adaptive
+     * button on the main screen makes it reachable, so it had to be fixed rather than
+     * left as a latent wrong packet.
      *
      * QUERY reply / 0x0204 subType 0x03 NOTIFY use bits 3 and 8 instead:
      * 0x0008 Off, 0x0100 Transparency(+voice enhance off), 0x0010 Deep,
@@ -186,7 +204,18 @@ object OpoProtocol {
     fun ancMedium(): ByteArray = buildPacket(CMD_SET_ANC, payload = ancPayload(5))
     fun ancLight(): ByteArray = buildPacket(CMD_SET_ANC, payload = ancPayload(6))
     fun ancSmart(): ByteArray = buildPacket(CMD_SET_ANC, payload = ancPayload(7))
-    fun ancAdaptive(): ByteArray = buildPacket(CMD_SET_ANC, payload = ancPayload(8))
+    /**
+     * Adaptive is written EXPLICITLY, not through [ancPayload].
+     *
+     * `ancPayload(11)` would produce these exact bytes — the bit index for mask 0x0800
+     * really is 11 — but 11 appears nowhere in the vendor's table and has to be
+     * computed from the mask, which is precisely the step that was already got wrong
+     * once here (the code passed 8 and sent `01 01 00 01`, a different mode).
+     * Spelling the four bytes matches `AncAdaptive` upstream verbatim and cannot be
+     * mis-derived. Prefer the literal; do NOT "simplify" this to `ancPayload(8)`.
+     */
+    fun ancAdaptive(): ByteArray =
+        buildPacket(CMD_SET_ANC, payload = byteArrayOf(0x01, 0x01, 0x00, 0x08))
 
     private fun featurePayload(featureId: Int, on: Boolean): ByteArray =
         byteArrayOf(featureId.toByte(), if (on) 0x01 else 0x00)

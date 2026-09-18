@@ -65,8 +65,11 @@ class BudsConnectionManager(private val context: Context) {
          * WidgetStateStore and let the store listener repaint both surfaces. An
          * implementation that ignores an equal value is what keeps an echo a no-op.
          *
-         * `mode` is a store ANC name ("Off", "Transparency", "ANC-Light",
-         * "ANC-Medium", "ANC-Deep"). An unnameable raw value is never reported, so an
+         * `mode` is a store ANC name ("Off", "Transparency", "Adaptive",
+         * "ANC-Light", "ANC-Medium", "ANC-Deep"). "Adaptive" is included because the
+         * buds CAN report it (0x0800) and the app now has a circle for it — before the
+         * circle existed it was folded into "ANC-Light". An unnameable raw value is
+         * never reported, so an
          * implementer can never be handed a mode the buds did not actually report.
          */
         fun onAncModeState(mode: String) {}
@@ -267,6 +270,16 @@ class BudsConnectionManager(private val context: Context) {
     fun sendAncDeep() { lastAncLevelSent = "ANC-Deep"; sendRaw(OpoProtocol.ancDeep(), "ANC Deep") }
     fun sendAncMedium() { lastAncLevelSent = "ANC-Medium"; sendRaw(OpoProtocol.ancMedium(), "ANC Medium") }
     fun sendAncLight() { lastAncLevelSent = "ANC-Light"; sendRaw(OpoProtocol.ancLight(), "ANC Light") }
+
+    /**
+     * Adaptive — a state of its own, NOT a fourth level.
+     *
+     * `lastAncLevelSent` stays null (like Off), because that field exists only to
+     * interpret the ambiguous "ANC on" stop, which reports whichever LEVEL was last
+     * used. Adaptive reports itself unambiguously as 0x0800, which AncEventParser now
+     * names outright, so there is nothing for a hint to disambiguate.
+     */
+    fun sendAncAdaptive() { lastAncLevelSent = null; sendRaw(OpoProtocol.ancAdaptive(), "ANC Adaptive") }
 
     fun setGameMode(on: Boolean) =
         sendRaw(if (on) OpoProtocol.gameModeOn() else OpoProtocol.gameModeOff(), "GameMode")

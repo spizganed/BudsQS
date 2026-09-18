@@ -352,10 +352,22 @@
 
             <!-- ============ 2. ANC CIRCLES ============ -->
             <!--
-              Four buttons only. The chooser for the full mode list opens from the
-              ACTIVE button (see MainActivity.showAncChooser), which is why there
-              are four and not five: one slot per conceptual state, with the
-              sub-variants of noise cancelling behind the ANC button.
+              FOUR circles, one per conceptual state:
+
+                  OFF | ANC | ADAPT | TRANS
+
+              ANC is a CHOOSER, not a mode: tapping it opens the Low / Medium / High
+              sheet (see MainActivity.showAncChooser), so the three noise-cancelling
+              strengths live behind one button and the row stays four wide.
+
+              Adaptive is its OWN circle rather than a fourth entry in that sheet.
+              It is not a strength — the buds switch it in and out by themselves — so
+              listing it between Medium and High would imply it was just another
+              level. It sits next to ANC because both mean "cancelling is on".
+
+              `weightSum` MUST match the child count. It was 3 while the row held
+              three circles; a stale weightSum does not throw, it just makes every
+              button a different width than intended.
             -->
             <LinearLayout
                 android:id="@+id/ancRow"
@@ -363,7 +375,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="18dp"
                 android:orientation="horizontal"
-                android:weightSum="3">
+                android:weightSum="4">
 
                 <TextView
                     android:id="@+id/anc_btn_off"
@@ -385,6 +397,19 @@
                     android:layout_marginStart="@dimen/anc_circle_gap"
                     android:gravity="center"
                     android:text="@string/app_anc_anc"
+                    android:textSize="@dimen/anc_circle_text_size"
+                    android:textStyle="bold"
+                    android:textColor="?attr/appColorSegText"
+                    android:background="@drawable/anc_circle_bg" />
+
+                <TextView
+                    android:id="@+id/anc_btn_adapt"
+                    android:layout_width="0dp"
+                    android:layout_height="@dimen/anc_button_height"
+                    android:layout_weight="1"
+                    android:layout_marginStart="@dimen/anc_circle_gap"
+                    android:gravity="center"
+                    android:text="@string/app_anc_adapt"
                     android:textSize="@dimen/anc_circle_text_size"
                     android:textStyle="bold"
                     android:textColor="?attr/appColorSegText"

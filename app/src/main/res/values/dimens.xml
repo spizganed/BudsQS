@@ -1,17 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!--
-      Width of the in-app status panel (activity_status_panel.xml).
+      Width of the in-app status panel.
 
-      The panel mirrors the home-screen widget, whose provider declares a 3x2
-      footprint (see xml/widget_anc_info.xml). On a phone, letting that design
-      run to match_parent stretched the battery bars across the whole screen and
-      looked wrong, so the panel is capped to something close to the widget's own
-      proportions and the remaining width is left free on the right.
+      The panel mirrors the home-screen widget, whose provider declares a **4x2**
+      footprint (see xml/widget_anc_info.xml — `targetCellWidth=4`,
+      `targetCellHeight=2`). This comment said 3x2 for a long time after the widget
+      was widened, as did README.md; the file itself is the authority. On a phone,
+      letting that design run to match_parent stretched the battery bars across the
+      whole screen and looked wrong, so the panel is capped to something close to
+      the widget's own proportions and the remaining width is left free on the right.
 
-      200dp is deliberately a hair narrower than the 3-cell width (3 x 72dp minus
-      padding) so it reads as a compact card rather than a full-width bar. Raise
-      this one value to widen the panel; nothing else needs changing.
+      200dp is deliberately a hair narrower than the widget's own width so it reads
+      as a compact card rather than a full-width bar. Raise this one value to widen
+      the panel; nothing else needs changing.
+
+      NOTE: this comment previously cited `activity_status_panel.xml` as the panel's
+      layout. That file no longer exists — the main screen is `activity_main.xml` and
+      the panel is built inside it (`batteryCard` / `batteryBarsCard`). Kept as a
+      warning: a reference to a deleted layout is the kind of stale detail that sends
+      the next session looking for a file that is not there.
     -->
     <dimen name="widget_panel_width">200dp</dimen>
 

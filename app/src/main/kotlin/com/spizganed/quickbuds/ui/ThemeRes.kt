@@ -48,7 +48,13 @@ object ThemeRes {
     const val DARK = 1
     const val LIGHT = 2
 
-    private const val PREFS = "BudsQSPrefs"
+    // Renamed from "BudsQSPrefs" with the project's move to the QuickBuds name. The
+    // file name IS the string, so this is a genuine one-time settings reset: the theme
+    // preference and the stored gesture selections start from their defaults again,
+    // and the crash dialog may announce one older report once. Cheap here (the 1.0.0
+    // release had no downloads), and worth doing while it is still cheap — after this
+    // release the name is permanent.
+    private const val PREFS = "QuickBudsPrefs"
     private const val KEY = "theme"
 
     /** Exposed so other screens reuse this prefs file rather than duplicating the name. */

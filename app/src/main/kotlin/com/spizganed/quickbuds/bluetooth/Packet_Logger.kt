@@ -15,8 +15,8 @@ import java.util.concurrent.CopyOnWriteArrayList
  * through its private log(), which now also calls PacketLogger.log().
  * So this single object captures the ENTIRE protocol conversation:
  *
- *   - Logcat tag "BudsQS-Packets" for live watching:
- *         logcat | grep BudsQS-Packets
+ *   - Logcat tag "QuickBuds-Packets" for live watching:
+ *         logcat | grep QuickBuds-Packets
  *   - Appends to packets.log in app-specific external storage, so the log
  *     survives app restarts and can be opened in a hex editor / text viewer.
  *   - In-memory ring buffer (getLines()) so the Dev Tools screen (#7) can
@@ -29,7 +29,7 @@ object PacketLogger {
 
     var ENABLED = true
 
-    private const val TAG = "BudsQS-Packets"
+    private const val TAG = "QuickBuds-Packets"
     private const val MAX_BYTES = 512 * 1024L
     private const val MAX_BUFFER_LINES = 2000
 

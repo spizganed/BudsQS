@@ -76,6 +76,17 @@ object WidgetStateStore {
         fun lowIsActive(): Boolean = ancMode == "ANC-Light"
         fun medIsActive(): Boolean = ancMode == "ANC-Medium"
         fun highIsActive(): Boolean = ancMode == "ANC-Deep"
+
+        /**
+         * Adaptive is its OWN state, not one of the three levels.
+         *
+         * The buds report it as 0x0800 and the app sets it with
+         * `OpoProtocol.ancAdaptive()`. It needs its own flag because without one the
+         * widget would light NO segment while the buds sat in Adaptive, and a widget
+         * with nothing highlighted reads as "nothing is active" — the same class of
+         * lie the store's `offIsActive()` guards against.
+         */
+        fun adaptiveIsActive(): Boolean = ancMode == "Adaptive"
     }
 
     fun addListener(l: (State) -> Unit) { listeners.add(l) }

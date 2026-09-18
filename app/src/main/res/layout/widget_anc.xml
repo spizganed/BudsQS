@@ -267,6 +267,21 @@
             android:textColor="@color/widget_segment_text"
             android:textSize="10sp" android:textStyle="bold"
             android:background="@drawable/widget_segment_bg" />
+
+        <!--
+          Adaptive, appended at the END so the five existing segments keep the exact
+          positions he has muscle memory for. It is a six-segment row now; every
+          segment carries weight 1, so a sixth simply divides the same width once
+          more rather than overflowing. The widest label is still "Trans", so the
+          text does not become the binding constraint.
+        -->
+        <TextView android:id="@+id/widget_seg_adapt"
+            android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:gravity="center"
+            android:text="@string/widget_anc_adapt"
+            android:textColor="@color/widget_segment_text"
+            android:textSize="10sp" android:textStyle="bold"
+            android:background="@drawable/widget_segment_bg" />
     </LinearLayout>
 
     <LinearLayout

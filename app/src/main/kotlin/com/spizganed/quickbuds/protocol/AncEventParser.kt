@@ -80,13 +80,15 @@ object AncEventParser {
      *
      * `currentLevel` is used ONLY for an unlisted ANC bit, so the UI highlights the
      * right circle rather than guessing a level; it never overrides a known value.
-     * An Adaptive value maps to Light for the app's three-level UI.
+     * Adaptive is now named as itself (`0x0800 -> "Adaptive"`), not folded into Light.
+     * The fold was correct while the app had NO Adaptive control; it has one now, so a
+     * bud-side Adaptive must light the ADAPT circle rather than ANC-L.
      */
     fun modeForRaw(raw: Int, currentLevel: String? = null): String? = when (raw) {
         0x0008 -> "Off"
         0x0100 -> "Transparency"
         0x0200 -> "Transparency"
-        0x0800 -> "ANC-Light"   // Adaptive -> nearest app level
+        0x0800 -> "Adaptive"    // its own circle; see MainActivity.circleFor
         0x0010 -> "ANC-Deep"
         0x0020 -> "ANC-Medium"
         0x0040 -> "ANC-Light"
@@ -119,14 +121,12 @@ object AncEventParser {
         if (raw < 0) return "ANC event (payload too short)"
         val hex = "0x%04X".format(raw)
 
-        // Adaptive is named for the LOG, not for the UI. modeForRaw() maps it to
-        // "ANC-Light" because the app has no Adaptive circle, which is right for
-        // the circles and WRONG for a capture: the four-stop cycle he ran came back
-        // "raw=0x0040 -> ANC-Light" followed by "raw=0x0800 -> ANC-Light", i.e. two
-        // different stops printed identically. The log exists to be read back, so it
-        // says what the buds actually are and notes what the UI does with it.
-        if (raw == 0x0800) return "raw=$hex -> Adaptive (app shows ANC-Light)"
-
+        // The old 0x0800 special case is GONE, and it is worth saying why rather than
+        // just deleting it: it existed because modeForRaw() folded Adaptive into
+        // "ANC-Light", so the four-stop cycle he ran printed "raw=0x0040 -> ANC-Light"
+        // followed by "raw=0x0800 -> ANC-Light" — two different stops, identical lines.
+        // NAMING Adaptive is what fixes that, at the source; a special case in the log
+        // formatter only papered over the indistinguishable mapping.
         val mode = modeForRaw(raw, currentLevel)
         return if (mode == null) "raw=$hex -> unknown ANC value" else "raw=$hex -> $mode"
     }

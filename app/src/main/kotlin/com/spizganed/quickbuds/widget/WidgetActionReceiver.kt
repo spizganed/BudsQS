@@ -28,6 +28,11 @@ class WidgetActionReceiver : BroadcastReceiver() {
                     "low"   -> { state.ancMode = "ANC-Light";    shortAction = "ANC_CYCLE" }
                     "med"   -> { state.ancMode = "ANC-Medium";   shortAction = "ANC_CYCLE" }
                     "high"  -> { state.ancMode = "ANC-Deep";     shortAction = "ANC_CYCLE" }
+                    // Routed through ANC_CYCLE like the three levels above: the
+                    // service already resolves an ANC mode NAME to a command there,
+                    // so Adaptive needs no new action string and the widget and the
+                    // service cannot drift apart on how it is sent.
+                    "adapt" -> { state.ancMode = "Adaptive";     shortAction = "ANC_CYCLE" }
                 }
                 sendAncMode = state.ancMode
             }

@@ -1,6 +1,6 @@
 # Credits and protocol sources
 
-BudsQS is a clean-room Android client for the OPPO / OnePlus / realme earbud
+QuickBuds is a clean-room Android client for the OPPO / OnePlus / realme earbud
 RFCOMM protocol. None of the protocol knowledge here was documented by the
 vendor. It exists because other people reverse-engineered it first and published
 their results. This file records exactly whose work we rely on, and for what, so
@@ -115,6 +115,14 @@ from anyone else:
 - **The hold's function byte does not control the ANC cycle** — clearing it to
   `0x00` did not stop the gesture. Its mode list belongs to the separate
   `setSupportNoiseReduction` (`0x0404`).
+- **`ancAdaptive()` was sending the wrong payload: Adaptive is bit 11, not bit 8.**
+  We passed `8` to our own index helper, which produced `01 01 00 01` — a different
+  mode. The real payload is `01 01 00 08` (mask `0x0800`, little endian after the
+  `01 01` prefix). Corrected against `OppoPodsManager`'s literal `AncAdaptive`, which
+  our table had otherwise reproduced correctly — so this is a bug in OUR derivation of
+  Adaptive, not in their table. `ancPayload(11)` would produce the right bytes; the
+  builder spells them literally anyway so the mask never has to be re-derived.
+  Fixed and marked in PROTOCOL.md §5.
 - Everything in the Android UI layer: the widget, the layout, the theme system,
   the LayoutReport dev tool, and the `KEYFN DIFF:` binding-diff tool.
 
@@ -132,6 +140,50 @@ Recorded on purpose, because a future session will otherwise re-derive them:
   `0x05`.
 - The SET_ANC bit table was briefly "corrected" to the notify bit numbers on the
   theory that set and query must agree. **They do not.** That change was reverted.
+- Adaptive was stored as **bit index 8** in the SET table, which `ancPayload()`
+  renders as `01 01 00 01` — a different mode. The real payload is `01 01 00 08`,
+  i.e. mask `0x0800`, whose bit index is **11**. The mistake was assuming the vendor's
+  list was one-bit-per-mode with no gaps, so "Adaptive comes after Smart (bit 7)" was
+  taken to mean index 8; bits 8-10 are in fact unused. Careless in one more way: an
+  earlier revision of PROTOCOL.md then over-corrected to "Adaptive cannot be expressed
+  as a bit index at all", which is also false. **Derive the index from the mask, never
+  from the mode's position in a list.** The same misreading existed in `LogDecoder`,
+  which looked for `0x0100` and so would have printed our own corrected Adaptive
+  command as `Unknown (0x0800)`. Both fixed 2026-09-22.
+- The command numbers in an earlier revision of README.md's protocol notes were
+  written as **`0x01F0`** (battery) and **`0x01F2`** (wearing). Those commands do
+  not exist: they are the command byte welded onto the SEQ value the app happens to
+  send. The real numbers are **`0x0106`** and **`0x0109`**. Anything grepping a log
+  for `0x01F0` finds nothing. Corrected 2026-09-22.
+- The README described the widget as **3x2**; `xml/widget_anc_info.xml` declares
+  **4x2** (`targetCellWidth=4`). Corrected 2026-09-22.
+- ROADMAP's "Working principles" named **Kimi** as the AI doing the heavy logic.
+  That was never the main one — see the disclosure below. Corrected 2026-09-22.
+
+---
+
+## How this was built — the AI disclosure
+
+Stated plainly because it is unusual, and because pretending otherwise would make the
+"original to this project" section above look like more than it is. **Every model below
+worked on protocol bytes captured from real hardware, and the on-device testing — not the
+model — is what makes the claims in [PROTOCOL.md](./PROTOCOL.md) checkable.**
+
+| Phase | Model | Rough share | What it did |
+|-------|-------|-------------|-------------|
+| Start | **DeepSeek chat** | ~15% | The first codebase, the first reverse-engineering steps, basic UI, packet logger, core logic, and a basic ANC-button widget. **That widget was subsequently rewritten almost entirely** — treat the early history as scaffolding, not as the current design. |
+| Main | **DeepSeek v4.1-fast**, via the CodeAssist agent + OpenRouter | ~80% | The large majority of what is here now: the protocol parsers, the widget and theme rework, the gesture configuration, the dev tools. |
+| Small tasks | Kimi chat, Gemini (image generation), Grok | ~5% | Occasional side work. Kimi was never the main model; ROADMAP said otherwise for a while. |
+
+**All of it ran on free tiers.** No paid API budget was involved.
+
+### Tools
+
+- **CodeAssist** (Tyron) — the on-device IDE this is developed in
+- **Termux** — terminal, scripting, git
+- **GitHub mobile** — repo management
+- **decompile.com** — HeyMelody (Melody) decompilation, used as a secondary reference
+- Brave browser, Google Files, a hex editor — research and inspection
 
 ---
 

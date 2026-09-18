@@ -360,12 +360,16 @@ class AncWidgetProvider : AppWidgetProvider() {
             setSegment(views, R.id.widget_seg_low,   state.lowIsActive())
             setSegment(views, R.id.widget_seg_med,   state.medIsActive())
             setSegment(views, R.id.widget_seg_high,  state.highIsActive())
+            setSegment(views, R.id.widget_seg_adapt, state.adaptiveIsActive())
 
             views.setOnClickPendingIntent(R.id.widget_seg_off,   ancSelectPI(context, "off",   200))
             views.setOnClickPendingIntent(R.id.widget_seg_trans, ancSelectPI(context, "trans", 201))
             views.setOnClickPendingIntent(R.id.widget_seg_low,   ancSelectPI(context, "low",   202))
             views.setOnClickPendingIntent(R.id.widget_seg_med,   ancSelectPI(context, "med",   203))
             views.setOnClickPendingIntent(R.id.widget_seg_high,  ancSelectPI(context, "high",  204))
+            // 205 continues the sequence the other five use; the request codes only
+            // need to be distinct, and keeping them in one run makes that obvious.
+            views.setOnClickPendingIntent(R.id.widget_seg_adapt, ancSelectPI(context, "adapt", 205))
 
             views.setTextViewText(
                 R.id.widget_game_switch,
@@ -390,6 +394,7 @@ class AncWidgetProvider : AppWidgetProvider() {
                 views.setOnClickPendingIntent(R.id.widget_seg_low, dead)
                 views.setOnClickPendingIntent(R.id.widget_seg_med, dead)
                 views.setOnClickPendingIntent(R.id.widget_seg_high, dead)
+                views.setOnClickPendingIntent(R.id.widget_seg_adapt, dead)
                 views.setOnClickPendingIntent(R.id.widget_game_row, dead)
             }
 

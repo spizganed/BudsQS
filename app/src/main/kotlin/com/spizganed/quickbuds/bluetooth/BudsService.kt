@@ -69,7 +69,7 @@ class BudsService : Service(), BudsConnectionManager.Listener {
         super.onCreate()
         statusLog("[SVC] onCreate")
         val pm = getSystemService(POWER_SERVICE) as PowerManager
-        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "BudsQS::GattWakeLock")
+        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "QuickBuds::GattWakeLock")
         wakeLock?.setReferenceCounted(false)
         wakeLock?.acquire(60 * 60 * 1000L)
 
@@ -166,6 +166,10 @@ class BudsService : Service(), BudsConnectionManager.Listener {
                 "ANC-Medium" -> { statusLog("<< sending ANC Medium"); manager?.sendAncMedium() }
                 "ANC-Light" -> { statusLog("<< sending ANC Light"); manager?.sendAncLight() }
                 "ANC-Smart" -> { statusLog("<< sending ANC Smart"); manager?.sendAncSmart() }
+                // Adaptive reaches here from the widget's own segment, which tags it
+                // ANC_CYCLE rather than inventing an action. It is NOT Smart: they are
+                // different bits (0x0800 vs 0x0080) and different bud states.
+                "Adaptive" -> { statusLog("<< sending ANC Adaptive"); manager?.sendAncAdaptive() }
             }
             "TRANS" -> { statusLog("<< sending Transparency"); manager?.sendAncTransparency() }
             "OFF" -> { statusLog("<< sending ANC Off"); manager?.sendAncOff() }
@@ -175,7 +179,7 @@ class BudsService : Service(), BudsConnectionManager.Listener {
     }
 
     private fun startForegroundService() {
-        val channelId = "BudsQS_Service"
+        val channelId = "QuickBuds_Service"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 channelId,
